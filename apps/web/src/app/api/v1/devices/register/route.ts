@@ -1,0 +1,54 @@
+import { z } from "zod";
+import { db, devices } from "@/db";
+import { handler, json, parseBody } from "@/lib/api";
+import { generateClaimCode, hashDeviceSecret } from "@/lib/auth";
+
+const registerSchema = z.object({
+  claim_code: z
+    .string()
+    .regex(/^[A-Z0-9]{2}-[A-Z0-9]{2}-[A-Z0-9]{2}$/, "claim_code must look like AB-CD-EF"),
+  device_secret: z.string().min(32),
+  hostname: z.string().max(128).optional(),
+  os: z.string().max(32).optional(),
+  git_email: z.string().email().max(256).optional(),
+});
+
+/**
+ * Called once by the plugin the first time it runs on a new machine.
+ * Creates a pending device row so admin can see it on /admin/devices
+ * and approve it.
+ */
+export const POST = handler(async (request) => {
+  const body = await parseBody(request, registerSchema);
+
+  // Collision handling: if the plugin's claim_code collides with an existing
+  // pending code (astronomically rare), just generate a server-side one instead
+  // of rejecting. The plugin will see server_claim_code in the response.
+  let claimCode = body.claim_code;
+  for (let i = 0; i < 5; i++) {
+    try {
+      const [row] = await db
+        .insert(devices)
+        .values({
+          claimCode: claimCode,
+          deviceSecretHash: hashDeviceSecret(body.device_secret),
+          hostname: body.hostname,
+          os: body.os,
+          gitEmail: body.git_email,
+          status: "pending",
+        })
+        .returning({ id: devices.id, claimCode: devices.claimCode });
+      return json({
+        device_id: row.id,
+        claim_code: row.claimCode,
+        status: "pending",
+      });
+    } catch (err) {
+      // Likely unique-violation on claim_code; retry with new code.
+      claimCode = generateClaimCode();
+      if (i === 4) throw err;
+    }
+  }
+  // Unreachable.
+  return json({ error: "failed to register device" }, { status: 500 });
+});

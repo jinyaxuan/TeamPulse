@@ -1,0 +1,20 @@
+{
+  "name": "teampulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Team AI coordination platform for Claude Code",
+  "packageManager": "pnpm@10.25.0",
+  "scripts": {
+    "dev": "pnpm --filter @teampulse/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @teampulse/web db:generate",
+    "db:migrate": "pnpm --filter @teampulse/web db:migrate",
+    "db:push": "pnpm --filter @teampulse/web db:push",
+    "create-admin": "pnpm --filter @teampulse/web create-admin"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}

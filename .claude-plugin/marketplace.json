@@ -1,0 +1,17 @@
+{
+  "name": "teampulse",
+  "description": "Team AI coordination: see who's doing what in Claude Code sessions across your team, with cross-device memory sync.",
+  "owner": {
+    "name": "TeamPulse (internal)"
+  },
+  "plugins": [
+    {
+      "name": "teampulse",
+      "source": "./packages/plugin",
+      "description": "TeamPulse plugin — hooks + MCP server for Claude Code. Auto-reports task intent and active file paths to your team's TeamPulse server, syncs MEMORY.md across devices, and surfaces teammate activity in SessionStart context.",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": ["team", "coordination", "presence", "memory", "collaboration"]
+    }
+  ]
+}

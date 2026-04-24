@@ -1,0 +1,234 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { formatRelativeTime } from "@/lib/utils";
+
+export type PendingDevice = {
+  id: string;
+  claim_code: string | null;
+  hostname: string | null;
+  os: string | null;
+  git_email: string | null;
+  registered_at: Date | null;
+};
+
+export type ActiveDevice = {
+  id: string;
+  hostname: string | null;
+  os: string | null;
+  last_used_at: Date | null;
+  approved_at: Date | null;
+  user_id: string;
+  user_name: string;
+  user_display_name: string | null;
+};
+
+type ExistingUser = { name: string; display_name: string | null };
+
+export function DevicesClient({
+  pending,
+  active,
+  existingUsers,
+}: {
+  pending: PendingDevice[];
+  active: ActiveDevice[];
+  existingUsers: ExistingUser[];
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  async function approve(deviceId: string, userName: string) {
+    setError(null);
+    const res = await fetch(`/api/v1/admin/devices/${deviceId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_name: userName }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? "Approve failed");
+      return;
+    }
+    startTransition(() => router.refresh());
+  }
+
+  async function revoke(deviceId: string) {
+    setError(null);
+    const res = await fetch(`/api/v1/admin/devices/${deviceId}/revoke`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? "Revoke failed");
+      return;
+    }
+    startTransition(() => router.refresh());
+  }
+
+  return (
+    <div className="space-y-8">
+      {error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Pending ({pending.length})
+        </h2>
+        <div className="mt-3 space-y-3">
+          {pending.length === 0 && (
+            <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
+              No pending devices. When a teammate installs the Claude Code plugin, they'll show up here.
+            </p>
+          )}
+          {pending.map((d) => (
+            <PendingCard
+              key={d.id}
+              device={d}
+              existingUsers={existingUsers}
+              onApprove={approve}
+              onReject={revoke}
+              disabled={isPending}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Active Devices ({active.length})
+        </h2>
+        <div className="mt-3 overflow-x-auto rounded-md border bg-card">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 text-left">Device</th>
+                <th className="px-4 py-2 text-left">User</th>
+                <th className="px-4 py-2 text-left">OS</th>
+                <th className="px-4 py-2 text-left">Last seen</th>
+                <th className="px-4 py-2 text-left">Approved</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {active.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    No active devices yet.
+                  </td>
+                </tr>
+              )}
+              {active.map((d) => (
+                <tr key={d.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-2 font-mono text-xs">{d.hostname ?? "(unknown)"}</td>
+                  <td className="px-4 py-2">
+                    {d.user_display_name ?? d.user_name}{" "}
+                    <span className="text-xs text-muted-foreground">@{d.user_name}</span>
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">{d.os ?? "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {d.last_used_at ? formatRelativeTime(d.last_used_at) : "never"}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {d.approved_at ? formatRelativeTime(d.approved_at) : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      onClick={() => revoke(d.id)}
+                      disabled={isPending}
+                      className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      Revoke
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function PendingCard({
+  device,
+  existingUsers,
+  onApprove,
+  onReject,
+  disabled,
+}: {
+  device: PendingDevice;
+  existingUsers: ExistingUser[];
+  onApprove: (deviceId: string, userName: string) => void;
+  onReject: (deviceId: string) => void;
+  disabled: boolean;
+}) {
+  // Suggest a user name based on git_email local-part, if available.
+  const defaultName = device.git_email ? device.git_email.split("@")[0] : "";
+  const [name, setName] = useState(defaultName);
+  const listId = `users-${device.id}`;
+
+  return (
+    <div className="rounded-md border bg-card p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-1">
+          <div className="font-mono text-sm font-semibold">{device.claim_code ?? "—"}</div>
+          <div className="text-sm">
+            <span className="font-medium">{device.hostname ?? "(unknown host)"}</span>
+            {device.os && <span className="text-muted-foreground"> · {device.os}</span>}
+          </div>
+          {device.git_email && (
+            <div className="text-xs text-muted-foreground">git email: {device.git_email}</div>
+          )}
+          <div className="text-xs text-muted-foreground">
+            requested {device.registered_at ? formatRelativeTime(device.registered_at) : "?"}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-[12rem]">
+          <label className="block text-xs font-medium text-muted-foreground">
+            Claim as user
+          </label>
+          <input
+            type="text"
+            list={listId}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. alice"
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          <datalist id={listId}>
+            {existingUsers.map((u) => (
+              <option key={u.name} value={u.name}>
+                {u.display_name ?? u.name}
+              </option>
+            ))}
+          </datalist>
+        </div>
+        <button
+          onClick={() => {
+            if (!name.trim()) return;
+            onApprove(device.id, name.trim());
+          }}
+          disabled={disabled || !name.trim()}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          Approve
+        </button>
+        <button
+          onClick={() => onReject(device.id)}
+          disabled={disabled}
+          className="rounded-md border px-4 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}

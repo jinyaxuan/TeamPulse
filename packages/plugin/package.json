@@ -1,0 +1,18 @@
+{
+  "name": "@teampulse/plugin",
+  "version": "0.1.0",
+  "description": "TeamPulse plugin for Claude Code — reports tasks to the team coordination server",
+  "private": true,
+  "type": "module",
+  "main": "mcp-server/index.js",
+  "scripts": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "chokidar": "^4.0.1",
+    "eventsource": "^3.0.2",
+    "undici": "^6.21.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

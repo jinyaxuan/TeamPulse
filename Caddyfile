@@ -1,0 +1,24 @@
+# TeamPulse reverse proxy with automatic TLS.
+# Replace {$PUBLIC_HOSTNAME} with your actual hostname via env or edit directly.
+
+{$PUBLIC_HOSTNAME:teampulse.internal.company.com} {
+    # SSE + WebSocket (future) friendly: no buffering, long-lived upstream.
+    encode gzip
+
+    @sse {
+        path /api/v1/stream*
+    }
+    reverse_proxy @sse app:3000 {
+        flush_interval -1
+    }
+
+    reverse_proxy app:3000
+
+    # Basic security headers — tweak to taste.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "DENY"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+    }
+}

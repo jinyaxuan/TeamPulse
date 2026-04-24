@@ -1,0 +1,34 @@
+{
+  "name": "teampulse",
+  "version": "0.1.0",
+  "description": "Team AI coordination — see who's doing what in Claude Code sessions across your team.",
+  "author": "TeamPulse",
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "matcher": "*",
+      "command": "node ${PLUGIN_DIR}/hooks/session-start.js"
+    },
+    {
+      "event": "UserPromptSubmit",
+      "matcher": "*",
+      "command": "node ${PLUGIN_DIR}/hooks/on-prompt.js"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "tool == \"Edit\" || tool == \"Write\" || tool == \"MultiEdit\"",
+      "command": "node ${PLUGIN_DIR}/hooks/on-tool-use.js"
+    },
+    {
+      "event": "Stop",
+      "matcher": "*",
+      "command": "node ${PLUGIN_DIR}/hooks/on-stop.js"
+    }
+  ],
+  "mcpServers": {
+    "teampulse": {
+      "command": "node",
+      "args": ["${PLUGIN_DIR}/mcp-server/index.js"]
+    }
+  }
+}
