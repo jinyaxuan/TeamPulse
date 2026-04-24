@@ -13,6 +13,7 @@ import {
 import { TeamPulseApiClient } from "./api-client.js";
 import { isDisabled, readCredentials } from "./auth.js";
 import { LiveEvents } from "./live-events.js";
+import { resolveProject } from "./project-resolve.js";
 
 const server = new Server(
   {
@@ -76,6 +77,14 @@ const TOOLS = [
           items: { type: "string" },
           description: "Optional: file paths you expect to modify.",
         },
+        cwd: {
+          type: "string",
+          description: "Repository cwd. Defaults to process cwd.",
+        },
+        project_id: {
+          type: "string",
+          description: "Optional explicit TeamPulse project id.",
+        },
       },
       required: ["intent"],
     },
@@ -97,7 +106,10 @@ const TOOLS = [
     description: "List teammates currently active in the current project. Use when you want to know who's doing what right now.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        cwd: { type: "string" },
+        all_projects: { type: "boolean", default: false },
+      },
     },
   },
   {
@@ -108,6 +120,7 @@ const TOOLS = [
       properties: {
         days: { type: "integer", minimum: 1, maximum: 30, default: 7 },
         user: { type: "string", description: "Optional filter: a specific user name." },
+        cwd: { type: "string" },
       },
     },
   },
@@ -172,15 +185,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     }
 
     case "teampulse_start_task": {
-      // Project resolution is handled server-side based on the latest
-      // cwd reported by hooks. For now we rely on the client sending
-      // project_id in session metadata; if missing, we include a hint
-      // to the LLM.
+      const cwd = args.cwd || process.env.PWD || process.cwd();
+      const projectId = args.project_id || (await resolveProject({ client, cwd }));
+      if (!projectId) return errorResult(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
       const res = await client.post("/api/v1/tasks", {
         intent: args.intent,
         files_hint: args.files_hint,
         client: "claude-code",
-        project_id: args.project_id,
+        project_id: projectId,
         session_id: process.env.CLAUDE_SESSION_ID || "unknown",
       });
       if (!res.ok) return errorResult(res.error);
@@ -200,7 +213,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     }
 
     case "teampulse_list_active_tasks": {
-      const res = await client.get("/api/v1/tasks/active");
+      let path = "/api/v1/tasks/active";
+      if (!args.all_projects) {
+        const projectId = await resolveProject({
+          client,
+          cwd: args.cwd || process.env.PWD || process.cwd(),
+        });
+        if (projectId) path += `?project=${encodeURIComponent(projectId)}`;
+      }
+      const res = await client.get(path);
       if (!res.ok) return errorResult(res.error);
       return textResult(res.data);
     }
@@ -210,6 +231,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const sinceIso = new Date(Date.now() - days * 86400_000).toISOString();
       const params = new URLSearchParams({ since: sinceIso });
       if (args.user) params.set("user", args.user);
+      const projectId = await resolveProject({
+        client,
+        cwd: args.cwd || process.env.PWD || process.cwd(),
+      });
+      if (projectId) params.set("project", projectId);
       const res = await client.get(`/api/v1/tasks/history?${params}`);
       if (!res.ok) return errorResult(res.error);
       return textResult(res.data);

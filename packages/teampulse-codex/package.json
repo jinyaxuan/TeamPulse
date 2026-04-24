@@ -1,0 +1,31 @@
+{
+  "name": "@teampulse/codex-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Codex integration for TeamPulse",
+  "main": "mcp-server/index.js",
+  "bin": {
+    "teampulse-codex": "bin/teampulse-codex.js"
+  },
+  "scripts": {
+    "check": "node --check mcp-server/index.js && node --check bin/teampulse-codex.js",
+    "status": "node bin/teampulse-codex.js status",
+    "register": "node bin/teampulse-codex.js register",
+    "poll": "node bin/teampulse-codex.js poll",
+    "start-task": "node bin/teampulse-codex.js start",
+    "heartbeat": "node bin/teampulse-codex.js heartbeat",
+    "end-session": "node bin/teampulse-codex.js end",
+    "active": "node bin/teampulse-codex.js active",
+    "history": "node bin/teampulse-codex.js history",
+    "web-login": "node bin/teampulse-codex.js web-login"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "eventsource": "^3.0.2",
+    "undici": "^6.21.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

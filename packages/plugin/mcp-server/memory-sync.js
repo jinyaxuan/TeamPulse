@@ -90,10 +90,15 @@ export async function pushMemory({ apiClient, projectId, cwd }) {
   const headers = {};
   if (state.version != null) headers["If-Match"] = `"${state.version}"`;
 
-  const res = await apiClient.req("PUT", `/api/v1/memory/${projectId}`, {
-    content: local.content,
-    device_name: hostname(),
-  });
+  const res = await apiClient.req(
+    "PUT",
+    `/api/v1/memory/${projectId}`,
+    {
+      content: local.content,
+      device_name: hostname(),
+    },
+    { headers }
+  );
 
   if (res.status === 409 && res.data?.current_version) {
     // Conflict: save our version to a conflict file, accept server version.

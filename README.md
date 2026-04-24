@@ -52,6 +52,48 @@ pnpm dev
 
 开发者不需要单独创建密码，也不需要手动移动凭据文件。
 
+### Codex 接入
+
+项目内置了一个 Codex 适配插件：`packages/teampulse-codex`。它复用 TeamPulse 的设备审批和 bearer token 机制，凭据同样保存到 `~/.teampulse/credentials.json`。
+
+首次接入：
+
+```bash
+# 如果你的本地 TeamPulse 跑在 3002，先指定服务地址
+TEAMPULSE_SERVER_URL=http://localhost:3002 pnpm codex:register
+
+# 输出 claim_code 后，到 Web 面板 /admin/devices 审批该设备
+
+TEAMPULSE_SERVER_URL=http://localhost:3002 pnpm codex:poll
+pnpm codex:status
+```
+
+手动上报当前 Codex 任务：
+
+```bash
+pnpm --filter @teampulse/codex-plugin start-task -- \
+  --intent "实现 Codex 接入" \
+  --cwd /path/to/repo
+
+pnpm --filter @teampulse/codex-plugin heartbeat -- \
+  --file packages/teampulse-codex/mcp-server/index.js
+
+pnpm --filter @teampulse/codex-plugin end-session
+```
+
+作为 Codex 插件安装时，插件声明在 `packages/teampulse-codex/.codex-plugin/plugin.json`，MCP 配置在 `packages/teampulse-codex/.mcp.json`。可用 MCP tools 包括：
+
+- `teampulse_register_device`
+- `teampulse_poll_device`
+- `teampulse_status`
+- `teampulse_start_task`
+- `teampulse_heartbeat`
+- `teampulse_end_session`
+- `teampulse_list_active_tasks`
+- `teampulse_recent_history`
+- `teampulse_web_login`
+- `teampulse_recent_events`
+
 ## 架构要点
 
 - **Web 优先**：核心产品是团队面板，插件只是轻量接入层。
@@ -124,6 +166,13 @@ packages/plugin/
     live-events.js                   SSE 订阅
     project-resolve.js               项目识别
     queue.js                         离线请求队列
+
+packages/teampulse-codex/
+  .codex-plugin/plugin.json          Codex 插件声明
+  .mcp.json                          Codex MCP server 配置
+  skills/teampulse-codex/SKILL.md    Codex 使用 TeamPulse 的行为指引
+  mcp-server/index.js                Codex MCP tools
+  bin/teampulse-codex.js             手动注册、上报、查询 CLI
 ```
 
 ## 已完成功能
@@ -139,6 +188,10 @@ packages/plugin/
   - 用户自助撤销设备：`DELETE /api/v1/devices/:id`。
   - Abandoned task sweep：每 60 秒清理一次，15 分钟无心跳视为 abandoned。
   - `.teampulse.json` 项目覆盖配置，以及 `paused_until` 暂停文件。
+- Codex 接入：
+  - `packages/teampulse-codex` Codex 插件声明。
+  - MCP tools 支持注册设备、开始任务、心跳、结束会话、查询活跃任务和历史记录。
+  - `teampulse-codex` CLI 支持手动接入和调试。
 - 部署：
   - 多阶段 Dockerfile。
   - `docker-compose.prod.yml`：Postgres、migrate、app、Caddy、夜间备份。

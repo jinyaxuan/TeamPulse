@@ -1,0 +1,39 @@
+{
+  "name": "teampulse-codex",
+  "version": "0.1.0",
+  "description": "Codex integration for TeamPulse task presence and activity sync.",
+  "author": {
+    "name": "TeamPulse",
+    "email": "team@example.com",
+    "url": "https://gitea.tangchaolizi.com/kindong/TeamPulse"
+  },
+  "homepage": "https://gitea.tangchaolizi.com/kindong/TeamPulse",
+  "repository": "https://gitea.tangchaolizi.com/kindong/TeamPulse",
+  "license": "UNLICENSED",
+  "keywords": [
+    "team",
+    "presence",
+    "codex",
+    "agent"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "TeamPulse for Codex",
+    "shortDescription": "Report Codex work to TeamPulse.",
+    "longDescription": "Adds MCP tools so Codex can register tasks, send heartbeats, end sessions, and inspect teammate activity in TeamPulse.",
+    "developerName": "TeamPulse",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "MCP"
+    ],
+    "websiteURL": "https://gitea.tangchaolizi.com/kindong/TeamPulse",
+    "defaultPrompt": [
+      "Show TeamPulse status.",
+      "Start tracking this Codex task.",
+      "List active TeamPulse tasks."
+    ],
+    "brandColor": "#0F172A"
+  }
+}

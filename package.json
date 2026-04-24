@@ -11,7 +11,10 @@
     "db:generate": "pnpm --filter @teampulse/web db:generate",
     "db:migrate": "pnpm --filter @teampulse/web db:migrate",
     "db:push": "pnpm --filter @teampulse/web db:push",
-    "create-admin": "pnpm --filter @teampulse/web create-admin"
+    "create-admin": "pnpm --filter @teampulse/web create-admin",
+    "codex:status": "pnpm --filter @teampulse/codex-plugin status",
+    "codex:register": "pnpm --filter @teampulse/codex-plugin register",
+    "codex:poll": "pnpm --filter @teampulse/codex-plugin poll"
   },
   "engines": {
     "node": ">=20.0.0",
