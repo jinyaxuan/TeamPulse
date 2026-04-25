@@ -19,7 +19,24 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          server_url="${GITHUB_SERVER_URL:-${GITEA_SERVER_URL:-https://gitea.tangchaolizi.com}}"
+          repository="${GITHUB_REPOSITORY:-${GITEA_REPOSITORY:-kindong/TeamPulse}}"
+          revision="${GITHUB_SHA:-${GITEA_SHA:-}}"
+
+          if [ -z "$revision" ]; then
+            echo "GITHUB_SHA or GITEA_SHA is required"
+            exit 1
+          fi
+
+          find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          git init .
+          git remote add origin "${server_url%/}/${repository}.git"
+          git fetch --depth=1 origin "$revision"
+          git checkout --detach "$revision"
 
       - name: Check deployment credentials
         id: deploy_creds
