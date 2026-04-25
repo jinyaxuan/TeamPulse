@@ -10,6 +10,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { execFileSync } from "node:child_process";
 import { TeamPulseApiClient } from "./api-client.js";
 import { isDisabled, readCredentials } from "./auth.js";
 import { withCoordinationAdvice } from "./coordination.js";
@@ -45,6 +46,19 @@ function getLiveEvents() {
   return liveEvents;
 }
 
+function gitBranch(cwd) {
+  try {
+    const out = execFileSync("git", ["-C", cwd, "branch", "--show-current"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 2000,
+    }).trim();
+    return out || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function notConfiguredResult() {
   return {
     content: [
@@ -77,6 +91,10 @@ const TOOLS = [
           type: "array",
           items: { type: "string" },
           description: "Optional: file paths you expect to modify.",
+        },
+        branch: {
+          type: "string",
+          description: "Optional branch override. Defaults to the current git branch for cwd.",
         },
         cwd: {
           type: "string",
@@ -198,6 +216,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const res = await client.post("/api/v1/tasks", {
         intent: args.intent,
         files_hint: args.files_hint,
+        branch: args.branch ? String(args.branch).trim().slice(0, 256) : gitBranch(cwd),
         client: "claude-code",
         project_id: projectId,
         session_id: process.env.CLAUDE_SESSION_ID || "unknown",

@@ -1,4 +1,4 @@
-export type OverlapReason = "files" | "branch";
+export type OverlapReason = "files" | "branch" | "merge_risk";
 
 export type OverlapSeverity = "medium" | "high";
 
@@ -48,9 +48,11 @@ export function findTaskOverlapWarnings({
   return activeTasks
     .map((task) => {
       const overlappingFiles = overlappingPaths(filesTouched, task.files_touched);
-      const reasons: OverlapReason[] = [];
-      if (overlappingFiles.length > 0) reasons.push("files");
-      if (sameBranch(branch, task.branch)) reasons.push("branch");
+      const reasons = overlapReasons({
+        leftBranch: branch,
+        rightBranch: task.branch,
+        hasFileOverlap: overlappingFiles.length > 0,
+      });
 
       if (reasons.length === 0) return null;
       return warningFromTask(task, reasons, overlappingFiles);
@@ -66,9 +68,11 @@ export function findActiveTaskOverlaps(tasks: OverlapCandidate[]): ActiveTaskOve
       const first = tasks[i];
       const second = tasks[j];
       const overlappingFiles = overlappingPaths(first.files_touched, second.files_touched);
-      const reasons: OverlapReason[] = [];
-      if (overlappingFiles.length > 0) reasons.push("files");
-      if (sameBranch(first.branch, second.branch)) reasons.push("branch");
+      const reasons = overlapReasons({
+        leftBranch: first.branch,
+        rightBranch: second.branch,
+        hasFileOverlap: overlappingFiles.length > 0,
+      });
       if (reasons.length === 0) continue;
 
       overlaps.push({
@@ -108,10 +112,33 @@ function severityFor(reasons: OverlapReason[]): OverlapSeverity {
   return reasons.includes("files") ? "high" : "medium";
 }
 
+function overlapReasons({
+  leftBranch,
+  rightBranch,
+  hasFileOverlap,
+}: {
+  leftBranch?: string | null;
+  rightBranch?: string | null;
+  hasFileOverlap: boolean;
+}): OverlapReason[] {
+  const branchesKnown = hasBranch(leftBranch) && hasBranch(rightBranch);
+  const branchesMatch = sameBranch(leftBranch, rightBranch);
+
+  if (hasFileOverlap && branchesMatch) return ["files", "branch"];
+  if (hasFileOverlap && branchesKnown) return ["merge_risk"];
+  if (hasFileOverlap) return ["files"];
+  if (branchesMatch) return ["branch"];
+  return [];
+}
+
 function sameBranch(a?: string | null, b?: string | null): boolean {
   const left = a?.trim();
   const right = b?.trim();
   return Boolean(left && right && left === right);
+}
+
+function hasBranch(value?: string | null): boolean {
+  return Boolean(value?.trim());
 }
 
 function overlappingPaths(left: string[], right: string[]): string[] {

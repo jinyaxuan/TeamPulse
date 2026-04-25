@@ -5,12 +5,13 @@
  *   3. device register → pending → admin approve → poll returns token
  *   4. project resolve (idempotent)
  *   5. task start → appears in active_tasks → history
- *   6. task end-session saves handoff summary → details/project/export
- *   7. SSE: new task event fans out to a separate subscriber
- *   8. cleanup closes remaining e2e tasks
- *   9. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   6. branch-aware overlap warnings distinguish merge risk vs high risk
+ *   7. task end-session saves handoff summary → details/project/export
+ *   8. SSE: new task event fans out to a separate subscriber
+ *   9. cleanup closes remaining e2e tasks
+ *   10. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   10. magic link: bearer issues link → consume returns session cookie
+ *   11. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -280,6 +281,7 @@ test("e2e: full happy path", async (t) => {
 
   let taskId!: string;
   let overlapTaskId!: string;
+  let sameBranchTaskId!: string;
   let sseTaskId!: string;
 
   await t.test("task: start + appears in active", async () => {
@@ -306,7 +308,7 @@ test("e2e: full happy path", async (t) => {
     assert.equal(ours.intent, "E2E: write a failing test");
   });
 
-  await t.test("task: overlapping files produce warnings", async () => {
+  await t.test("task: different branch same file produces merge risk", async () => {
     const res = await http("/api/v1/tasks", {
       method: "POST",
       headers: { Authorization: `Bearer ${devToken}` },
@@ -322,8 +324,8 @@ test("e2e: full happy path", async (t) => {
     overlapTaskId = res.body.task_id;
     assert.equal(res.body.overlap_warnings.length, 1);
     assert.equal(res.body.overlap_warnings[0].task_id, taskId);
-    assert.equal(res.body.overlap_warnings[0].severity, "high");
-    assert.deepEqual(res.body.overlap_warnings[0].reasons, ["files"]);
+    assert.equal(res.body.overlap_warnings[0].severity, "medium");
+    assert.deepEqual(res.body.overlap_warnings[0].reasons, ["merge_risk"]);
     assert.deepEqual(res.body.overlap_warnings[0].overlapping_files, [
       "src/lib/conflict-target.ts",
     ]);
@@ -334,10 +336,38 @@ test("e2e: full happy path", async (t) => {
     assert.equal(project.status, 200);
     assert.ok(
       project.body.active_overlaps.some((overlap: any) =>
+        overlap.reasons.includes("merge_risk") &&
         overlap.overlapping_files.includes("src/lib/conflict-target.ts")
       ),
-      "expected project details to include active overlap"
+      "expected project details to include cross-branch merge risk"
     );
+  });
+
+  await t.test("task: same branch same file produces high warning", async () => {
+    const res = await http("/api/v1/tasks", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        project_id: projectId,
+        session_id: `e2e-sess-same-branch-${adminName}`,
+        intent: "E2E: touch the same file on the same branch",
+        branch: "e2e-branch",
+        files_hint: ["src/lib/conflict-target.ts"],
+      },
+    });
+    assert.equal(res.status, 200);
+    sameBranchTaskId = res.body.task_id;
+
+    const high = res.body.overlap_warnings.find((w: any) => w.task_id === taskId);
+    assert.ok(high, "expected warning against original same-branch task");
+    assert.equal(high.severity, "high");
+    assert.deepEqual(high.reasons, ["files", "branch"]);
+    assert.deepEqual(high.overlapping_files, ["src/lib/conflict-target.ts"]);
+
+    const mergeRisk = res.body.overlap_warnings.find((w: any) => w.task_id === overlapTaskId);
+    assert.ok(mergeRisk, "expected warning against different-branch task");
+    assert.equal(mergeRisk.severity, "medium");
+    assert.deepEqual(mergeRisk.reasons, ["merge_risk"]);
   });
 
   await t.test("task: history contains our task", async () => {
@@ -446,6 +476,7 @@ test("e2e: full happy path", async (t) => {
   await t.test("cleanup: closes remaining e2e tasks", async () => {
     for (const sessionId of [
       `e2e-sess-overlap-${adminName}`,
+      `e2e-sess-same-branch-${adminName}`,
       `e2e-sess-sse-${adminName}`,
     ]) {
       const ended = await http("/api/v1/tasks/end-session", {
@@ -474,9 +505,9 @@ test("e2e: full happy path", async (t) => {
     assert.equal(project.status, 200);
     assert.deepEqual(project.body.active_overlaps, []);
 
-    const closedIds = new Set([taskId, overlapTaskId, sseTaskId]);
+    const closedIds = new Set([taskId, overlapTaskId, sameBranchTaskId, sseTaskId]);
     const recentlyClosed = project.body.recent.filter((t: any) => closedIds.has(t.id));
-    assert.equal(recentlyClosed.length, 3);
+    assert.equal(recentlyClosed.length, 4);
     assert.ok(recentlyClosed.every((t: any) => t.status !== "active"));
   });
 

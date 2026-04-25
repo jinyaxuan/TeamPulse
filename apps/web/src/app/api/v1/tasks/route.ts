@@ -44,6 +44,7 @@ export const POST = handler(async (request) => {
   }
 
   const intent = body.intent.trim().slice(0, 500);
+  const branch = body.branch?.trim() || undefined;
 
   const [task] = await db
     .insert(tasks)
@@ -53,7 +54,7 @@ export const POST = handler(async (request) => {
       sessionId: body.session_id,
       client: body.client,
       intent,
-      branch: body.branch,
+      branch,
       status: "active",
       filesTouched: body.files_hint ?? [],
     })

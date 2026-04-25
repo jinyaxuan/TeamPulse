@@ -84,19 +84,21 @@ node "$HOME/.teampulse/bin/teampulse-connect.mjs" start --intent "<one sentence>
 \`\`\`
 
 If the active task response shows related teammates, mention that once before
-continuing. Include --files when you already know likely edit paths; it lets
-TeamPulse detect direct file overlap before you start.
+continuing. The connector captures the current git branch automatically. Include
+--files when you already know likely edit paths; it lets TeamPulse distinguish
+same-branch file conflicts from cross-branch merge risk.
 
 After start, inspect the JSON response's coordination.action before editing
 files:
 
-- pause_for_confirmation: high-risk file overlap. Stop before editing, tell
-  the user who is active and which files overlap, then ask whether to wait,
+- pause_for_confirmation: high-risk same-branch or unknown-branch file
+  overlap. Stop before editing, tell the user who is active and which files
+  overlap, then ask whether to wait,
   take over, narrow scope, or continue anyway. Do not edit overlapping files
   until the user gives explicit direction.
-- proceed_with_caution: related work but no direct file overlap. Mention it
-  once, keep the implementation narrow, and avoid expanding into the related
-  task.
+- proceed_with_caution: related work, same-branch parallel work, or
+  cross-branch merge risk. Mention it once, keep the implementation narrow, and
+  avoid expanding into the related task.
 - continue: no overlap warning. Proceed normally.
 
 During work, send a heartbeat after editing or creating a relevant file:

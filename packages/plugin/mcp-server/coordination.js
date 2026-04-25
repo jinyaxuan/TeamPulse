@@ -31,9 +31,10 @@ export function withCoordinationAdvice(payload) {
         action: "proceed_with_caution",
         severity: "medium",
         summary:
-          "Related active work detected. Mention it once, keep the change scope narrow, and avoid expanding into the other task.",
+          "Related active work or cross-branch merge risk detected. Mention it once, keep the change scope narrow, and avoid expanding into the other task.",
         instructions: [
           "Tell the user there is related active work before making edits.",
+          "If the warning is merge_risk, explain that another branch is touching the same path and future merges may need coordination.",
           "Prefer a narrower implementation plan that avoids the related task area.",
           "Continue only if the planned work does not depend on the teammate's active task.",
         ],

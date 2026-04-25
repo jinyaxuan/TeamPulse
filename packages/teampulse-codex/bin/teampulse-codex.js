@@ -3,6 +3,7 @@
  * Small CLI for wiring a Codex environment into TeamPulse.
  */
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { TeamPulseApiClient } from "../../plugin/mcp-server/api-client.js";
 import { withCoordinationAdvice } from "../../plugin/mcp-server/coordination.js";
@@ -73,7 +74,7 @@ Usage:
   teampulse-codex register [--server-url http://localhost:3002]
   teampulse-codex poll [--server-url http://localhost:3002]
   teampulse-codex status
-  teampulse-codex start --intent "Fix login bug" [--cwd /repo]
+  teampulse-codex start --intent "Fix login bug" [--cwd /repo] [--branch name]
   teampulse-codex heartbeat [--file path]
   teampulse-codex end [--outcome done|abandoned] [--summary "..."] [--summary-file path]
   teampulse-codex active [--all]
@@ -132,6 +133,7 @@ async function startTask() {
     session_id: sessionId(),
     client: "codex",
     intent: intent.slice(0, 500),
+    branch: option("branch") || gitBranch(cwd),
     files_hint: files ? files.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
   });
   if (!res.ok) throw new Error(res.error);
@@ -209,6 +211,19 @@ function sessionId() {
 
 function currentCwd() {
   return option("cwd") || process.env.TEAMPULSE_CWD || process.env.INIT_CWD || process.cwd();
+}
+
+function gitBranch(cwd) {
+  try {
+    const out = execFileSync("git", ["-C", cwd, "branch", "--show-current"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 2000,
+    }).trim();
+    return out || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function option(name) {

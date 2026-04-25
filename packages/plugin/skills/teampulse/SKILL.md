@@ -32,18 +32,20 @@ teampulse_start_task(
 )
 ```
 
-Include `files_hint` when you already know likely edit paths; it lets TeamPulse
-detect direct file overlap before you start. The response includes
+TeamPulse captures the current git branch automatically. Include `files_hint`
+when you already know likely edit paths; it lets TeamPulse distinguish
+same-branch file conflicts from cross-branch merge risk. The response includes
 `active_tasks`, `overlap_warnings`, and `coordination`.
 Always inspect `coordination.action` before editing files:
 
-- `pause_for_confirmation`: high-risk file overlap. Stop before editing, tell
-  the user who is active and which files overlap, then ask whether to wait,
+- `pause_for_confirmation`: high-risk same-branch or unknown-branch file
+  overlap. Stop before editing, tell the user who is active and which files
+  overlap, then ask whether to wait,
   take over, narrow scope, or continue anyway. Do not edit overlapping files
   until the user gives explicit direction.
-- `proceed_with_caution`: related work but no direct file overlap. Mention it
-  once, keep the implementation narrow, and avoid expanding into the related
-  task.
+- `proceed_with_caution`: related work, same-branch parallel work, or
+  cross-branch merge risk. Mention it once, keep the implementation narrow, and
+  avoid expanding into the related task.
 - `continue`: no overlap warning. Proceed normally.
 
 ## When the user asks historical questions

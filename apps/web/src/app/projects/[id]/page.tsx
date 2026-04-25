@@ -62,6 +62,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     .limit(50);
 
   const activeOverlaps = findActiveTaskOverlaps(active);
+  const activeBranchGroups = groupActiveByBranch(active);
 
   return (
     <AppShell user={user} activeNav="projects">
@@ -80,6 +81,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 当前进行中 <strong className="ml-1 text-foreground">{active.length}</strong>
               </span>
               <span className="rounded-md border bg-background px-3 py-2">
+                活跃分支 <strong className="ml-1 text-foreground">{activeBranchGroups.length}</strong>
+              </span>
+              <span className="rounded-md border bg-background px-3 py-2">
                 7 天记录 <strong className="ml-1 text-foreground">{recent.length}</strong>
               </span>
             </div>
@@ -90,30 +94,42 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             当前进行中 ({active.length})
           </h2>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-3">
             {active.length === 0 && (
               <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
                 当前没有成员在这个项目上工作。
               </div>
             )}
-            {active.map((t) => (
-              <div key={t.id} className="rounded-md border bg-card p-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{t.intent}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {t.user_display_name ?? t.user_name}
-                      {" · "}
-                      {formatRelativeTime(t.started_at)}
-                      {t.branch && ` · 分支：${t.branch}`}
-                    </div>
-                    {t.files_touched.length > 0 && (
-                      <div className="mt-1 font-mono text-xs text-muted-foreground">
-                        {t.files_touched.slice(0, 5).join(", ")}
-                        {t.files_touched.length > 5 && `（另有 ${t.files_touched.length - 5} 个文件）`}
-                      </div>
+            {activeBranchGroups.map((group) => (
+              <div key={group.key} className="overflow-hidden rounded-md border bg-card">
+                <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-3 py-2">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-medium">{group.label}</h3>
+                    {group.isUnknown && (
+                      <div className="text-xs text-muted-foreground">未从客户端上报到 git branch</div>
                     )}
                   </div>
+                  <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    {group.tasks.length} 个任务
+                  </span>
+                </div>
+                <div className="divide-y">
+                  {group.tasks.map((t) => (
+                    <div key={t.id} className="p-3">
+                      <div className="text-sm font-medium">{t.intent}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {t.user_display_name ?? t.user_name}
+                        {" · "}
+                        {formatRelativeTime(t.started_at)}
+                      </div>
+                      {t.files_touched.length > 0 && (
+                        <div className="mt-1 font-mono text-xs text-muted-foreground">
+                          {t.files_touched.slice(0, 5).join(", ")}
+                          {t.files_touched.length > 5 && `（另有 ${t.files_touched.length - 5} 个文件）`}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -185,17 +201,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 function OverlapAlert({ overlap }: { overlap: ActiveTaskOverlap }) {
   const firstName = overlap.first.user_display_name ?? overlap.first.user_name;
   const secondName = overlap.second.user_display_name ?? overlap.second.user_name;
+  const isMergeRisk = overlap.reasons.includes("merge_risk");
 
   return (
     <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="font-medium">
-            {firstName} 和 {secondName} 可能在处理同一块内容
+            {firstName} 和 {secondName}
+            {isMergeRisk ? " 在不同分支修改了相同路径" : " 可能在处理同一块内容"}
           </div>
           <div className="mt-1 text-xs text-amber-800">
-            {overlapReasonLabel(overlap.reasons)}
-            {overlap.first.branch && overlap.reasons.includes("branch") && ` · 分支：${overlap.first.branch}`}
+            {overlapContextLabel(overlap)}
           </div>
         </div>
         <span
@@ -206,7 +223,7 @@ function OverlapAlert({ overlap }: { overlap: ActiveTaskOverlap }) {
               : "bg-amber-100 text-amber-800")
           }
         >
-          {overlap.severity === "high" ? "高风险" : "需确认"}
+          {overlap.severity === "high" ? "高风险" : isMergeRisk ? "合并风险" : "需确认"}
         </span>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -236,5 +253,42 @@ function overlapReasonLabel(reasons: OverlapReason[]): string {
   const labels = [];
   if (reasons.includes("files")) labels.push("文件路径重叠");
   if (reasons.includes("branch")) labels.push("同一分支并行");
+  if (reasons.includes("merge_risk")) labels.push("跨分支改同一路径");
   return labels.join("、");
+}
+
+function overlapContextLabel(overlap: ActiveTaskOverlap): string {
+  const labels = [overlapReasonLabel(overlap.reasons)];
+  if (overlap.reasons.includes("merge_risk")) {
+    labels.push(`分支：${branchLabel(overlap.first.branch)} / ${branchLabel(overlap.second.branch)}`);
+  } else if (overlap.reasons.includes("branch")) {
+    labels.push(`分支：${branchLabel(overlap.first.branch)}`);
+  }
+  return labels.join(" · ");
+}
+
+function branchLabel(branch: string | null): string {
+  return branch?.trim() || "未检测到分支";
+}
+
+function groupActiveByBranch<T extends { branch: string | null }>(tasks: T[]) {
+  const groups = new Map<string, { key: string; label: string; isUnknown: boolean; tasks: T[] }>();
+
+  for (const task of tasks) {
+    const branch = task.branch?.trim();
+    const key = branch || "__unknown__";
+    const existing = groups.get(key);
+    if (existing) {
+      existing.tasks.push(task);
+      continue;
+    }
+    groups.set(key, {
+      key,
+      label: branch ? `分支：${branch}` : "未检测到分支",
+      isUnknown: !branch,
+      tasks: [task],
+    });
+  }
+
+  return Array.from(groups.values());
 }

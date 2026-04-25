@@ -11,6 +11,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { TeamPulseApiClient } from "../../plugin/mcp-server/api-client.js";
 import {
@@ -106,6 +107,10 @@ const TOOLS = [
           type: "array",
           items: { type: "string" },
           description: "Optional file paths likely to be modified.",
+        },
+        branch: {
+          type: "string",
+          description: "Optional branch override. Defaults to the current git branch for cwd.",
         },
         session_id: {
           type: "string",
@@ -238,6 +243,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           session_id: sessionId(args.session_id),
           client: "codex",
           intent: String(args.intent || "").trim().slice(0, 500),
+          branch: args.branch ? String(args.branch).trim().slice(0, 256) : gitBranch(cwd),
           files_hint: args.files_hint,
         });
         if (!res.ok) return errorResult(res.error);
@@ -344,6 +350,19 @@ function currentCwd(arg) {
     process.env.PWD ||
     process.cwd()
   );
+}
+
+function gitBranch(cwd) {
+  try {
+    const out = execFileSync("git", ["-C", cwd, "branch", "--show-current"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 2000,
+    }).trim();
+    return out || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function sessionId(arg) {
