@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gt, gte, isNull, max, sql } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { db, projects, tasks, users } from "@/db";
+import { db, devices, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
 import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
@@ -15,6 +15,20 @@ export default async function TeamPage() {
 
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
+
+  const activeDeviceRows = await db
+    .select({
+      user_id: devices.userId,
+      active_device_count: count(devices.id),
+    })
+    .from(devices)
+    .where(eq(devices.status, "active"))
+    .groupBy(devices.userId);
+  const activeDeviceCountByUser = new Map(
+    activeDeviceRows
+      .filter((row) => row.user_id)
+      .map((row) => [row.user_id as string, Number(row.active_device_count)])
+  );
 
   const rawMemberStats = await db
     .select({
@@ -97,7 +111,13 @@ export default async function TeamPage() {
     activeCountByUser.set(task.user_id, (activeCountByUser.get(task.user_id) ?? 0) + 1);
   }
 
-  const memberStats = rawMemberStats.sort((a, b) => {
+  const memberStats = rawMemberStats.filter((member) => {
+    const hasRecentTasks = Number(member.task_count) > 0;
+    const hasActiveDevice = (activeDeviceCountByUser.get(member.id) ?? 0) > 0;
+    return member.id === sessionUser.id || hasRecentTasks || hasActiveDevice;
+  }).sort((a, b) => {
+    if (a.id === sessionUser.id) return -1;
+    if (b.id === sessionUser.id) return 1;
     const activeDelta = (activeCountByUser.get(b.id) ?? 0) - (activeCountByUser.get(a.id) ?? 0);
     if (activeDelta !== 0) return activeDelta;
     return timestamp(b.last_active) - timestamp(a.last_active);
@@ -160,6 +180,7 @@ export default async function TeamPage() {
                       <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{m.display_name ?? m.name}</span>
+                        {m.id === sessionUser.id && <SelfPill>我</SelfPill>}
                         <span className="text-xs text-muted-foreground">@{m.name}</span>
                         {m.role === "admin" && <RolePill>{roleLabel(m.role)}</RolePill>}
                         {activeNow > 0 && <LivePill>{activeNow} 个实时任务</LivePill>}
@@ -299,6 +320,14 @@ function EmptyState({ children }: { children: React.ReactNode }) {
 function RolePill({ children }: { children: React.ReactNode }) {
   return (
     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+      {children}
+    </span>
+  );
+}
+
+function SelfPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white">
       {children}
     </span>
   );
