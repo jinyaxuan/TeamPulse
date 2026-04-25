@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * Consumes the magic link by POSTing to /api/v1/auth/magic/consume which
@@ -15,7 +16,7 @@ export function MagicConsumer({ token }: { token: string }) {
     let aborted = false;
     (async () => {
       try {
-        const res = await fetch("/api/v1/auth/magic/consume", {
+        const res = await fetch(withBasePath("/api/v1/auth/magic/consume"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
@@ -45,7 +46,7 @@ export function MagicConsumer({ token }: { token: string }) {
           <>
             <p className="mt-2 text-sm text-destructive">{error}</p>
             <a
-              href="/login"
+              href={withBasePath("/login")}
               className="mt-4 inline-block rounded-md border px-4 py-2 text-sm hover:bg-accent"
             >
               重新获取链接

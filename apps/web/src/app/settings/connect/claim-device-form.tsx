@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 
 export function ClaimDeviceForm() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function ClaimDeviceForm() {
     setMessage(null);
     setError(null);
 
-    const res = await fetch("/api/v1/devices/claim-self", {
+    const res = await fetch(withBasePath("/api/v1/devices/claim-self"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ claim_code: claimCode.trim() }),

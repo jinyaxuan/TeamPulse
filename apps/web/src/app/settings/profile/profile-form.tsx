@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import { roleLabel } from "@/lib/utils";
 
 type Current = {
@@ -38,7 +39,7 @@ export function ProfileForm({ current }: { current: Current }) {
       return;
     }
 
-    const res = await fetch("/api/v1/users/me", {
+    const res = await fetch(withBasePath("/api/v1/users/me"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

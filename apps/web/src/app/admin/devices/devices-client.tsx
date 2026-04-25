@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import { formatRelativeTime } from "@/lib/utils";
 
 export type PendingDevice = {
@@ -41,7 +42,7 @@ export function DevicesClient({
 
   async function approve(deviceId: string, userName: string) {
     setError(null);
-    const res = await fetch(`/api/v1/admin/devices/${deviceId}/approve`, {
+    const res = await fetch(withBasePath(`/api/v1/admin/devices/${deviceId}/approve`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_name: userName }),
@@ -56,7 +57,7 @@ export function DevicesClient({
 
   async function revoke(deviceId: string) {
     setError(null);
-    const res = await fetch(`/api/v1/admin/devices/${deviceId}/revoke`, {
+    const res = await fetch(withBasePath(`/api/v1/admin/devices/${deviceId}/revoke`), {
       method: "POST",
     });
     if (!res.ok) {

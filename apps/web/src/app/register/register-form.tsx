@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function RegisterForm() {
     setSubmitting(true);
 
     try {
-      const res = await fetch("/api/v1/auth/register", {
+      const res = await fetch(withBasePath("/api/v1/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

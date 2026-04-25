@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import { deviceStatusLabel, formatRelativeTime } from "@/lib/utils";
 
 type MyDevice = {
@@ -25,7 +26,7 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
       return;
     }
     setError(null);
-    const res = await fetch(`/api/v1/devices/${id}`, { method: "DELETE" });
+    const res = await fetch(withBasePath(`/api/v1/devices/${id}`), { method: "DELETE" });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setError(body.error ?? "撤销失败");

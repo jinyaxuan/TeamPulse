@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import { formatRelativeTime, roleLabel } from "@/lib/utils";
 
 export type UserRow = {
@@ -23,7 +24,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
 
   async function setRole(id: string, role: "admin" | "member") {
     setError(null);
-    const res = await fetch(`/api/v1/admin/users/${id}`, {
+    const res = await fetch(withBasePath(`/api/v1/admin/users/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role }),
@@ -39,7 +40,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
     if (!confirm(`确定撤销用户「${name}」吗？该用户会被强制退出，所有设备也会被禁用。`))
       return;
     setError(null);
-    const res = await fetch(`/api/v1/admin/users/${id}/revoke`, { method: "POST" });
+    const res = await fetch(withBasePath(`/api/v1/admin/users/${id}/revoke`), { method: "POST" });
     if (!res.ok) {
       setError((await res.json().catch(() => ({}))).error ?? "操作失败");
       return;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function LoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch("/api/v1/auth/login", {
+      const res = await fetch(withBasePath("/api/v1/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

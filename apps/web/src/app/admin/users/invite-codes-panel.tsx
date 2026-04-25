@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/lib/base-path";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 
 export type InviteCodeRow = {
@@ -29,7 +30,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
     setError(null);
     setCreatedCode(null);
 
-    const res = await fetch("/api/v1/admin/invite-codes", {
+    const res = await fetch(withBasePath("/api/v1/admin/invite-codes"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -56,7 +57,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
     if (!confirm("确定撤销这个邀请码吗？撤销后无法再用于注册。")) return;
 
     setError(null);
-    const res = await fetch(`/api/v1/admin/invite-codes/${id}/revoke`, { method: "POST" });
+    const res = await fetch(withBasePath(`/api/v1/admin/invite-codes/${id}/revoke`), { method: "POST" });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setError(body.error ?? "撤销邀请码失败");

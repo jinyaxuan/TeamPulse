@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { withBasePath } from "@/lib/base-path";
 
 export function LogoutButton() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   async function logout() {
-    await fetch("/api/v1/auth/logout", { method: "POST" });
+    await fetch(withBasePath("/api/v1/auth/logout"), { method: "POST" });
     startTransition(() => {
       router.replace("/login");
       router.refresh();
