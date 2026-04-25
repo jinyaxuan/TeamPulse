@@ -4,7 +4,7 @@ import { db, projects, tasks, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
 import { canWriteProject, ensureProjectMember, getVisibleProject } from "@/lib/project-access";
 import { publishPresence } from "@/lib/presence";
-import { findTaskOverlapWarnings } from "@/lib/task-overlap";
+import { findTaskOverlapWarnings, taskOverlapKey } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -123,14 +123,20 @@ export const POST = handler(async (request) => {
     .orderBy(desc(tasks.heartbeatAt))
     .limit(20);
 
+  const overlapWarnings = findTaskOverlapWarnings({
+    branch: task.branch,
+    filesTouched: task.filesTouched,
+    activeTasks: activeOthers,
+  });
+
   return json({
     task_id: task.id,
     project_id: projectId,
     active_tasks: activeOthers,
-    overlap_warnings: findTaskOverlapWarnings({
-      branch: task.branch,
-      filesTouched: task.filesTouched,
-      activeTasks: activeOthers,
-    }),
+    overlap_warnings: overlapWarnings.map((warning) => ({
+      ...warning,
+      overlap_key: taskOverlapKey(task.id, warning.task_id),
+      action_url: `/api/v1/projects/${projectId}/overlaps`,
+    })),
   });
 });

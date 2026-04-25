@@ -1,14 +1,17 @@
 import { and, desc, eq, gt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { db, projectMembers, tasks, users } from "@/db";
+import { db, projectMembers, projectMessages, taskOverlapResolutions, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
 import { gitRemoteLinks } from "@/lib/git-remote";
-import { canManageProjectMembers, getVisibleProject } from "@/lib/project-access";
-import { findActiveTaskOverlaps, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
+import { canManageProjectMembers, canWriteProject, getVisibleProject } from "@/lib/project-access";
+import { findActiveTaskOverlaps, taskOverlapKey, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
+import { OverlapActionControls, type OverlapResolutionRow } from "./overlap-action-controls";
+import { ProjectMessagesPanel, type ProjectMessageRow } from "./project-messages-panel";
 import { ProjectMembersPanel, type ProjectMemberRow } from "./project-members-panel";
 import { ProjectLiveUpdates } from "./project-live";
 
@@ -94,8 +97,58 @@ export default async function ProjectPage({
     .where(eq(projectMembers.projectId, project.id))
     .orderBy(desc(projectMembers.lastSeenAt));
   const canManageMembers = await canManageProjectMembers(project.id, user);
+  const canWriteMessages = await canWriteProject(project.id, user);
+
+  const messageAuthor = alias(users, "message_author");
+  const messageTarget = alias(users, "message_target");
+  const recentMessages = await db
+    .select({
+      id: projectMessages.id,
+      thread_key: projectMessages.threadKey,
+      body: projectMessages.body,
+      task_id: projectMessages.taskId,
+      created_at: projectMessages.createdAt,
+      author_id: projectMessages.authorId,
+      author_name: messageAuthor.name,
+      author_display_name: messageAuthor.displayName,
+      target_user_id: projectMessages.targetUserId,
+      target_user_name: messageTarget.name,
+      target_user_display_name: messageTarget.displayName,
+    })
+    .from(projectMessages)
+    .leftJoin(messageAuthor, eq(projectMessages.authorId, messageAuthor.id))
+    .leftJoin(messageTarget, eq(projectMessages.targetUserId, messageTarget.id))
+    .where(eq(projectMessages.projectId, project.id))
+    .orderBy(desc(projectMessages.createdAt))
+    .limit(20);
 
   const activeOverlaps = findActiveTaskOverlaps(active);
+  const activeOverlapKeys = new Set(activeOverlaps.map((overlap) => overlap.key));
+  const activeOverlapResolutions =
+    active.length > 0
+      ? (
+          await db
+            .select({
+              first_task_id: taskOverlapResolutions.firstTaskId,
+              second_task_id: taskOverlapResolutions.secondTaskId,
+              action: taskOverlapResolutions.action,
+              note: taskOverlapResolutions.note,
+              resolved_by_name: users.name,
+              resolved_by_display_name: users.displayName,
+              updated_at: taskOverlapResolutions.updatedAt,
+            })
+            .from(taskOverlapResolutions)
+            .leftJoin(users, eq(taskOverlapResolutions.resolvedBy, users.id))
+            .where(eq(taskOverlapResolutions.projectId, project.id))
+        )
+          .map((resolution) => ({
+            ...resolution,
+            key: taskOverlapKey(resolution.first_task_id, resolution.second_task_id),
+          }))
+          .filter((resolution) => activeOverlapKeys.has(resolution.key))
+      : [];
+  const activeResolutionByKey = new Map(activeOverlapResolutions.map((resolution) => [resolution.key, resolution]));
+  const canResolveOverlaps = canWriteMessages;
   const mergeRiskOverlaps = activeOverlaps.filter((overlap) => overlap.reasons.includes("merge_risk"));
   const coordinationOverlaps = activeOverlaps.filter((overlap) => !overlap.reasons.includes("merge_risk"));
   const branchFilter = normalizeBranchFilter(query.branch);
@@ -146,6 +199,13 @@ export default async function ProjectPage({
           members={members as ProjectMemberRow[]}
           canManage={canManageMembers}
           currentUserId={user.id}
+        />
+
+        <ProjectMessagesPanel
+          projectId={project.id}
+          messages={recentMessages.reverse() as ProjectMessageRow[]}
+          members={members as ProjectMemberRow[]}
+          canSend={canWriteMessages}
         />
 
         <section>
@@ -230,7 +290,13 @@ export default async function ProjectPage({
             </h2>
             <div className="mt-3 space-y-2">
               {coordinationOverlaps.map((overlap) => (
-                <OverlapAlert key={`${overlap.first.task_id}:${overlap.second.task_id}`} overlap={overlap} />
+                <OverlapAlert
+                  key={overlap.key}
+                  projectId={project.id}
+                  overlap={overlap}
+                  resolution={activeResolutionByKey.get(overlap.key)}
+                  canResolve={canResolveOverlaps}
+                />
               ))}
             </div>
           </section>
@@ -243,7 +309,13 @@ export default async function ProjectPage({
             </h2>
             <div className="mt-3 space-y-2">
               {mergeRiskOverlaps.map((overlap) => (
-                <OverlapAlert key={`${overlap.first.task_id}:${overlap.second.task_id}`} overlap={overlap} />
+                <OverlapAlert
+                  key={overlap.key}
+                  projectId={project.id}
+                  overlap={overlap}
+                  resolution={activeResolutionByKey.get(overlap.key)}
+                  canResolve={canResolveOverlaps}
+                />
               ))}
             </div>
           </section>
@@ -370,7 +442,17 @@ function BranchFilter({
   );
 }
 
-function OverlapAlert({ overlap }: { overlap: ActiveTaskOverlap }) {
+function OverlapAlert({
+  projectId,
+  overlap,
+  resolution,
+  canResolve,
+}: {
+  projectId: string;
+  overlap: ActiveTaskOverlap;
+  resolution?: OverlapResolutionRow;
+  canResolve: boolean;
+}) {
   const firstName = overlap.first.user_display_name ?? overlap.first.user_name;
   const secondName = overlap.second.user_display_name ?? overlap.second.user_name;
   const isMergeRisk = overlap.reasons.includes("merge_risk");
@@ -408,6 +490,13 @@ function OverlapAlert({ overlap }: { overlap: ActiveTaskOverlap }) {
           {overlap.overlapping_files.length > 6 && `（另有 ${overlap.overlapping_files.length - 6} 个路径）`}
         </div>
       )}
+      <OverlapActionControls
+        projectId={projectId}
+        firstTaskId={overlap.first.task_id}
+        secondTaskId={overlap.second.task_id}
+        resolution={resolution}
+        canResolve={canResolve}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 ---
 name: teampulse
-description: Team AI coordination — team awareness, shared memory across devices, and task presence. Use when the user is working in a shared repo and their team uses TeamPulse.
+description: Team AI coordination — team awareness, shared memory across devices, task presence, and project messages between agents. Use when the user is working in a shared repo and their team uses TeamPulse.
 ---
 
 # TeamPulse — Team Awareness
@@ -63,6 +63,26 @@ If a message labeled `[TeamPulse live update]` appears during the conversation,
 it means a teammate JUST started something new. If it's related to the user's
 current task, mention it once and let the user decide. Don't nag repeatedly.
 
+## Agent Messages
+
+Use project messages when coordination needs an explicit note or reply:
+
+```txt
+teampulse_inbox(limit: 20)
+teampulse_send_message(
+  thread_key: "project",
+  text: "Working on auth tests; please avoid apps/web/src/lib/auth.ts for now."
+)
+teampulse_reply(
+  thread_key: "task:<task id>",
+  text: "Done with this side; safe to continue."
+)
+```
+
+Use `thread_key: "overlap:<key>"` for conflict-resolution threads. Send to a
+specific member with `to` or `to_user_id` when the message is directed. Do not
+include secrets, tokens, or private credentials in project messages.
+
 ## When the user ends the work session
 
 Hooks handle `teampulse_end_task` automatically on session stop. If you manually
@@ -106,5 +126,8 @@ current session, or visit the web dashboard to pause at the project level.
 - `teampulse_end_task(task_id, outcome?, summary?)` — mark a task as done and save a handoff summary (hooks usually handle this).
 - `teampulse_list_active_tasks()` — who's active right now in this project.
 - `teampulse_recent_history(days?, user?)` — past tasks in this project.
+- `teampulse_inbox(limit?, thread_key?)` — recent project messages.
+- `teampulse_send_message(text, thread_key?, to?)` — send a project-scoped coordination note.
+- `teampulse_reply(thread_key, text, to?)` — reply into an existing message thread.
 - `teampulse_status()` — connection + login status.
 - `teampulse_web_login()` — generate a magic URL to log into the web dashboard.

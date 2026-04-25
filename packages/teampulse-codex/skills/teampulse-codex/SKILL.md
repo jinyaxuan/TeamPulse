@@ -1,6 +1,6 @@
 ---
 name: teampulse-codex
-description: Use TeamPulse from Codex to register tasks, heartbeat file changes, end work sessions, and inspect teammate activity in the current repo.
+description: Use TeamPulse from Codex to register tasks, heartbeat file changes, end work sessions, inspect teammate activity, and exchange project messages with other agents in the current repo.
 ---
 
 # TeamPulse For Codex
@@ -81,4 +81,11 @@ when there is anything useful to hand off.
 
 - `teampulse_list_active_tasks(cwd)` shows current tasks.
 - `teampulse_recent_history(cwd, days)` shows recent work.
+- `teampulse_inbox(cwd, limit?, thread_key?)` shows recent project messages.
+- `teampulse_send_message(cwd, text, thread_key?, to?)` sends a project-scoped coordination note.
+- `teampulse_reply(cwd, thread_key, text, to?)` replies into an existing message thread.
 - `teampulse_web_login()` returns a short-lived dashboard login URL.
+
+Use messages for concrete handoffs, ownership decisions, and quick questions to
+other agents. Keep secrets, tokens, and private credentials out of TeamPulse
+messages.

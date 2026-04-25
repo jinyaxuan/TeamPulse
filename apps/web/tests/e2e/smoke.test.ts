@@ -8,12 +8,14 @@
  *   6. task start → appears in active_tasks → history
  *   7. branch-aware overlap warnings distinguish merge risk vs high risk
  *   8. project details expose branch filtering data + merge-risk queue inputs
- *   9. task end-session saves handoff summary → details/project/export
- *   10. SSE: new task event fans out to a separate subscriber
- *   11. cleanup closes remaining e2e tasks
- *   12. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   9. overlap risk decisions can be recorded and read back on project details
+ *   10. project messages support thread/direct agent coordination
+ *   11. task end-session saves handoff summary → details/project/export
+ *   12. SSE: new task event fans out to a separate subscriber
+ *   13. cleanup closes remaining e2e tasks
+ *   14. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   13. magic link: bearer issues link → consume returns session cookie
+ *   15. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -343,6 +345,15 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(readonlyStart.status, 403);
 
+    const readonlyMessage = await http(`/api/v1/projects/${projectId}/messages`, {
+      method: "POST",
+      cookies: [invitedCookie],
+      body: {
+        body: "E2E: viewer cannot send project messages",
+      },
+    });
+    assert.equal(readonlyMessage.status, 403);
+
     const promoted = await http(`/api/v1/projects/${projectId}/members/${invitedUserId}`, {
       method: "PATCH",
       cookies: [adminCookie],
@@ -444,6 +455,8 @@ test("e2e: full happy path", async (t) => {
     assert.equal(res.body.overlap_warnings[0].task_id, taskId);
     assert.equal(res.body.overlap_warnings[0].severity, "medium");
     assert.deepEqual(res.body.overlap_warnings[0].reasons, ["merge_risk"]);
+    assert.equal(res.body.overlap_warnings[0].overlap_key, taskPairKey(taskId, overlapTaskId));
+    assert.equal(res.body.overlap_warnings[0].action_url, `/api/v1/projects/${projectId}/overlaps`);
     assert.deepEqual(res.body.overlap_warnings[0].overlapping_files, [
       "src/lib/conflict-target.ts",
     ]);
@@ -544,6 +557,79 @@ test("e2e: full happy path", async (t) => {
         overlap.overlapping_files.includes("src/lib/conflict-target.ts")
       )
     );
+  });
+
+  await t.test("overlap: record coordination decision and read it from project details", async () => {
+    const resolution = await http(`/api/v1/projects/${projectId}/overlaps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        first_task_id: taskId,
+        second_task_id: sameBranchTaskId,
+        action: "acknowledged",
+        note: "E2E: teammates coordinated the same-branch overlap.",
+      },
+    });
+    assert.equal(resolution.status, 200);
+    assert.equal(resolution.body.resolution.key, taskPairKey(taskId, sameBranchTaskId));
+    assert.equal(resolution.body.resolution.action, "acknowledged");
+
+    const project = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(project.status, 200);
+    const saved = project.body.active_overlap_resolutions.find(
+      (item: any) => item.key === taskPairKey(taskId, sameBranchTaskId)
+    );
+    assert.ok(saved, "expected project details to include saved overlap resolution");
+    assert.equal(saved.action, "acknowledged");
+    assert.match(saved.note, /teammates coordinated/);
+    assert.equal(saved.resolved_by_name, devUserName);
+  });
+
+  await t.test("messages: send direct thread note and read it from project details", async () => {
+    const threadKey = `task:${sameBranchTaskId}`;
+    const sent = await http(`/api/v1/projects/${projectId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        body: "E2E: agent message for same-branch handoff.",
+        thread_key: threadKey,
+        to: devUserName,
+      },
+    });
+    assert.equal(sent.status, 201);
+    assert.equal(sent.body.message.thread_key, threadKey);
+    assert.equal(sent.body.message.author_name, devUserName);
+    assert.equal(sent.body.message.target_user_name, devUserName);
+
+    const thread = await http(
+      `/api/v1/projects/${projectId}/messages?thread_key=${encodeURIComponent(threadKey)}`,
+      { headers: { Authorization: `Bearer ${devToken}` } }
+    );
+    assert.equal(thread.status, 200);
+    assert.ok(
+      thread.body.messages.some((message: any) => message.id === sent.body.message.id),
+      "expected thread list to include sent message"
+    );
+
+    const inbox = await http(`/api/v1/projects/${projectId}/messages?inbox=1`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(inbox.status, 200);
+    assert.ok(
+      inbox.body.messages.some((message: any) => message.id === sent.body.message.id),
+      "expected inbox list to include direct message"
+    );
+
+    const project = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(project.status, 200);
+    const saved = project.body.recent_messages.find((message: any) => message.id === sent.body.message.id);
+    assert.ok(saved, "expected project details to expose recent messages");
+    assert.equal(saved.thread_key, threadKey);
+    assert.match(saved.body, /same-branch handoff/);
   });
 
   await t.test("task: history contains our task", async () => {

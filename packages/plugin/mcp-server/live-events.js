@@ -4,7 +4,7 @@
  * The MCP server subscribes once per project and buffers incoming task
  * events in a rolling in-memory list. Claude can call
  * `teampulse_recent_events()` mid-conversation to see what teammates have
- * started/ended since the last check.
+ * started/ended or which project messages arrived since the last check.
  */
 import { EventSource } from "eventsource";
 
@@ -64,6 +64,7 @@ export class LiveEvents {
     source.addEventListener("task.started", record("task.started"));
     source.addEventListener("task.updated", record("task.updated"));
     source.addEventListener("task.ended", record("task.ended"));
+    source.addEventListener("message.created", record("message.created"));
   }
 
   /**

@@ -36,6 +36,20 @@
       "when": 1777122100000,
       "tag": "0004_promote_project_owners",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777122200000,
+      "tag": "0005_bumpy_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777122300000,
+      "tag": "0006_special_blindfold",
+      "breakpoints": true
     }
   ]
 }

@@ -185,6 +185,58 @@ export const tasks = pgTable(
 );
 
 /**
+ * task_overlap_resolutions — current coordination decision for an active task pair.
+ */
+export const taskOverlapResolutions = pgTable(
+  "task_overlap_resolutions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    firstTaskId: uuid("first_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    secondTaskId: uuid("second_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    action: text("action").notNull(), // acknowledged|handoff|paused
+    note: text("note"),
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("task_overlap_resolutions_pair_unique").on(t.projectId, t.firstTaskId, t.secondTaskId),
+    index("task_overlap_resolutions_project_updated_idx").on(t.projectId, t.updatedAt),
+  ]
+);
+
+/**
+ * project_messages — lightweight agent-to-agent notes scoped to a project.
+ */
+export const projectMessages = pgTable(
+  "project_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    targetUserId: uuid("target_user_id").references(() => users.id, { onDelete: "set null" }),
+    threadKey: text("thread_key").notNull().default("project"),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("project_messages_project_created_idx").on(t.projectId, t.createdAt),
+    index("project_messages_project_thread_idx").on(t.projectId, t.threadKey, t.createdAt),
+    index("project_messages_target_created_idx").on(t.targetUserId, t.createdAt),
+  ]
+);
+
+/**
  * memory_blobs — LWW-synced MEMORY.md per (user, project).
  */
 export const memoryBlobs = pgTable(
@@ -214,6 +266,8 @@ export type ProjectMember = typeof projectMembers.$inferSelect;
 export type NewProjectMember = typeof projectMembers.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
+export type TaskOverlapResolution = typeof taskOverlapResolutions.$inferSelect;
+export type ProjectMessage = typeof projectMessages.$inferSelect;
 export type MemoryBlob = typeof memoryBlobs.$inferSelect;
 export type WebSession = typeof webSessions.$inferSelect;
 export type MagicLink = typeof magicLinks.$inferSelect;

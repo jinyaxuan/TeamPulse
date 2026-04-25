@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { homedir, hostname, platform } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 
-const CONNECTOR_VERSION = "0.3.0";
+const CONNECTOR_VERSION = "0.4.0";
 const CONNECTOR_MARKER = "TEAMPULSE_CONNECTOR_SCRIPT";
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -51,6 +51,15 @@ async function main() {
     case "history":
       await history();
       return;
+    case "message":
+      await sendMessage();
+      return;
+    case "reply":
+      await sendMessage({ requireThread: true });
+      return;
+    case "inbox":
+      await inbox();
+      return;
     default:
       throw new Error(`Unknown command: ${command}`);
   }
@@ -70,6 +79,9 @@ Usage:
   node scripts/teampulse-connect.mjs heartbeat [--file path]
   node scripts/teampulse-connect.mjs end [--outcome done|abandoned] [--summary "..."] [--summary-file path]
   node scripts/teampulse-connect.mjs history [--days 7] [--cwd /repo]
+  node scripts/teampulse-connect.mjs inbox [--limit 20] [--thread project]
+  node scripts/teampulse-connect.mjs message --text "FYI: ..." [--to alice] [--thread project]
+  node scripts/teampulse-connect.mjs reply --thread "task:<id>" --text "..."
 
 Credentials are stored in ${credentialsPath}.
 `);
@@ -319,6 +331,42 @@ async function history() {
   writeJson(await apiGet(serverUrl, token, `/api/v1/tasks/history?${params}`));
 }
 
+async function sendMessage({ requireThread = false } = {}) {
+  const text = await messageText();
+  if (!text) throw new Error("--text or --text-file is required");
+  if (requireThread && !option("thread")) throw new Error("--thread is required for reply");
+
+  const { serverUrl, token } = await credentialsOrThrow();
+  const cwd = currentCwd();
+  const projectId = await resolveProject({ serverUrl, token, cwd });
+  if (!projectId) throw new Error(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
+  writeJson(
+    await apiPost(serverUrl, token, `/api/v1/projects/${projectId}/messages`, {
+      body: text,
+      thread_key: option("thread"),
+      task_id: option("task-id"),
+      to: option("to"),
+      to_user_id: option("to-user-id"),
+    })
+  );
+}
+
+async function inbox() {
+  const { serverUrl, token } = await credentialsOrThrow();
+  const cwd = currentCwd();
+  const projectId = await resolveProject({ serverUrl, token, cwd });
+  if (!projectId) throw new Error(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
+  const params = new URLSearchParams({
+    limit: String(Number(option("limit") || 20)),
+  });
+  if (option("thread")) params.set("thread_key", option("thread"));
+  if (flag("mine")) params.set("inbox", "1");
+
+  writeJson(await apiGet(serverUrl, token, `/api/v1/projects/${projectId}/messages?${params}`));
+}
+
 function normalizedServerUrl() {
   return normalizeServerUrl(option("server-url") || process.env.TEAMPULSE_SERVER_URL || "http://localhost:3002");
 }
@@ -441,6 +489,13 @@ function splitCsv(value) {
 async function summaryText() {
   const file = option("summary-file");
   const inline = option("summary");
+  const value = file ? await readFile(file, "utf8") : inline;
+  return value ? value.trim().slice(0, 2000) : undefined;
+}
+
+async function messageText() {
+  const file = option("text-file");
+  const inline = option("text");
   const value = file ? await readFile(file, "utf8") : inline;
   return value ? value.trim().slice(0, 2000) : undefined;
 }

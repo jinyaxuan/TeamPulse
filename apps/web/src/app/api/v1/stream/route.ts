@@ -10,7 +10,8 @@ export const runtime = "nodejs";
  *
  * Server-Sent Events endpoint. Both the web browser and the MCP server
  * subscribe here. Emits task.started / task.updated / task.ended events
- * scoped to the given project. Sends a keep-alive comment every 25s.
+ * scoped to the given project. Also emits message.created for project-scoped
+ * agent messages. Sends a keep-alive comment every 25s.
  */
 export async function GET(request: Request) {
   const ctx = await getAuthFromRequest(request);

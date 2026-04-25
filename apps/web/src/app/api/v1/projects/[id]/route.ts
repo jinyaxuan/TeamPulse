@@ -1,8 +1,9 @@
 import { and, desc, eq, gt } from "drizzle-orm";
-import { db, projectMembers, tasks, users } from "@/db";
+import { alias } from "drizzle-orm/pg-core";
+import { db, projectMembers, projectMessages, taskOverlapResolutions, tasks, users } from "@/db";
 import { ApiError, handler, json, requireAuth } from "@/lib/api";
 import { canManageProjectMembers, getVisibleProject } from "@/lib/project-access";
-import { findActiveTaskOverlaps } from "@/lib/task-overlap";
+import { findActiveTaskOverlaps, taskOverlapKey } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -77,6 +78,54 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     .where(eq(projectMembers.projectId, project.id))
     .orderBy(desc(projectMembers.lastSeenAt));
 
+  const messageAuthor = alias(users, "message_author");
+  const messageTarget = alias(users, "message_target");
+  const recentMessages = await db
+    .select({
+      id: projectMessages.id,
+      thread_key: projectMessages.threadKey,
+      body: projectMessages.body,
+      task_id: projectMessages.taskId,
+      created_at: projectMessages.createdAt,
+      author_id: projectMessages.authorId,
+      author_name: messageAuthor.name,
+      author_display_name: messageAuthor.displayName,
+      target_user_id: projectMessages.targetUserId,
+      target_user_name: messageTarget.name,
+      target_user_display_name: messageTarget.displayName,
+    })
+    .from(projectMessages)
+    .leftJoin(messageAuthor, eq(projectMessages.authorId, messageAuthor.id))
+    .leftJoin(messageTarget, eq(projectMessages.targetUserId, messageTarget.id))
+    .where(eq(projectMessages.projectId, project.id))
+    .orderBy(desc(projectMessages.createdAt))
+    .limit(20);
+
+  const activeOverlaps = findActiveTaskOverlaps(active);
+  const activeOverlapKeys = new Set(activeOverlaps.map((overlap) => overlap.key));
+  const activeOverlapResolutions =
+    active.length > 0
+      ? (
+          await db
+            .select({
+              id: taskOverlapResolutions.id,
+              first_task_id: taskOverlapResolutions.firstTaskId,
+              second_task_id: taskOverlapResolutions.secondTaskId,
+              action: taskOverlapResolutions.action,
+              note: taskOverlapResolutions.note,
+              resolved_by: taskOverlapResolutions.resolvedBy,
+              resolved_by_name: users.name,
+              resolved_by_display_name: users.displayName,
+              updated_at: taskOverlapResolutions.updatedAt,
+            })
+            .from(taskOverlapResolutions)
+            .leftJoin(users, eq(taskOverlapResolutions.resolvedBy, users.id))
+            .where(eq(taskOverlapResolutions.projectId, project.id))
+        ).filter((resolution) =>
+          activeOverlapKeys.has(taskOverlapKey(resolution.first_task_id, resolution.second_task_id))
+        )
+      : [];
+
   return json({
     project: {
       id: project.id,
@@ -86,9 +135,14 @@ export const GET = handler<{ id: string }>(async (request, params) => {
       created_at: project.createdAt,
     },
     active,
-    active_overlaps: findActiveTaskOverlaps(active),
+    active_overlaps: activeOverlaps,
+    active_overlap_resolutions: activeOverlapResolutions.map((resolution) => ({
+      ...resolution,
+      key: taskOverlapKey(resolution.first_task_id, resolution.second_task_id),
+    })),
     can_manage_members: await canManageProjectMembers(project.id, ctx.user),
     members,
+    recent_messages: recentMessages.reverse(),
     recent,
   });
 });

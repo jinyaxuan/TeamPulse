@@ -58,6 +58,18 @@ async function main() {
       await history();
       break;
 
+    case "message":
+      await sendMessage();
+      break;
+
+    case "reply":
+      await sendMessage({ requireThread: true });
+      break;
+
+    case "inbox":
+      await inbox();
+      break;
+
     case "web-login":
       await webLogin();
       break;
@@ -79,6 +91,9 @@ Usage:
   teampulse-codex end [--outcome done|abandoned] [--summary "..."] [--summary-file path]
   teampulse-codex active [--all]
   teampulse-codex history [--days 7] [--user alice]
+  teampulse-codex inbox [--limit 20] [--thread project]
+  teampulse-codex message --text "FYI: ..." [--to alice] [--thread project]
+  teampulse-codex reply --thread "task:<id>" --text "..."
   teampulse-codex web-login
 
 Credentials are stored in ${paths.CREDENTIALS_PATH}.
@@ -186,6 +201,44 @@ async function history() {
   writeJson(res.data);
 }
 
+async function sendMessage({ requireThread = false } = {}) {
+  const client = await clientOrThrow();
+  const cwd = currentCwd();
+  const projectId = await resolveProject({ client, cwd });
+  if (!projectId) throw new Error(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
+  const text = await messageText();
+  if (!text) throw new Error("--text or --text-file is required");
+  if (requireThread && !option("thread")) throw new Error("--thread is required for reply");
+
+  const res = await client.post(`/api/v1/projects/${projectId}/messages`, {
+    body: text,
+    thread_key: option("thread") || undefined,
+    task_id: option("task-id") || undefined,
+    to: option("to") || undefined,
+    to_user_id: option("to-user-id") || undefined,
+  });
+  if (!res.ok) throw new Error(res.error);
+  writeJson(res.data);
+}
+
+async function inbox() {
+  const client = await clientOrThrow();
+  const cwd = currentCwd();
+  const projectId = await resolveProject({ client, cwd });
+  if (!projectId) throw new Error(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
+  const params = new URLSearchParams({
+    limit: String(Number(option("limit") || 20)),
+  });
+  if (option("thread")) params.set("thread_key", option("thread"));
+  if (flag("mine")) params.set("inbox", "1");
+
+  const res = await client.get(`/api/v1/projects/${projectId}/messages?${params}`);
+  if (!res.ok) throw new Error(res.error);
+  writeJson(res.data);
+}
+
 async function webLogin() {
   const client = await clientOrThrow();
   const res = await client.post("/api/v1/auth/magic", {});
@@ -240,6 +293,13 @@ function flag(name) {
 async function summaryText() {
   const file = option("summary-file");
   const inline = option("summary");
+  const value = file ? await readFile(file, "utf8") : inline;
+  return value ? value.trim().slice(0, 2000) : undefined;
+}
+
+async function messageText() {
+  const file = option("text-file");
+  const inline = option("text");
   const value = file ? await readFile(file, "utf8") : inline;
   return value ? value.trim().slice(0, 2000) : undefined;
 }

@@ -29,6 +29,7 @@ export type TaskOverlapWarning = {
 };
 
 export type ActiveTaskOverlap = {
+  key: string;
   first: TaskOverlapWarning;
   second: TaskOverlapWarning;
   reasons: OverlapReason[];
@@ -76,6 +77,7 @@ export function findActiveTaskOverlaps(tasks: OverlapCandidate[]): ActiveTaskOve
       if (reasons.length === 0) continue;
 
       overlaps.push({
+        key: taskOverlapKey(first.id, second.id),
         first: warningFromTask(first, reasons, overlappingFiles),
         second: warningFromTask(second, reasons, overlappingFiles),
         reasons,
@@ -86,6 +88,14 @@ export function findActiveTaskOverlaps(tasks: OverlapCandidate[]): ActiveTaskOve
   }
 
   return overlaps;
+}
+
+export function orderedTaskPair(firstTaskId: string, secondTaskId: string): [string, string] {
+  return firstTaskId < secondTaskId ? [firstTaskId, secondTaskId] : [secondTaskId, firstTaskId];
+}
+
+export function taskOverlapKey(firstTaskId: string, secondTaskId: string): string {
+  return orderedTaskPair(firstTaskId, secondTaskId).join(":");
 }
 
 function warningFromTask(

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 /**
  * Subscribes to SSE for the given project and triggers a server-component
- * refresh when task events arrive. Also shows a small live status dot.
+ * refresh when task or message events arrive. Also shows a small live status dot.
  */
 export function ProjectLiveUpdates({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -27,6 +27,7 @@ export function ProjectLiveUpdates({ projectId }: { projectId: string }) {
     es.addEventListener("task.started", handle("task.started"));
     es.addEventListener("task.updated", handle("task.updated"));
     es.addEventListener("task.ended", handle("task.ended"));
+    es.addEventListener("message.created", handle("message.created"));
 
     return () => {
       es.close();
@@ -56,6 +57,8 @@ function eventLabel(type: string): string {
       return "任务更新";
     case "task.ended":
       return "任务结束";
+    case "message.created":
+      return "新消息";
     default:
       return type;
   }

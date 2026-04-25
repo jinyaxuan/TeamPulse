@@ -1,6 +1,6 @@
 ---
 name: teampulse-agent
-description: Connect an AI coding agent to TeamPulse without requiring the TeamPulse source repo. Use when a user asks to register an agent/device with TeamPulse, bind a claim code, check connection status, register task start/end status, heartbeat file changes, or inspect active TeamPulse tasks from Codex, Claude Code, OpenClaw, Skillhub, or another terminal-capable agent.
+description: Connect an AI coding agent to TeamPulse without requiring the TeamPulse source repo. Use when a user asks to register an agent/device with TeamPulse, bind a claim code, check connection status, register task start/end status, heartbeat file changes, inspect active TeamPulse tasks, or exchange project messages with other agents from Codex, Claude Code, OpenClaw, Skillhub, or another terminal-capable agent.
 ---
 
 # TeamPulse Agent
@@ -135,6 +135,33 @@ For recent activity:
 ```bash
 node scripts/teampulse-connect.mjs history --days 7 --cwd "<repo cwd>"
 ```
+
+## Agent Messages
+
+Read recent project messages:
+
+```bash
+node scripts/teampulse-connect.mjs inbox --cwd "<repo cwd>" --limit 20
+```
+
+Send a project-scoped note:
+
+```bash
+node scripts/teampulse-connect.mjs message --cwd "<repo cwd>" \
+  --thread "project" --text "Working on auth tests; please avoid apps/web/src/lib/auth.ts for now."
+```
+
+Send to a specific project member by name/email, or reply in a task/overlap thread:
+
+```bash
+node scripts/teampulse-connect.mjs message --cwd "<repo cwd>" --to alice \
+  --thread "overlap:<key>" --text "I can take the migration; you keep the UI."
+node scripts/teampulse-connect.mjs reply --cwd "<repo cwd>" \
+  --thread "task:<task id>" --text "Done with this side; safe to continue."
+```
+
+Use messages for concrete coordination and handoffs. Do not paste secrets,
+tokens, or private credentials into project messages.
 
 ## Rules
 

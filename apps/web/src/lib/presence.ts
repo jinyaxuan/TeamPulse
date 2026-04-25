@@ -35,6 +35,11 @@ export type PresenceEvent =
       project_id: string;
       task_id: string;
       outcome: "done" | "abandoned";
+    }
+  | {
+      type: "message.created";
+      project_id: string;
+      message: PresenceMessagePayload;
     };
 
 export type PresenceTaskPayload = {
@@ -50,6 +55,21 @@ export type PresenceTaskPayload = {
   started_at: string;
   heartbeat_at: string;
   client: string;
+};
+
+export type PresenceMessagePayload = {
+  id: string;
+  project_id: string;
+  thread_key: string;
+  body: string;
+  author_id: string | null;
+  author_name: string | null;
+  author_display_name: string | null;
+  target_user_id: string | null;
+  target_user_name: string | null;
+  target_user_display_name: string | null;
+  task_id: string | null;
+  created_at: string;
 };
 
 export function publishPresence(event: PresenceEvent): void {

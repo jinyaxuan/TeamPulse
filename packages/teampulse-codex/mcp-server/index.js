@@ -179,9 +179,65 @@ const TOOLS = [
     },
   },
   {
+    name: "teampulse_send_message",
+    description:
+      "Send a project-scoped message to other agents. Use for handoffs, questions, and coordination notes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        text: { type: "string", maxLength: 2000 },
+        thread_key: {
+          type: "string",
+          description: "Optional thread key, e.g. project, task:<task id>, overlap:<overlap key>.",
+          maxLength: 160,
+        },
+        task_id: { type: "string" },
+        to: {
+          type: "string",
+          description: "Optional project member name, display name, or email.",
+        },
+        to_user_id: { type: "string" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "teampulse_reply",
+    description: "Reply to an existing TeamPulse message thread.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        thread_key: { type: "string", maxLength: 160 },
+        text: { type: "string", maxLength: 2000 },
+        to: { type: "string" },
+        to_user_id: { type: "string" },
+      },
+      required: ["thread_key", "text"],
+    },
+  },
+  {
+    name: "teampulse_inbox",
+    description: "Read recent TeamPulse project messages for the current repo.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        thread_key: { type: "string" },
+        limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+        mine: {
+          type: "boolean",
+          description: "When true, only messages authored by or addressed to the current user.",
+          default: false,
+        },
+      },
+    },
+  },
+  {
     name: "teampulse_recent_events",
     description:
-      "Subscribe to and read recent live TeamPulse task events for the current project.",
+      "Subscribe to and read recent live TeamPulse task and message events for the current project.",
     inputSchema: {
       type: "object",
       properties: {
@@ -298,6 +354,38 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
               instructions: "Open this URL in your browser to log into TeamPulse.",
             })
           : errorResult(res.error);
+      }
+
+      case "teampulse_send_message":
+      case "teampulse_reply": {
+        const cwd = currentCwd(args.cwd);
+        const projectId = await resolveProject({ client, cwd });
+        if (!projectId) return errorResult(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+        const text = String(args.text || "").trim().slice(0, 2000);
+        if (!text) return errorResult("text is required");
+        const res = await client.post(`/api/v1/projects/${projectId}/messages`, {
+          body: text,
+          thread_key: args.thread_key,
+          task_id: args.task_id,
+          to: args.to,
+          to_user_id: args.to_user_id,
+        });
+        if (liveEvents) liveEvents.subscribe(projectId);
+        return res.ok ? textResult(res.data) : errorResult(res.error);
+      }
+
+      case "teampulse_inbox": {
+        const cwd = currentCwd(args.cwd);
+        const projectId = await resolveProject({ client, cwd });
+        if (!projectId) return errorResult(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+        const params = new URLSearchParams({
+          limit: String(Math.max(1, Math.min(100, Number(args.limit ?? 20)))),
+        });
+        if (args.thread_key) params.set("thread_key", String(args.thread_key));
+        if (args.mine) params.set("inbox", "1");
+        const res = await client.get(`/api/v1/projects/${projectId}/messages?${params}`);
+        if (liveEvents) liveEvents.subscribe(projectId);
+        return res.ok ? textResult(res.data) : errorResult(res.error);
       }
 
       case "teampulse_recent_events": {
