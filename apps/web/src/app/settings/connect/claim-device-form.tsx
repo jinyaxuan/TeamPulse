@@ -28,16 +28,16 @@ export function ClaimDeviceForm() {
     }
 
     setClaimCode("");
-    setMessage("设备已绑定到当前账号。回到终端继续执行 poll 命令即可完成本机凭据写入。");
+    setMessage("设备已绑定到当前账号。告诉 Agent 继续，它会自动完成本机凭据写入。");
     startTransition(() => router.refresh());
   }
 
   return (
     <form onSubmit={submit} className="rounded-lg border bg-white p-4 shadow-sm">
       <div>
-        <h2 className="text-sm font-semibold">2. 绑定到当前账号</h2>
+        <h2 className="text-sm font-semibold">绑定到当前账号</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          输入本机注册命令输出的认领码。绑定后，后续任务会归属到当前登录用户。
+          输入 Agent 返回的认领码。绑定后，后续任务会归属到当前登录用户。
         </p>
       </div>
 
