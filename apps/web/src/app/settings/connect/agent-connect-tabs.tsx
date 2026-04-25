@@ -16,7 +16,7 @@ const TABS: TabConfig[] = [
     key: "skill",
     title: "Agent Skill",
     badge: "推荐",
-    description: "把整段指令交给 Agent。Agent 负责安装连接器、注册设备、等待绑定、写入凭据。",
+    description: "复制一句话给 Agent，由 Agent 自动完成接入。",
   },
   {
     key: "codex",
@@ -82,7 +82,7 @@ export function AgentConnectTabs({ appUrl }: { appUrl: string }) {
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{activeTab.description}</p>
 
-        <PromptBlock title="复制给 Agent 的指令" text={prompts[active]} />
+        <PromptBlock title="复制给 Agent 的一句话" text={prompts[active]} />
 
         <div className="mt-4 rounded-md border bg-slate-50 p-3 text-xs leading-5 text-muted-foreground">
           Agent 会返回一个 <span className="font-mono text-foreground">claim_code</span>。你只需要把它填到下面的绑定框；
@@ -106,23 +106,12 @@ function PromptBlock({ title, text }: { title: string; text: string }) {
 
 function buildPrompts(appUrl: string): Record<TabKey, string> {
   const connectorUrl = `${appUrl}/agent/teampulse-connect.mjs`;
-  const basePrompt = `请使用 TeamPulse Agent Skill 接入当前机器。
-
-要求：
-- 不要要求我手工执行终端命令。
-- 不要要求我拥有 TeamPulse 项目源码。
-- 你负责安装或下载连接器、注册设备、暂存 device_secret、在我绑定 claim_code 后继续 poll，并写入 ~/.teampulse/credentials.json。
-- token 和 device_secret 都是敏感信息，不要贴给我，除非我明确要求。
-
-TeamPulse 服务地址：${appUrl}
-连接器地址：${connectorUrl}
-
-你需要自动完成连接器下载、register、等待我绑定、poll 写入凭据、status 校验这些动作。完成 register 后只把 claim_code 返回给我；等我确认已经在 TeamPulse “我的接入”页面绑定后，再继续写入凭据并告诉我连接到的账号。`;
+  const basePrompt = `请根据 ${connectorUrl} 将当前机器接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`;
 
   return {
     skill: basePrompt,
-    codex: `请为当前 Codex 环境接入 TeamPulse。\n\n${basePrompt}`,
-    claude: `请为当前 Claude Code 环境接入 TeamPulse。\n\n${basePrompt}`,
-    openclaw: `请为当前 OpenClaw / Skillhub Agent 接入 TeamPulse。\n\n${basePrompt}`,
+    codex: `请在当前 Codex 环境中根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
+    claude: `请在当前 Claude Code 环境中根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
+    openclaw: `请根据 https://skillhub.cn/install/skillhub.md 安装 Skillhub 商店，并根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
   };
 }
