@@ -26,11 +26,28 @@ For non-trivial implementation, debugging, refactoring, or investigation work,
 call:
 
 ```txt
-teampulse_start_task(intent: "<one sentence>", cwd: "<repo cwd>")
+teampulse_start_task(
+  intent: "<one sentence>",
+  cwd: "<repo cwd>",
+  files_hint: ["path/you/expect/to/edit"]
+)
 ```
 
-Use the current repository path as `cwd`. If the response includes active
-teammates doing related work, mention that once before continuing.
+Use the current repository path as `cwd`. Include `files_hint` when you already
+know likely edit paths; it lets TeamPulse detect direct file overlap before you
+start. If the response includes active teammates doing related work, mention
+that once before continuing.
+
+Inspect the response's `coordination.action` before editing files:
+
+- `pause_for_confirmation`: high-risk file overlap. Stop before editing, tell
+  the user who is active and which files overlap, then ask whether to wait,
+  take over, narrow scope, or continue anyway. Do not edit overlapping files
+  until the user gives explicit direction.
+- `proceed_with_caution`: related work but no direct file overlap. Mention it
+  once, keep the implementation narrow, and avoid expanding into the related
+  task.
+- `continue`: no overlap warning. Proceed normally.
 
 ## During work
 

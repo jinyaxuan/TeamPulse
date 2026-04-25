@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { findActiveTaskOverlaps, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { ProjectLiveUpdates } from "./project-live";
 
@@ -59,6 +60,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     .where(and(eq(tasks.projectId, project.id), gt(tasks.startedAt, recentCutoff)))
     .orderBy(desc(tasks.startedAt))
     .limit(50);
+
+  const activeOverlaps = findActiveTaskOverlaps(active);
 
   return (
     <AppShell user={user} activeNav="projects">
@@ -117,6 +120,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         </section>
 
+        {activeOverlaps.length > 0 && (
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">
+              潜在重叠 ({activeOverlaps.length})
+            </h2>
+            <div className="mt-3 space-y-2">
+              {activeOverlaps.map((overlap) => (
+                <OverlapAlert key={`${overlap.first.task_id}:${overlap.second.task_id}`} overlap={overlap} />
+              ))}
+            </div>
+          </section>
+        )}
+
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             最近动态 · 7 天
@@ -159,4 +175,61 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </div>
     </AppShell>
   );
+}
+
+function OverlapAlert({ overlap }: { overlap: ActiveTaskOverlap }) {
+  const firstName = overlap.first.user_display_name ?? overlap.first.user_name;
+  const secondName = overlap.second.user_display_name ?? overlap.second.user_name;
+
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="font-medium">
+            {firstName} 和 {secondName} 可能在处理同一块内容
+          </div>
+          <div className="mt-1 text-xs text-amber-800">
+            {overlapReasonLabel(overlap.reasons)}
+            {overlap.first.branch && overlap.reasons.includes("branch") && ` · 分支：${overlap.first.branch}`}
+          </div>
+        </div>
+        <span
+          className={
+            "w-fit rounded-full px-2 py-0.5 text-xs font-medium " +
+            (overlap.severity === "high"
+              ? "bg-red-100 text-red-800"
+              : "bg-amber-100 text-amber-800")
+          }
+        >
+          {overlap.severity === "high" ? "高风险" : "需确认"}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <TaskSummary name={firstName} intent={overlap.first.intent} />
+        <TaskSummary name={secondName} intent={overlap.second.intent} />
+      </div>
+      {overlap.overlapping_files.length > 0 && (
+        <div className="mt-3 rounded border border-amber-200 bg-white/70 p-2 font-mono text-xs text-amber-900">
+          {overlap.overlapping_files.slice(0, 6).join(", ")}
+          {overlap.overlapping_files.length > 6 && `（另有 ${overlap.overlapping_files.length - 6} 个路径）`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskSummary({ name, intent }: { name: string; intent: string }) {
+  return (
+    <div className="min-w-0 rounded border border-amber-200 bg-white/70 p-2">
+      <div className="text-xs font-medium text-amber-900">{name}</div>
+      <div className="mt-1 truncate text-xs text-amber-800">{intent}</div>
+    </div>
+  );
+}
+
+function overlapReasonLabel(reasons: OverlapReason[]): string {
+  const labels = [];
+  if (reasons.includes("files")) labels.push("文件路径重叠");
+  if (reasons.includes("branch")) labels.push("同一分支并行");
+  return labels.join("、");
 }

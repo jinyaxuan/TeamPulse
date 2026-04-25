@@ -12,6 +12,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { TeamPulseApiClient } from "./api-client.js";
 import { isDisabled, readCredentials } from "./auth.js";
+import { withCoordinationAdvice } from "./coordination.js";
 import { LiveEvents } from "./live-events.js";
 import { resolveProject } from "./project-resolve.js";
 
@@ -63,7 +64,7 @@ const TOOLS = [
   {
     name: "teampulse_start_task",
     description:
-      "Register a new task you're about to start. Returns teammates currently active in this project so you can check for overlap. Call at the beginning of any non-trivial piece of work.",
+      "Register a new task you're about to start. Returns active teammates, overlap warnings, and coordination instructions. Call at the beginning of any non-trivial piece of work.",
     inputSchema: {
       type: "object",
       properties: {
@@ -201,7 +202,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       // teampulse_recent_events calls return fresh data.
       const le = getLiveEvents();
       if (le && res.data?.project_id) le.subscribe(res.data.project_id);
-      return textResult(res.data);
+      return textResult(withCoordinationAdvice(res.data));
     }
 
     case "teampulse_end_task": {

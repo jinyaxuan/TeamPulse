@@ -26,11 +26,25 @@ Non-trivial = a new feature, refactor, bug fix, or exploratory spike (not "expla
 this code" or "what does X do"). For those, call:
 
 ```
-teampulse_start_task(intent: "<one-sentence summary of what we're about to do>")
+teampulse_start_task(
+  intent: "<one-sentence summary of what we're about to do>",
+  files_hint: ["path/you/expect/to/edit"]
+)
 ```
 
-The response includes `active_tasks` — a list of teammates currently working in
-this project. If something looks related, tell the user before starting work.
+Include `files_hint` when you already know likely edit paths; it lets TeamPulse
+detect direct file overlap before you start. The response includes
+`active_tasks`, `overlap_warnings`, and `coordination`.
+Always inspect `coordination.action` before editing files:
+
+- `pause_for_confirmation`: high-risk file overlap. Stop before editing, tell
+  the user who is active and which files overlap, then ask whether to wait,
+  take over, narrow scope, or continue anyway. Do not edit overlapping files
+  until the user gives explicit direction.
+- `proceed_with_caution`: related work but no direct file overlap. Mention it
+  once, keep the implementation narrow, and avoid expanding into the related
+  task.
+- `continue`: no overlap warning. Proceed normally.
 
 ## When the user asks historical questions
 

@@ -20,6 +20,7 @@ import {
   readCredentials,
   registerDevice,
 } from "../../plugin/mcp-server/auth.js";
+import { withCoordinationAdvice } from "../../plugin/mcp-server/coordination.js";
 import { LiveEvents } from "../../plugin/mcp-server/live-events.js";
 import { resolveProject } from "../../plugin/mcp-server/project-resolve.js";
 
@@ -88,7 +89,7 @@ const TOOLS = [
   {
     name: "teampulse_start_task",
     description:
-      "Start a TeamPulse task for the current Codex work. Resolves the project from cwd and returns active teammates.",
+      "Start a TeamPulse task for the current Codex work. Resolves the project from cwd and returns active teammates, overlap warnings, and coordination instructions.",
     inputSchema: {
       type: "object",
       properties: {
@@ -236,7 +237,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         });
         if (!res.ok) return errorResult(res.error);
         if (liveEvents && res.data?.project_id) liveEvents.subscribe(res.data.project_id);
-        return textResult(res.data);
+        return textResult(withCoordinationAdvice(res.data));
       }
 
       case "teampulse_heartbeat": {

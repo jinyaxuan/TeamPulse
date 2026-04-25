@@ -4,6 +4,7 @@
  */
 import { createHash } from "node:crypto";
 import { TeamPulseApiClient } from "../../plugin/mcp-server/api-client.js";
+import { withCoordinationAdvice } from "../../plugin/mcp-server/coordination.js";
 import {
   paths,
   pollClaimCode,
@@ -133,7 +134,7 @@ async function startTask() {
     files_hint: files ? files.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
   });
   if (!res.ok) throw new Error(res.error);
-  writeJson(res.data);
+  writeJson(withCoordinationAdvice(res.data));
 }
 
 async function heartbeat() {

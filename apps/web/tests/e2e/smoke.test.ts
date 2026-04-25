@@ -287,6 +287,7 @@ test("e2e: full happy path", async (t) => {
         session_id: `e2e-sess-${adminName}`,
         intent: "E2E: write a failing test",
         branch: "e2e-branch",
+        files_hint: ["src/lib/conflict-target.ts"],
       },
     });
     assert.equal(res.status, 200);
@@ -299,6 +300,39 @@ test("e2e: full happy path", async (t) => {
     const ours = list.body.tasks.find((t: any) => t.id === taskId);
     assert.ok(ours, "task not found in active list");
     assert.equal(ours.intent, "E2E: write a failing test");
+  });
+
+  await t.test("task: overlapping files produce warnings", async () => {
+    const res = await http("/api/v1/tasks", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        project_id: projectId,
+        session_id: `e2e-sess-overlap-${adminName}`,
+        intent: "E2E: touch the same file from another task",
+        branch: "e2e-overlap-branch",
+        files_hint: ["./src/lib/conflict-target.ts"],
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.overlap_warnings.length, 1);
+    assert.equal(res.body.overlap_warnings[0].task_id, taskId);
+    assert.equal(res.body.overlap_warnings[0].severity, "high");
+    assert.deepEqual(res.body.overlap_warnings[0].reasons, ["files"]);
+    assert.deepEqual(res.body.overlap_warnings[0].overlapping_files, [
+      "src/lib/conflict-target.ts",
+    ]);
+
+    const project = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(project.status, 200);
+    assert.ok(
+      project.body.active_overlaps.some((overlap: any) =>
+        overlap.overlapping_files.includes("src/lib/conflict-target.ts")
+      ),
+      "expected project details to include active overlap"
+    );
   });
 
   await t.test("task: history contains our task", async () => {

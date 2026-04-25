@@ -1,6 +1,7 @@
 import { and, desc, eq, gt } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { ApiError, handler, json, requireAuth } from "@/lib/api";
+import { findActiveTaskOverlaps } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -68,6 +69,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
       created_at: project.createdAt,
     },
     active,
+    active_overlaps: findActiveTaskOverlaps(active),
     recent,
   });
 });

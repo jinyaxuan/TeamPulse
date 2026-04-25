@@ -3,6 +3,7 @@ import { and, desc, eq, gt, ne } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
 import { publishPresence } from "@/lib/presence";
+import { findTaskOverlapWarnings } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -108,5 +109,10 @@ export const POST = handler(async (request) => {
     task_id: task.id,
     project_id: projectId,
     active_tasks: activeOthers,
+    overlap_warnings: findTaskOverlapWarnings({
+      branch: task.branch,
+      filesTouched: task.filesTouched,
+      activeTasks: activeOthers,
+    }),
   });
 });
