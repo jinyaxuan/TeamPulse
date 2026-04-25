@@ -143,7 +143,8 @@ pnpm --filter @teampulse/codex-plugin start-task -- \
 pnpm --filter @teampulse/codex-plugin heartbeat -- \
   --file packages/teampulse-codex/mcp-server/index.js
 
-pnpm --filter @teampulse/codex-plugin end-session
+pnpm --filter @teampulse/codex-plugin end-session -- \
+  --summary "Changed: ...; Verified: ...; Risks: ...; Next: ..."
 ```
 
 作为 Codex 插件安装时，插件声明在 `packages/teampulse-codex/.codex-plugin/plugin.json`，MCP 配置在 `packages/teampulse-codex/.mcp.json`。可用 MCP tools 包括：

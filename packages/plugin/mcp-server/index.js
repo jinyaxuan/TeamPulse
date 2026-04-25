@@ -98,6 +98,11 @@ const TOOLS = [
       properties: {
         task_id: { type: "string" },
         outcome: { type: "string", enum: ["done", "abandoned"] },
+        summary: {
+          type: "string",
+          description: "Optional handoff summary: what changed, tests run, risks, and next steps. Max 2000 chars.",
+          maxLength: 2000,
+        },
       },
       required: ["task_id"],
     },
@@ -208,6 +213,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     case "teampulse_end_task": {
       const res = await client.patch(`/api/v1/tasks/${args.task_id}`, {
         status: args.outcome || "done",
+        summary: args.summary ? String(args.summary).trim().slice(0, 2000) : undefined,
       });
       if (!res.ok) return errorResult(res.error);
       return textResult(res.data);

@@ -3,6 +3,7 @@
  * Small CLI for wiring a Codex environment into TeamPulse.
  */
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { TeamPulseApiClient } from "../../plugin/mcp-server/api-client.js";
 import { withCoordinationAdvice } from "../../plugin/mcp-server/coordination.js";
 import {
@@ -74,7 +75,7 @@ Usage:
   teampulse-codex status
   teampulse-codex start --intent "Fix login bug" [--cwd /repo]
   teampulse-codex heartbeat [--file path]
-  teampulse-codex end [--outcome done|abandoned]
+  teampulse-codex end [--outcome done|abandoned] [--summary "..."] [--summary-file path]
   teampulse-codex active [--all]
   teampulse-codex history [--days 7] [--user alice]
   teampulse-codex web-login
@@ -152,6 +153,7 @@ async function endSession() {
   const res = await client.post("/api/v1/tasks/end-session", {
     session_id: sessionId(),
     outcome: option("outcome") || "done",
+    summary: await summaryText(),
   });
   if (!res.ok) throw new Error(res.error);
   writeJson(res.data);
@@ -218,6 +220,13 @@ function option(name) {
 
 function flag(name) {
   return args.includes(`--${name}`);
+}
+
+async function summaryText() {
+  const file = option("summary-file");
+  const inline = option("summary");
+  const value = file ? await readFile(file, "utf8") : inline;
+  return value ? value.trim().slice(0, 2000) : undefined;
 }
 
 function writeJson(value) {

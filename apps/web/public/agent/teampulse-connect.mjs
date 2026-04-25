@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { homedir, hostname, platform } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 
-const CONNECTOR_VERSION = "0.2.0";
+const CONNECTOR_VERSION = "0.3.0";
 const CONNECTOR_MARKER = "TEAMPULSE_CONNECTOR_SCRIPT";
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -68,7 +68,7 @@ Usage:
   node scripts/teampulse-connect.mjs active [--cwd /repo] [--all]
   node scripts/teampulse-connect.mjs start --intent "Fix login bug" [--cwd /repo]
   node scripts/teampulse-connect.mjs heartbeat [--file path]
-  node scripts/teampulse-connect.mjs end [--outcome done|abandoned]
+  node scripts/teampulse-connect.mjs end [--outcome done|abandoned] [--summary "..."] [--summary-file path]
   node scripts/teampulse-connect.mjs history [--days 7] [--cwd /repo]
 
 Credentials are stored in ${credentialsPath}.
@@ -303,6 +303,7 @@ async function endSession() {
     await apiPost(serverUrl, token, "/api/v1/tasks/end-session", {
       session_id: sessionId(currentCwd()),
       outcome,
+      summary: await summaryText(),
     })
   );
 }
@@ -435,6 +436,13 @@ function clientName() {
 
 function splitCsv(value) {
   return value ? value.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+}
+
+async function summaryText() {
+  const file = option("summary-file");
+  const inline = option("summary");
+  const value = file ? await readFile(file, "utf8") : inline;
+  return value ? value.trim().slice(0, 2000) : undefined;
 }
 
 async function ensureDir() {

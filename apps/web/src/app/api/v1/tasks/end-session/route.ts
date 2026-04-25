@@ -10,6 +10,7 @@ export const runtime = "nodejs";
 const endSessionSchema = z.object({
   session_id: z.string().min(1).max(128),
   outcome: z.enum(["done", "abandoned"]).default("done"),
+  summary: z.string().max(2000).optional(),
 });
 
 /**
@@ -21,12 +22,14 @@ const endSessionSchema = z.object({
 export const POST = handler(async (request) => {
   const ctx = await requireAuth(request);
   const body = await parseBody(request, endSessionSchema);
+  const summary = body.summary?.trim();
 
   const affected = await db
     .update(tasks)
     .set({
       status: body.outcome,
       endedAt: new Date(),
+      ...(summary ? { summary } : {}),
     })
     .where(
       and(
@@ -46,5 +49,8 @@ export const POST = handler(async (request) => {
     });
   }
 
-  return json({ ended_count: affected.length });
+  return json({
+    ended_count: affected.length,
+    summary_saved: Boolean(summary && affected.length > 0),
+  });
 });

@@ -128,12 +128,17 @@ const TOOLS = [
   },
   {
     name: "teampulse_end_session",
-    description: "Mark all active TeamPulse tasks for this Codex session as done or abandoned.",
+    description: "Mark all active TeamPulse tasks for this Codex session as done or abandoned, optionally saving a handoff summary.",
     inputSchema: {
       type: "object",
       properties: {
         session_id: { type: "string" },
         outcome: { type: "string", enum: ["done", "abandoned"], default: "done" },
+        summary: {
+          type: "string",
+          description: "Optional handoff summary: what changed, tests run, risks, and next steps. Max 2000 chars.",
+          maxLength: 2000,
+        },
       },
     },
   },
@@ -252,6 +257,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const res = await client.post("/api/v1/tasks/end-session", {
           session_id: sessionId(args.session_id),
           outcome: args.outcome || "done",
+          summary: args.summary ? String(args.summary).trim().slice(0, 2000) : undefined,
         });
         return res.ok ? textResult(res.data) : errorResult(res.error);
       }

@@ -63,7 +63,20 @@ current task, mention it once and let the user decide. Don't nag repeatedly.
 
 ## When the user ends the work session
 
-No action needed — hooks handle `teampulse_end_task` automatically on session stop.
+Hooks handle `teampulse_end_task` automatically on session stop. If you manually
+end the task or the tool is available in-session, include a concise handoff
+summary:
+
+```txt
+teampulse_end_task(
+  task_id: "<task id returned by teampulse_start_task>",
+  outcome: "done",
+  summary: "Changed: ...\nVerified: ...\nRisks: ...\nNext: ..."
+)
+```
+
+For redirected or abandoned work, use `outcome: "abandoned"` and summarize the
+current state and remaining next step.
 
 ## If TeamPulse is not configured
 
@@ -88,7 +101,7 @@ current session, or visit the web dashboard to pause at the project level.
 ## Tools reference
 
 - `teampulse_start_task(intent)` — begin a new tracked task. Returns teammates currently active in this project.
-- `teampulse_end_task(outcome?)` — mark current task as done (hooks usually handle this).
+- `teampulse_end_task(task_id, outcome?, summary?)` — mark a task as done and save a handoff summary (hooks usually handle this).
 - `teampulse_list_active_tasks()` — who's active right now in this project.
 - `teampulse_recent_history(days?, user?)` — past tasks in this project.
 - `teampulse_status()` — connection + login status.

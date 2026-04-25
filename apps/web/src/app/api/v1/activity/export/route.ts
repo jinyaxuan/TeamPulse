@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       intent: tasks.intent,
       branch: tasks.branch,
       status: tasks.status,
+      summary: tasks.summary,
       files_touched: tasks.filesTouched,
     })
     .from(tasks)
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
     .where(userFilter ? and(...conditions, userFilter) : and(...conditions))
     .orderBy(desc(tasks.startedAt));
 
-  const header = "开始时间,结束时间,用户,项目,状态,分支,任务意图,涉及文件\n";
+  const header = "开始时间,结束时间,用户,项目,状态,分支,任务意图,交接摘要,涉及文件\n";
   const lines = rows.map((r) =>
     [
       r.started_at.toISOString(),
@@ -69,6 +70,7 @@ export async function GET(request: Request) {
       taskStatusLabel(r.status),
       csvEscape(r.branch ?? ""),
       csvEscape(r.intent),
+      csvEscape(r.summary ?? ""),
       csvEscape(r.files_touched.join("; ")),
     ].join(",")
   );

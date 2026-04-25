@@ -64,10 +64,16 @@ This keeps the task active and records touched files.
 When the user's requested work is done, call:
 
 ```txt
-teampulse_end_session(outcome: "done")
+teampulse_end_session(
+  outcome: "done",
+  summary: "Changed: ...\nVerified: ...\nRisks: ...\nNext: ..."
+)
 ```
 
-If the user abandons or redirects the work, use `outcome: "abandoned"`.
+Keep the summary concise and handoff-oriented: what changed, what was verified,
+any remaining risks, and the next useful step. If the user abandons or redirects
+the work, use `outcome: "abandoned"` and include the current state in `summary`
+when there is anything useful to hand off.
 
 ## Looking around
 

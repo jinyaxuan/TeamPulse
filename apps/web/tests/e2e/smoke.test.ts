@@ -5,10 +5,11 @@
  *   3. device register → pending → admin approve → poll returns token
  *   4. project resolve (idempotent)
  *   5. task start → appears in active_tasks → history
- *   6. SSE: new task event fans out to a separate subscriber
- *   7. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   6. task end-session saves handoff summary → details/project/export
+ *   7. SSE: new task event fans out to a separate subscriber
+ *   8. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   8. magic link: bearer issues link → consume returns session cookie
+ *   9. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -343,6 +344,52 @@ test("e2e: full happy path", async (t) => {
     assert.equal(res.status, 200);
     const ours = res.body.tasks.find((t: any) => t.id === taskId);
     assert.ok(ours);
+  });
+
+  await t.test("task: end-session saves handoff summary", async () => {
+    const handoffToken = `handoff-${adminName}`;
+    const summary = [
+      `Changed: ${handoffToken} implemented the failing test path.`,
+      "Verified: smoke test checked task detail, project detail, and CSV export.",
+      "Risks: none for this e2e fixture.",
+      "Next: keep the token visible for handoff search.",
+    ].join("\n");
+
+    const ended = await http("/api/v1/tasks/end-session", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        session_id: `e2e-sess-${adminName}`,
+        outcome: "done",
+        summary,
+      },
+    });
+    assert.equal(ended.status, 200);
+    assert.equal(ended.body.ended_count, 1);
+    assert.equal(ended.body.summary_saved, true);
+
+    const detail = await http(`/api/v1/tasks/${taskId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.task.status, "done");
+    assert.match(detail.body.task.summary, new RegExp(handoffToken));
+
+    const project = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(project.status, 200);
+    const recent = project.body.recent.find((t: any) => t.id === taskId);
+    assert.ok(recent, "ended task not found in recent project history");
+    assert.match(recent.summary, new RegExp(handoffToken));
+
+    const exported = await http(
+      `/api/v1/activity/export?showTestData=1&project=${projectId}&days=1`,
+      { cookies: [adminCookie], noBody: true }
+    );
+    assert.equal(exported.status, 200);
+    assert.match(exported.body, /交接摘要/);
+    assert.match(exported.body, new RegExp(handoffToken));
   });
 
   await t.test("SSE: second task fires task.started to live subscriber", async () => {

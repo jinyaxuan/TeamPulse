@@ -146,6 +146,11 @@ export default async function ActivityPage({
                   {t.branch && (
                     <div className="font-mono text-xs text-muted-foreground">分支：{t.branch}</div>
                   )}
+                  {t.summary && (
+                    <div className="mt-1 line-clamp-2 rounded border bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">
+                      {t.summary}
+                    </div>
+                  )}
                 </div>
                 <Link
                   href={`/projects/${t.project_id}`}
@@ -155,7 +160,7 @@ export default async function ActivityPage({
                 </Link>
                 <div
                   className={
-                    "w-16 flex-shrink-0 rounded-full px-2 py-0.5 text-center text-xs " +
+                    "h-fit w-16 flex-shrink-0 self-start rounded-full px-2 py-0.5 text-center text-xs lg:self-center " +
                     (t.status === "active"
                       ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                       : t.status === "done"

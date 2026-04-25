@@ -143,7 +143,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             )}
             <ul className="divide-y">
               {recent.map((t) => (
-                <li key={t.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 text-sm">
+                <li key={t.id} className="grid grid-cols-[auto_1fr_auto] gap-3 px-4 py-3 text-sm">
                   <div className="w-24 flex-shrink-0 text-xs text-muted-foreground">
                     {formatRelativeTime(t.started_at)}
                   </div>
@@ -152,10 +152,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       <span className="font-medium">{t.user_display_name ?? t.user_name}</span>
                       <span className="text-muted-foreground"> — {t.intent}</span>
                     </div>
+                    {t.summary && (
+                      <div className="mt-1 line-clamp-3 rounded border bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">
+                        {t.summary}
+                      </div>
+                    )}
                   </div>
                   <div
                     className={
-                      "flex-shrink-0 rounded-full px-2 py-0.5 text-xs " +
+                      "h-fit flex-shrink-0 self-start rounded-full px-2 py-0.5 text-xs " +
                       (t.status === "active"
                         ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                         : t.status === "done"

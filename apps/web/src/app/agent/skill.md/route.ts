@@ -108,14 +108,20 @@ node "$HOME/.teampulse/bin/teampulse-connect.mjs" heartbeat --file "<path>"
 At the end of the task, close the TeamPulse session:
 
 \`\`\`bash
-node "$HOME/.teampulse/bin/teampulse-connect.mjs" end --outcome done
+node "$HOME/.teampulse/bin/teampulse-connect.mjs" end --outcome done \\
+  --summary "Changed: ...; Verified: ...; Risks: ...; Next: ..."
 \`\`\`
 
 If the user redirects or abandons the work, use:
 
 \`\`\`bash
-node "$HOME/.teampulse/bin/teampulse-connect.mjs" end --outcome abandoned
+node "$HOME/.teampulse/bin/teampulse-connect.mjs" end --outcome abandoned \\
+  --summary "Stopped at: ...; Remaining: ..."
 \`\`\`
+
+For longer handoffs, write the summary to a file and pass \`--summary-file\`.
+Keep it focused on changed files/behavior, verification, residual risks, and
+the next useful step.
 
 For recent activity:
 
