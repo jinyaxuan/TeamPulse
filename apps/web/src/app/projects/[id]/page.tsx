@@ -1,4 +1,5 @@
 import { and, desc, eq, gt } from "drizzle-orm";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
@@ -9,11 +10,24 @@ import { ProjectLiveUpdates } from "./project-live";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+const UNKNOWN_BRANCH_FILTER = "__unknown__";
+
+type SearchParams = {
+  branch?: string;
+};
+
+export default async function ProjectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<SearchParams>;
+}) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
   const { id } = await params;
+  const query = await searchParams;
   const [project] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
   if (!project) notFound();
 
@@ -62,7 +76,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     .limit(50);
 
   const activeOverlaps = findActiveTaskOverlaps(active);
-  const activeBranchGroups = groupActiveByBranch(active);
+  const mergeRiskOverlaps = activeOverlaps.filter((overlap) => overlap.reasons.includes("merge_risk"));
+  const coordinationOverlaps = activeOverlaps.filter((overlap) => !overlap.reasons.includes("merge_risk"));
+  const branchFilter = normalizeBranchFilter(query.branch);
+  const filteredActive = filterActiveByBranch(active, branchFilter);
+  const allActiveBranchGroups = groupActiveByBranch(active);
+  const displayedActiveBranchGroups = groupActiveByBranch(filteredActive);
+  const activeBranchOptions = getActiveBranchOptions(active, branchFilter);
+  const isFiltered = branchFilter !== null;
 
   return (
     <AppShell user={user} activeNav="projects">
@@ -81,7 +102,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 当前进行中 <strong className="ml-1 text-foreground">{active.length}</strong>
               </span>
               <span className="rounded-md border bg-background px-3 py-2">
-                活跃分支 <strong className="ml-1 text-foreground">{activeBranchGroups.length}</strong>
+                活跃分支 <strong className="ml-1 text-foreground">{allActiveBranchGroups.length}</strong>
               </span>
               <span className="rounded-md border bg-background px-3 py-2">
                 7 天记录 <strong className="ml-1 text-foreground">{recent.length}</strong>
@@ -91,16 +112,35 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
 
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            当前进行中 ({active.length})
-          </h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                当前进行中 ({isFiltered ? `${filteredActive.length}/${active.length}` : active.length})
+              </h2>
+              {isFiltered && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  当前筛选：{branchFilterLabel(branchFilter)}
+                </div>
+              )}
+            </div>
+            <BranchFilter
+              projectId={project.id}
+              currentBranch={branchFilter}
+              branchOptions={activeBranchOptions}
+            />
+          </div>
           <div className="mt-3 space-y-3">
             {active.length === 0 && (
               <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
                 当前没有成员在这个项目上工作。
               </div>
             )}
-            {activeBranchGroups.map((group) => (
+            {active.length > 0 && filteredActive.length === 0 && (
+              <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
+                当前筛选的分支没有进行中的任务。
+              </div>
+            )}
+            {displayedActiveBranchGroups.map((group) => (
               <div key={group.key} className="overflow-hidden rounded-md border bg-card">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-3 py-2">
                   <div className="min-w-0">
@@ -136,13 +176,26 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         </section>
 
-        {activeOverlaps.length > 0 && (
+        {coordinationOverlaps.length > 0 && (
           <section>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">
-              潜在重叠 ({activeOverlaps.length})
+              高风险与同分支重叠 ({coordinationOverlaps.length})
             </h2>
             <div className="mt-3 space-y-2">
-              {activeOverlaps.map((overlap) => (
+              {coordinationOverlaps.map((overlap) => (
+                <OverlapAlert key={`${overlap.first.task_id}:${overlap.second.task_id}`} overlap={overlap} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {mergeRiskOverlaps.length > 0 && (
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">
+              合并风险队列 ({mergeRiskOverlaps.length})
+            </h2>
+            <div className="mt-3 space-y-2">
+              {mergeRiskOverlaps.map((overlap) => (
                 <OverlapAlert key={`${overlap.first.task_id}:${overlap.second.task_id}`} overlap={overlap} />
               ))}
             </div>
@@ -195,6 +248,52 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <ProjectLiveUpdates projectId={project.id} />
       </div>
     </AppShell>
+  );
+}
+
+function BranchFilter({
+  projectId,
+  currentBranch,
+  branchOptions,
+}: {
+  projectId: string;
+  currentBranch: string | null;
+  branchOptions: string[];
+}) {
+  return (
+    <form action={`/projects/${projectId}`} method="get" className="flex flex-wrap items-center gap-2 text-sm">
+      <label className="text-xs font-medium text-muted-foreground" htmlFor="project-branch-filter">
+        分支
+      </label>
+      <select
+        id="project-branch-filter"
+        name="branch"
+        defaultValue={currentBranch ?? ""}
+        className="rounded-md border border-input bg-background px-3 py-2"
+      >
+        <option value="">全部分支</option>
+        <option value={UNKNOWN_BRANCH_FILTER}>未检测到分支</option>
+        {branchOptions.map((branch) => (
+          <option key={branch} value={branch}>
+            {branch}
+          </option>
+        ))}
+      </select>
+      <button
+        type="submit"
+        className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
+      >
+        应用
+      </button>
+      {currentBranch && (
+        <Link
+          href={`/projects/${projectId}`}
+          className="px-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+        >
+          清空
+        </Link>
+      )}
+    </form>
   );
 }
 
@@ -269,6 +368,35 @@ function overlapContextLabel(overlap: ActiveTaskOverlap): string {
 
 function branchLabel(branch: string | null): string {
   return branch?.trim() || "未检测到分支";
+}
+
+function branchFilterLabel(branchFilter: string | null): string {
+  if (branchFilter === UNKNOWN_BRANCH_FILTER) return "未检测到分支";
+  return branchFilter ? `分支：${branchFilter}` : "全部分支";
+}
+
+function normalizeBranchFilter(branch: string | undefined): string | null {
+  const trimmed = branch?.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
+function filterActiveByBranch<T extends { branch: string | null }>(tasks: T[], branchFilter: string | null) {
+  if (!branchFilter) return tasks;
+  if (branchFilter === UNKNOWN_BRANCH_FILTER) {
+    return tasks.filter((task) => !task.branch?.trim());
+  }
+  return tasks.filter((task) => task.branch?.trim() === branchFilter);
+}
+
+function getActiveBranchOptions<T extends { branch: string | null }>(tasks: T[], branchFilter: string | null) {
+  const branches = new Set<string>();
+  for (const task of tasks) {
+    const branch = task.branch?.trim();
+    if (branch) branches.add(branch);
+  }
+  if (branchFilter && branchFilter !== UNKNOWN_BRANCH_FILTER) branches.add(branchFilter);
+  return Array.from(branches).sort((a, b) => a.localeCompare(b));
 }
 
 function groupActiveByBranch<T extends { branch: string | null }>(tasks: T[]) {

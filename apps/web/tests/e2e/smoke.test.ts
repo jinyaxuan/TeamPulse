@@ -6,12 +6,13 @@
  *   4. project resolve (idempotent)
  *   5. task start → appears in active_tasks → history
  *   6. branch-aware overlap warnings distinguish merge risk vs high risk
- *   7. task end-session saves handoff summary → details/project/export
- *   8. SSE: new task event fans out to a separate subscriber
- *   9. cleanup closes remaining e2e tasks
- *   10. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   7. project details expose branch filtering data + merge-risk queue inputs
+ *   8. task end-session saves handoff summary → details/project/export
+ *   9. SSE: new task event fans out to a separate subscriber
+ *   10. cleanup closes remaining e2e tasks
+ *   11. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   11. magic link: bearer issues link → consume returns session cookie
+ *   12. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -82,6 +83,10 @@ function randomLower(n: number) {
 function randomClaimCode() {
   const raw = randomBytes(3).toString("hex").toUpperCase();
   return `${raw.slice(0, 2)}-${raw.slice(2, 4)}-${raw.slice(4, 6)}`;
+}
+
+function taskPairKey(firstTaskId: string, secondTaskId: string): string {
+  return [firstTaskId, secondTaskId].sort().join(":");
 }
 
 async function runCreateAdmin(env: Record<string, string>) {
@@ -334,6 +339,17 @@ test("e2e: full happy path", async (t) => {
       headers: { Authorization: `Bearer ${devToken}` },
     });
     assert.equal(project.status, 200);
+    assert.equal(project.body.active.length, 2);
+    assert.equal(
+      project.body.active.find((task: any) => task.id === taskId)?.branch,
+      "e2e-branch"
+    );
+    assert.equal(
+      project.body.active.find((task: any) => task.id === overlapTaskId)?.branch,
+      "e2e-overlap-branch"
+    );
+    assert.equal(project.body.active_overlaps.length, 1);
+    assert.equal(project.body.active_overlaps[0].severity, "medium");
     assert.ok(
       project.body.active_overlaps.some((overlap: any) =>
         overlap.reasons.includes("merge_risk") &&
@@ -368,6 +384,53 @@ test("e2e: full happy path", async (t) => {
     assert.ok(mergeRisk, "expected warning against different-branch task");
     assert.equal(mergeRisk.severity, "medium");
     assert.deepEqual(mergeRisk.reasons, ["merge_risk"]);
+  });
+
+  await t.test("project: branch data supports filtering + merge-risk queue", async () => {
+    const project = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(project.status, 200);
+
+    const activeOnMainBranch = project.body.active
+      .filter((task: any) => task.branch === "e2e-branch")
+      .map((task: any) => task.id)
+      .sort();
+    assert.deepEqual(activeOnMainBranch, [sameBranchTaskId, taskId].sort());
+
+    const activeOnOverlapBranch = project.body.active
+      .filter((task: any) => task.branch === "e2e-overlap-branch")
+      .map((task: any) => task.id);
+    assert.deepEqual(activeOnOverlapBranch, [overlapTaskId]);
+
+    const mergeRiskOverlaps = project.body.active_overlaps.filter((overlap: any) =>
+      overlap.reasons.includes("merge_risk")
+    );
+    const directOverlaps = project.body.active_overlaps.filter(
+      (overlap: any) => !overlap.reasons.includes("merge_risk")
+    );
+
+    assert.deepEqual(
+      directOverlaps.map((overlap: any) =>
+        taskPairKey(overlap.first.task_id, overlap.second.task_id)
+      ),
+      [taskPairKey(taskId, sameBranchTaskId)]
+    );
+    assert.deepEqual(directOverlaps[0].reasons, ["files", "branch"]);
+    assert.equal(directOverlaps[0].severity, "high");
+
+    assert.deepEqual(
+      mergeRiskOverlaps
+        .map((overlap: any) => taskPairKey(overlap.first.task_id, overlap.second.task_id))
+        .sort(),
+      [taskPairKey(taskId, overlapTaskId), taskPairKey(overlapTaskId, sameBranchTaskId)].sort()
+    );
+    assert.ok(mergeRiskOverlaps.every((overlap: any) => overlap.severity === "medium"));
+    assert.ok(
+      mergeRiskOverlaps.every((overlap: any) =>
+        overlap.overlapping_files.includes("src/lib/conflict-target.ts")
+      )
+    );
   });
 
   await t.test("task: history contains our task", async () => {
