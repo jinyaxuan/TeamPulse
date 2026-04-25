@@ -1,0 +1,16 @@
+# TeamPulse reusable Node base image.
+#
+# Build once per server/runtime family:
+#   docker build -f apps/web/Dockerfile.base -t teampulse-node-base:22-bookworm .
+
+ARG NODE_VERSION=22
+ARG PNPM_VERSION=10.25.0
+
+FROM node:${NODE_VERSION}-bookworm
+
+ARG PNPM_VERSION
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+

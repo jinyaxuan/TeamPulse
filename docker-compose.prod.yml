@@ -20,8 +20,8 @@ services:
   # migrator directly against the SQL files we shipped into apps/web/src/db/migrations.
   migrate:
     image: teampulse-web:latest
+    init: true
     working_dir: /app/apps/web
-    entrypoint: ["/sbin/tini", "--"]
     command:
       - node
       - -e
@@ -46,10 +46,12 @@ services:
   app:
     image: teampulse-web:latest
     container_name: teampulse-web
+    init: true
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-teampulse}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teampulse}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://teampulse.internal.company.com}
+      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-teampulse_session}
       NODE_ENV: production
     depends_on:

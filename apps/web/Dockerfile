@@ -1,14 +1,17 @@
 # TeamPulse web app — multi-stage production build.
 #
 # Build context: monorepo root.
-#   docker buildx build -f apps/web/Dockerfile -t teampulse-web .
+#   docker buildx build \
+#     -f apps/web/Dockerfile \
+#     --build-arg BASE_IMAGE=teampulse-node-base:22-bookworm \
+#     --build-arg NEXT_PUBLIC_BASE_PATH=/teampulse \
+#     --build-arg PUBLIC_APP_URL=http://118.195.165.111/teampulse \
+#     -t teampulse-web .
 
-ARG NODE_VERSION=20
+ARG BASE_IMAGE=teampulse-node-base:22-bookworm
 
 # ---- Stage 1: deps ----
-FROM node:${NODE_VERSION}-alpine AS deps
-RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
+FROM ${BASE_IMAGE} AS deps
 WORKDIR /repo
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* .npmrc* ./
@@ -19,9 +22,9 @@ COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.js
 RUN pnpm install --frozen-lockfile
 
 # ---- Stage 2: builder ----
-FROM node:${NODE_VERSION}-alpine AS builder
-RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
+FROM ${BASE_IMAGE} AS builder
+ARG NEXT_PUBLIC_BASE_PATH=
+ARG PUBLIC_APP_URL=http://localhost:3000
 WORKDIR /repo
 
 COPY --from=deps /repo/node_modules ./node_modules
@@ -32,19 +35,23 @@ COPY packages ./packages
 
 WORKDIR /repo/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+ENV PUBLIC_APP_URL=${PUBLIC_APP_URL}
 RUN pnpm run build
 
 # ---- Stage 3: runtime ----
 # We install prod deps fresh (no dev deps) and copy in the built .next-build.
 # Simpler and more reliable than Next.js standalone in a pnpm monorepo.
-FROM node:${NODE_VERSION}-alpine AS runtime
-RUN apk add --no-cache libc6-compat tini
-RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
+FROM ${BASE_IMAGE} AS runtime
+ARG NEXT_PUBLIC_BASE_PATH=
+ARG PUBLIC_APP_URL=http://localhost:3000
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_DIST_DIR=.next-build
+ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+ENV PUBLIC_APP_URL=${PUBLIC_APP_URL}
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
@@ -70,5 +77,4 @@ USER nextjs
 EXPOSE 3000
 
 WORKDIR /app/apps/web
-ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "../../node_modules/next/dist/bin/next", "start"]

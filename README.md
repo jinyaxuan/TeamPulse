@@ -268,10 +268,19 @@ packages/teampulse-agent/
 cp .env.prod.example .env.prod
 ${EDITOR:-vim} .env.prod
 
-# 2. 构建镜像
-docker build -f apps/web/Dockerfile -t teampulse-web:latest .
+# 2. 构建基础镜像。服务器上已有 node:22-bookworm 时，这一步很快；
+#    后续应用镜像会复用这个基础镜像，不再反复安装系统依赖。
+docker build -f apps/web/Dockerfile.base -t teampulse-node-base:22-bookworm .
 
-# 3. 启动服务，migrate 容器会先执行数据库迁移
+# 3. 构建应用镜像。如果挂在域名子路径下，把 NEXT_PUBLIC_BASE_PATH 一起传入。
+docker build \
+  -f apps/web/Dockerfile \
+  --build-arg BASE_IMAGE=teampulse-node-base:22-bookworm \
+  --build-arg PUBLIC_APP_URL="${PUBLIC_APP_URL:-http://localhost:3000}" \
+  --build-arg NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-}" \
+  -t teampulse-web:latest .
+
+# 4. 启动服务，migrate 容器会先执行数据库迁移
 docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 ```
 
