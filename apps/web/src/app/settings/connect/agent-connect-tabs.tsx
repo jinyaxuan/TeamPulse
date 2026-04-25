@@ -105,13 +105,13 @@ function PromptBlock({ title, text }: { title: string; text: string }) {
 }
 
 function buildPrompts(appUrl: string): Record<TabKey, string> {
-  const connectorUrl = `${appUrl}/agent/teampulse-connect.mjs`;
-  const basePrompt = `请根据 ${connectorUrl} 将当前机器接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`;
+  const skillUrl = `${appUrl}/agent/skill.md`;
+  const basePrompt = `请根据 ${skillUrl} 安装 TeamPulse Skill，并将当前机器接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`;
 
   return {
     skill: basePrompt,
-    codex: `请在当前 Codex 环境中根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
-    claude: `请在当前 Claude Code 环境中根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
-    openclaw: `请根据 https://skillhub.cn/install/skillhub.md 安装 Skillhub 命令行工具并重启 Agent，然后根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
+    codex: `请在当前 Codex 环境中根据 ${skillUrl} 安装 TeamPulse Skill，并接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
+    claude: `请在当前 Claude Code 环境中根据 ${skillUrl} 安装 TeamPulse Skill，并接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
+    openclaw: `请根据 https://skillhub.cn/install/skillhub.md 安装 Skillhub 命令行工具并重启 Agent，然后根据 ${skillUrl} 安装 TeamPulse Skill 并接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
   };
 }
