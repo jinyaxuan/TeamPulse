@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { requireAuth } from "@/lib/api";
+import { visibleTasksCondition } from "@/lib/project-access";
 import {
   nonTestProjectCondition,
   nonTestUserCondition,
@@ -17,8 +18,9 @@ export const runtime = "nodejs";
  * Returns a CSV dump of matching tasks, for standup / reporting.
  */
 export async function GET(request: Request) {
+  let ctx: Awaited<ReturnType<typeof requireAuth>>;
   try {
-    await requireAuth(request);
+    ctx = await requireAuth(request);
   } catch {
     return new Response("未登录或认证已失效", { status: 401 });
   }
@@ -32,6 +34,8 @@ export async function GET(request: Request) {
 
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const conditions: SQL[] = [gte(tasks.startedAt, since)];
+  const visibility = visibleTasksCondition(ctx.user);
+  if (visibility) conditions.push(visibility);
   if (projectId) conditions.push(eq(tasks.projectId, projectId));
   if (!showTestData) {
     conditions.push(nonTestProjectCondition(), nonTestUserCondition());

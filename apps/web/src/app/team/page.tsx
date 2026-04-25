@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db, devices, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { listVisibleProjectMemberUserIds, visibleTasksCondition } from "@/lib/project-access";
 import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
 import { clientLabel, formatRelativeTime, roleLabel, taskStatusLabel } from "@/lib/utils";
 
@@ -15,6 +16,8 @@ export default async function TeamPage() {
 
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
+  const taskVisibility = visibleTasksCondition(sessionUser);
+  const visibleMemberIds = await listVisibleProjectMemberUserIds(sessionUser);
 
   const activeDeviceRows = await db
     .select({
@@ -46,7 +49,10 @@ export default async function TeamPage() {
       last_active: max(tasks.heartbeatAt),
     })
     .from(users)
-    .leftJoin(tasks, and(eq(tasks.userId, users.id), gte(tasks.startedAt, since)))
+    .leftJoin(
+      tasks,
+      and(eq(tasks.userId, users.id), gte(tasks.startedAt, since), ...(taskVisibility ? [taskVisibility] : []))
+    )
     .leftJoin(projects, eq(tasks.projectId, projects.id))
     .where(and(isNull(users.revokedAt), nonTestUserCondition(), nonTestProjectCondition()))
     .groupBy(users.id);
@@ -75,7 +81,8 @@ export default async function TeamPage() {
         gt(tasks.heartbeatAt, activeCutoff),
         isNull(users.revokedAt),
         nonTestProjectCondition(),
-        nonTestUserCondition()
+        nonTestUserCondition(),
+        ...(taskVisibility ? [taskVisibility] : [])
       )
     )
     .orderBy(desc(tasks.heartbeatAt))
@@ -100,7 +107,8 @@ export default async function TeamPage() {
         gte(tasks.startedAt, since),
         isNull(users.revokedAt),
         nonTestProjectCondition(),
-        nonTestUserCondition()
+        nonTestUserCondition(),
+        ...(taskVisibility ? [taskVisibility] : [])
       )
     )
     .orderBy(desc(tasks.startedAt))
@@ -112,6 +120,7 @@ export default async function TeamPage() {
   }
 
   const memberStats = rawMemberStats.filter((member) => {
+    if (visibleMemberIds && !visibleMemberIds.has(member.id) && member.id !== sessionUser.id) return false;
     const hasRecentTasks = Number(member.task_count) > 0;
     const hasActiveDevice = (activeDeviceCountByUser.get(member.id) ?? 0) > 0;
     return member.id === sessionUser.id || hasRecentTasks || hasActiveDevice;

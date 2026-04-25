@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { and, desc, eq, gt, ne } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
-import { handler, json, parseBody, requireAuth } from "@/lib/api";
+import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
+import { ensureProjectMember, getVisibleProject } from "@/lib/project-access";
 import { publishPresence } from "@/lib/presence";
 import { findTaskOverlapWarnings } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export const POST = handler(async (request) => {
 
   // Resolve project_id from hash if needed.
   let projectId = body.project_id;
+  let resolvedFromHash = false;
   if (!projectId && body.git_remote_hash) {
     const [p] = await db
       .select({ id: projects.id })
@@ -38,9 +40,18 @@ export const POST = handler(async (request) => {
       .where(eq(projects.gitRemoteHash, body.git_remote_hash))
       .limit(1);
     projectId = p?.id;
+    resolvedFromHash = Boolean(projectId);
   }
   if (!projectId) {
     return json({ error: "需要提供 project_id 或 git_remote_hash" }, { status: 400 });
+  }
+
+  if (resolvedFromHash) {
+    await ensureProjectMember(projectId, ctx.user.id, "activity");
+  } else {
+    const project = await getVisibleProject(projectId, ctx.user);
+    if (!project) throw new ApiError("项目不存在", 404);
+    await ensureProjectMember(projectId, ctx.user.id, "activity");
   }
 
   const intent = body.intent.trim().slice(0, 500);

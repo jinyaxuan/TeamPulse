@@ -4,15 +4,16 @@
  *   2. invite registration → one-use code creates a member account
  *   3. device register → pending → admin approve → poll returns token
  *   4. project resolve stores remote URL (idempotent)
- *   5. task start → appears in active_tasks → history
- *   6. branch-aware overlap warnings distinguish merge risk vs high risk
- *   7. project details expose branch filtering data + merge-risk queue inputs
- *   8. task end-session saves handoff summary → details/project/export
- *   9. SSE: new task event fans out to a separate subscriber
- *   10. cleanup closes remaining e2e tasks
- *   11. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   5. project membership is scoped by account and same remote joins automatically
+ *   6. task start → appears in active_tasks → history
+ *   7. branch-aware overlap warnings distinguish merge risk vs high risk
+ *   8. project details expose branch filtering data + merge-risk queue inputs
+ *   9. task end-session saves handoff summary → details/project/export
+ *   10. SSE: new task event fans out to a separate subscriber
+ *   11. cleanup closes remaining e2e tasks
+ *   12. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   12. magic link: bearer issues link → consume returns session cookie
+ *   13. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -135,8 +136,11 @@ test("e2e: full happy path", async (t) => {
     adminCookie = cookie!;
   });
 
+  let invitedName!: string;
+  let invitedCookie!: string;
+
   await t.test("invite registration: admin creates one-use code", async () => {
-    const invitedName = `e2e_invited_${randomLower(6)}`;
+    invitedName = `e2e_invited_${randomLower(6)}`;
     const invitedEmail = `${invitedName}@example.com`;
     const invitedPassword = randomBytes(16).toString("base64url");
 
@@ -159,7 +163,9 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(registered.status, 200);
     assert.equal(registered.body.user.name, invitedName);
-    assert.ok(extractSessionCookie(registered.setCookies), "expected invited user session cookie");
+    const cookie = extractSessionCookie(registered.setCookies);
+    assert.ok(cookie, "expected invited user session cookie");
+    invitedCookie = cookie!;
 
     const reused = await http("/api/v1/auth/register", {
       method: "POST",
@@ -288,6 +294,51 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(detail.status, 200);
     assert.equal(detail.body.project.git_remote_url, remoteUrl);
+    assert.ok(
+      detail.body.members.some((member: any) => member.user_name === devUserName),
+      "project resolver should add the device user as a project member"
+    );
+  });
+
+  await t.test("project: membership is scoped by account and same remote joins automatically", async () => {
+    const beforeJoin = await http(`/api/v1/projects/${projectId}`, {
+      cookies: [invitedCookie],
+    });
+    assert.equal(beforeJoin.status, 404);
+
+    const sessionId = `e2e-sess-invited-${adminName}`;
+    const joined = await http("/api/v1/tasks", {
+      method: "POST",
+      cookies: [invitedCookie],
+      body: {
+        git_remote_hash: remoteHash,
+        session_id: sessionId,
+        intent: "E2E: invited user joins by same remote",
+        branch: "e2e-invited-branch",
+      },
+    });
+    assert.equal(joined.status, 200);
+    assert.equal(joined.body.project_id, projectId);
+
+    const afterJoin = await http(`/api/v1/projects/${projectId}`, {
+      cookies: [invitedCookie],
+    });
+    assert.equal(afterJoin.status, 200);
+    const memberNames = afterJoin.body.members.map((member: any) => member.user_name).sort();
+    assert.ok(memberNames.includes(devUserName));
+    assert.ok(memberNames.includes(invitedName));
+
+    const ended = await http("/api/v1/tasks/end-session", {
+      method: "POST",
+      cookies: [invitedCookie],
+      body: {
+        session_id: sessionId,
+        outcome: "abandoned",
+        summary: "E2E cleanup: closing invited membership fixture.",
+      },
+    });
+    assert.equal(ended.status, 200);
+    assert.equal(ended.body.ended_count, 1);
   });
 
   let taskId!: string;

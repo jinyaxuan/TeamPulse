@@ -1,6 +1,7 @@
 import { and, desc, eq, gt } from "drizzle-orm";
 import { db, tasks, users } from "@/db";
 import { handler, json, requireAuth } from "@/lib/api";
+import { visibleTasksCondition } from "@/lib/project-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
  * "Active" means status='active' and heartbeat within the last 15 minutes.
  */
 export const GET = handler(async (request) => {
-  await requireAuth(request);
+  const ctx = await requireAuth(request);
   const url = new URL(request.url);
   const projectId = url.searchParams.get("project");
 
@@ -19,6 +20,8 @@ export const GET = handler(async (request) => {
 
   const conditions = [eq(tasks.status, "active"), gt(tasks.heartbeatAt, cutoff)];
   if (projectId) conditions.push(eq(tasks.projectId, projectId));
+  const visibility = visibleTasksCondition(ctx.user);
+  if (visibility) conditions.push(visibility);
 
   const rows = await db
     .select({

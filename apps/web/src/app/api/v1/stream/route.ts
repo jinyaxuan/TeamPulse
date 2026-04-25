@@ -1,4 +1,5 @@
 import { getAuthFromRequest } from "@/lib/auth";
+import { canAccessProject } from "@/lib/project-access";
 import { presenceBus, type PresenceEvent } from "@/lib/presence";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,9 @@ export async function GET(request: Request) {
   const projectId = url.searchParams.get("project");
   if (!projectId) {
     return new Response("需要 project 查询参数", { status: 400 });
+  }
+  if (!(await canAccessProject(projectId, ctx.user))) {
+    return new Response("项目不存在", { status: 404 });
   }
 
   const encoder = new TextEncoder();

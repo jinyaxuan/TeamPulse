@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, memoryBlobs, projects } from "@/db";
 import { requireAuth } from "@/lib/api";
+import { canAccessProject } from "@/lib/project-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -16,6 +17,9 @@ export async function GET(
   try {
     const ctx = await requireAuth(request);
     const { projectId } = await context.params;
+    if (!(await canAccessProject(projectId, ctx.user))) {
+      return new Response("项目不存在", { status: 404 });
+    }
 
     const [blob] = await db
       .select({

@@ -1,5 +1,7 @@
 import { desc, eq, gt, and, sql } from "drizzle-orm";
-import { db, projects, tasks } from "@/db";
+import type { SQL } from "drizzle-orm";
+import { db, projects, tasks, type User } from "@/db";
+import { visibleProjectsCondition } from "@/lib/project-access";
 import { nonTestProjectCondition } from "@/lib/test-data";
 
 export type ProjectStat = {
@@ -19,10 +21,16 @@ export type ProjectStat = {
  */
 export async function listProjectsWithStats({
   includeTestData = false,
+  user,
 }: {
   includeTestData?: boolean;
+  user?: Pick<User, "id" | "role">;
 } = {}): Promise<ProjectStat[]> {
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const conditions: SQL[] = [];
+  if (!includeTestData) conditions.push(nonTestProjectCondition());
+  const visibility = user ? visibleProjectsCondition(user) : undefined;
+  if (visibility) conditions.push(visibility);
 
   const query = db
     .select({
@@ -39,7 +47,7 @@ export async function listProjectsWithStats({
     .from(projects)
     .leftJoin(tasks, eq(tasks.projectId, projects.id));
 
-  const rows = await (includeTestData ? query : query.where(nonTestProjectCondition()))
+  const rows = await (conditions.length > 0 ? query.where(and(...conditions)) : query)
     .groupBy(projects.id)
     .orderBy(desc(projects.createdAt));
 

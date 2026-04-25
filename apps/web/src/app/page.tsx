@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { visibleTasksCondition } from "@/lib/project-access";
 import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export default async function Home() {
 
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const taskVisibility = visibleTasksCondition(user);
 
   const myActive = await db
     .select({
@@ -34,7 +36,8 @@ export default async function Home() {
         eq(tasks.userId, user.id),
         eq(tasks.status, "active"),
         gt(tasks.heartbeatAt, activeCutoff),
-        nonTestProjectCondition()
+        nonTestProjectCondition(),
+        ...(taskVisibility ? [taskVisibility] : [])
       )
     )
     .orderBy(desc(tasks.heartbeatAt))
@@ -54,7 +57,14 @@ export default async function Home() {
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
     .innerJoin(users, eq(tasks.userId, users.id))
-    .where(and(gt(tasks.startedAt, recentCutoff), nonTestProjectCondition(), nonTestUserCondition()))
+    .where(
+      and(
+        gt(tasks.startedAt, recentCutoff),
+        nonTestProjectCondition(),
+        nonTestUserCondition(),
+        ...(taskVisibility ? [taskVisibility] : [])
+      )
+    )
     .orderBy(desc(tasks.startedAt))
     .limit(20);
 

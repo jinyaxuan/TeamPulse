@@ -131,6 +131,29 @@ export const projects = pgTable("projects", {
 });
 
 /**
+ * project_members — users who can see and collaborate in a project.
+ */
+export const projectMembers = pgTable(
+  "project_members",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("member"), // member|owner in future
+    source: text("source").notNull().default("activity"), // resolve|activity|manual in future
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.userId] }),
+    index("project_members_user_idx").on(t.userId, t.projectId),
+  ]
+);
+
+/**
  * tasks — append-only activity log.
  */
 export const tasks = pgTable(
@@ -187,6 +210,8 @@ export type Device = typeof devices.$inferSelect;
 export type NewDevice = typeof devices.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
+export type ProjectMember = typeof projectMembers.$inferSelect;
+export type NewProjectMember = typeof projectMembers.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
 export type MemoryBlob = typeof memoryBlobs.$inferSelect;

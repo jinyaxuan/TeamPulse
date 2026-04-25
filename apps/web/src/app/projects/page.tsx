@@ -11,7 +11,7 @@ export default async function ProjectsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const rows = await listProjectsWithStats();
+  const rows = await listProjectsWithStats({ user });
   const activeProjects = rows.filter((p) => p.active_count > 0).length;
   const recentlyTouched = rows.filter((p) => Boolean(p.last_activity)).length;
 

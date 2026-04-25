@@ -1,6 +1,7 @@
 import { and, desc, eq, gt } from "drizzle-orm";
-import { db, projects, tasks, users } from "@/db";
+import { db, projectMembers, tasks, users } from "@/db";
 import { ApiError, handler, json, requireAuth } from "@/lib/api";
+import { getVisibleProject } from "@/lib/project-access";
 import { findActiveTaskOverlaps } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,9 +12,9 @@ export const runtime = "nodejs";
  * Project details + active tasks + recent history (last 24h).
  */
 export const GET = handler<{ id: string }>(async (request, params) => {
-  await requireAuth(request);
+  const ctx = await requireAuth(request);
 
-  const [project] = await db.select().from(projects).where(eq(projects.id, params.id)).limit(1);
+  const project = await getVisibleProject(params.id, ctx.user);
   if (!project) throw new ApiError("项目不存在", 404);
 
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
@@ -61,6 +62,21 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     .orderBy(desc(tasks.startedAt))
     .limit(50);
 
+  const members = await db
+    .select({
+      user_id: users.id,
+      user_name: users.name,
+      user_display_name: users.displayName,
+      role: projectMembers.role,
+      source: projectMembers.source,
+      joined_at: projectMembers.createdAt,
+      last_seen_at: projectMembers.lastSeenAt,
+    })
+    .from(projectMembers)
+    .innerJoin(users, eq(projectMembers.userId, users.id))
+    .where(eq(projectMembers.projectId, project.id))
+    .orderBy(desc(projectMembers.lastSeenAt));
+
   return json({
     project: {
       id: project.id,
@@ -71,6 +87,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     },
     active,
     active_overlaps: findActiveTaskOverlaps(active),
+    members,
     recent,
   });
 });

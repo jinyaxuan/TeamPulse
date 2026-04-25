@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { db, memoryBlobs, projects } from "@/db";
+import { db, memoryBlobs } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
+import { getVisibleProject } from "@/lib/project-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -21,8 +22,7 @@ const putSchema = z.object({
 export const GET = handler<{ projectId: string }>(async (request, params) => {
   const ctx = await requireAuth(request);
 
-  // Optional: verify project exists (cheap guard; not strictly required).
-  const [proj] = await db.select().from(projects).where(eq(projects.id, params.projectId)).limit(1);
+  const proj = await getVisibleProject(params.projectId, ctx.user);
   if (!proj) throw new ApiError("项目不存在", 404);
 
   const [blob] = await db
@@ -72,7 +72,7 @@ export const PUT = handler<{ projectId: string }>(async (request, params) => {
   const ctx = await requireAuth(request);
   const body = await parseBody(request, putSchema);
 
-  const [proj] = await db.select().from(projects).where(eq(projects.id, params.projectId)).limit(1);
+  const proj = await getVisibleProject(params.projectId, ctx.user);
   if (!proj) throw new ApiError("项目不存在", 404);
 
   const ifMatch = request.headers.get("if-match");

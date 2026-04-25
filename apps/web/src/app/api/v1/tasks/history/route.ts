@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, tasks, users } from "@/db";
 import { handler, json, requireAuth } from "@/lib/api";
+import { visibleTasksCondition } from "@/lib/project-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -18,7 +19,7 @@ export const runtime = "nodejs";
  *   limit     — max 500, default 100
  */
 export const GET = handler(async (request) => {
-  await requireAuth(request);
+  const ctx = await requireAuth(request);
   const url = new URL(request.url);
 
   const projectId = url.searchParams.get("project");
@@ -29,6 +30,8 @@ export const GET = handler(async (request) => {
   const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 500);
 
   const conditions: SQL[] = [];
+  const visibility = visibleTasksCondition(ctx.user);
+  if (visibility) conditions.push(visibility);
   if (projectId) conditions.push(eq(tasks.projectId, projectId));
   if (since) {
     const d = new Date(since);

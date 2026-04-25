@@ -9,7 +9,7 @@ export const runtime = "nodejs";
  * List all projects with their latest activity timestamp and active member count.
  */
 export const GET = handler(async (request) => {
-  await requireAuth(request);
-  const projects = await listProjectsWithStats();
+  const ctx = await requireAuth(request);
+  const projects = await listProjectsWithStats({ user: ctx.user });
   return json({ projects });
 });

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { visibleProjectsCondition, visibleTasksCondition } from "@/lib/project-access";
 import {
   nonTestProjectCondition,
   nonTestUserCondition,
@@ -37,6 +38,8 @@ export default async function ActivityPage({
   const showTestData = shouldShowTestData(params.showTestData);
 
   const conditions: SQL[] = [gte(tasks.startedAt, since)];
+  const taskVisibility = visibleTasksCondition(sessionUser);
+  if (taskVisibility) conditions.push(taskVisibility);
   if (params.project) conditions.push(eq(tasks.projectId, params.project));
   if (!showTestData) {
     conditions.push(nonTestProjectCondition(), nonTestUserCondition());
@@ -76,9 +79,13 @@ export default async function ActivityPage({
   const projectOptionsQuery = db
     .select({ id: projects.id, display_name: projects.displayName })
     .from(projects);
-  const projectOptions = await (showTestData
-    ? projectOptionsQuery
-    : projectOptionsQuery.where(nonTestProjectCondition())
+  const projectOptionConditions: SQL[] = [];
+  if (!showTestData) projectOptionConditions.push(nonTestProjectCondition());
+  const projectVisibility = visibleProjectsCondition(sessionUser);
+  if (projectVisibility) projectOptionConditions.push(projectVisibility);
+  const projectOptions = await (projectOptionConditions.length > 0
+    ? projectOptionsQuery.where(and(...projectOptionConditions))
+    : projectOptionsQuery
   ).orderBy(projects.displayName);
 
   // Build an export CSV link that preserves current filters.

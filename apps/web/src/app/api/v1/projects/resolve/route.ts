@@ -2,6 +2,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, projects } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
+import { ensureProjectMember } from "@/lib/project-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -17,7 +18,7 @@ const resolveSchema = z.object({
  * needs a project_id for the current cwd. Returns { project_id, display_name }.
  */
 export const POST = handler(async (request) => {
-  await requireAuth(request);
+  const ctx = await requireAuth(request);
   const body = await parseBody(request, resolveSchema);
 
   const remoteUrl = normalizeRemoteUrl(body.git_remote_url);
@@ -39,6 +40,8 @@ export const POST = handler(async (request) => {
         ? await db.update(projects).set(updates).where(eq(projects.id, existing.id)).returning()
         : [existing];
 
+    await ensureProjectMember(updated.id, ctx.user.id, "resolve");
+
     return json({
       project_id: updated.id,
       display_name: updated.displayName,
@@ -54,6 +57,8 @@ export const POST = handler(async (request) => {
       displayName: display,
     })
     .returning();
+
+  await ensureProjectMember(created.id, ctx.user.id, "resolve");
 
   return json({
     project_id: created.id,
