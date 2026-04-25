@@ -2,7 +2,7 @@
   "name": "teampulse",
   "version": "0.1.0",
   "private": true,
-  "description": "Team AI coordination platform for Claude Code",
+  "description": "Team AI coordination platform for agent teams",
   "packageManager": "pnpm@10.25.0",
   "scripts": {
     "dev": "pnpm --filter @teampulse/web dev",

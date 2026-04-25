@@ -13,7 +13,7 @@ export default async function ProfilePage() {
       <div>
         <h1 className="text-2xl font-semibold">个人资料</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          管理你的显示名称、头像和密码。用户名在设备审批时确定，这里不能修改。
+          管理你的显示名称、头像和密码。用户名由账号创建流程确定，这里不能修改。
         </p>
       </div>
 

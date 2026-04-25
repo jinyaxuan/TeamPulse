@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 工作台
               </Link>
               <Link href="/admin/devices" className="hover:text-foreground">
-                设备审批
+                设备管理
               </Link>
               <Link href="/admin/users" className="hover:text-foreground">
                 用户管理

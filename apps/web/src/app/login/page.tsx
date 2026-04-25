@@ -18,7 +18,7 @@ export default async function LoginPage() {
           <LoginForm />
         </div>
         <p className="mt-6 text-xs text-muted-foreground">
-          没有管理员密码的开发者：先安装 Claude Code 或 Codex 插件，再让管理员审批你的设备。
+          没有管理员密码的开发者：先让管理员创建账号，再登录账号到“我的接入”绑定自己的设备。
         </p>
       </div>
     </main>

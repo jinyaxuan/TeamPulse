@@ -1,6 +1,6 @@
 # TeamPulse
 
-TeamPulse 是一个面向 Claude Code 团队使用的 AI 协作面板。它用来查看团队成员当前正在做什么、最近做过什么，并支持跨设备同步项目记忆。
+TeamPulse 是一个面向团队 Agent 协作的 AI 工作面板。它用来查看成员当前正在做什么、最近做过什么，并支持 Codex、Claude Code 以及能执行终端命令的通用 Agent 接入。
 
 ## 项目结构
 
@@ -41,22 +41,22 @@ pnpm dev
 
 1. 运行 `pnpm create-admin` 创建第一个管理员账号。
 2. 打开 `http://localhost:3000/login` 登录。
-3. 进入 `/admin/devices`，审批新注册的开发设备。
+3. 在成员管理中创建团队账号。每个成员用自己的账号登录后，在 `/settings/connect` 认领自己的设备。
 
 ### 开发者接入
 
-1. 在 Claude Code 中安装 TeamPulse 插件。
-2. 在任意 git 仓库里打开 Claude Code。插件会自动注册设备，并在会话上下文里显示 6 位认领码，例如 `AB-CD-EF`。
-3. 把认领码发给管理员。
-4. 管理员在 `/admin/devices` 审批设备，并填写开发者用户名。
-5. 插件轮询服务端，拿到 bearer token 后保存到 `~/.teampulse/credentials.json`。
-6. 之后该仓库中的 Claude Code 会话会自动上报任务状态。
+1. 登录自己的 TeamPulse 账号，打开 `/settings/connect`。
+2. 根据页面选择 Agent 类型：Codex、Claude Code 或 OpenClaw / 通用 Agent。
+3. 在需要接入的机器上注册设备，拿到 6 位认领码，例如 `AB-CD-EF`。
+4. 把认领码填到“我的接入”页面。哪个账号提交认领码，设备就归属到哪个账号。
+5. 回到终端执行 poll 或重新打开 Agent 会话，凭据会保存到 `~/.teampulse/credentials.json`。
+6. 后续该设备上报的任务、心跳和文件触碰记录都会归到当前账号下。
 
-开发者不需要单独创建密码，也不需要手动移动凭据文件。
+管理员仍可在 `/admin/devices` 查看待认领设备，并在必要时代为绑定。
 
 ### Codex 接入
 
-项目内置了一个 Codex 适配插件：`packages/teampulse-codex`。它复用 TeamPulse 的设备审批和 bearer token 机制，凭据同样保存到 `~/.teampulse/credentials.json`。
+项目内置了一个 Codex 适配插件：`packages/teampulse-codex`。它复用 TeamPulse 的设备认领和 bearer token 机制，凭据同样保存到 `~/.teampulse/credentials.json`。
 
 首次接入：
 
@@ -64,11 +64,32 @@ pnpm dev
 # 如果你的本地 TeamPulse 跑在 3002，先指定服务地址
 TEAMPULSE_SERVER_URL=http://localhost:3002 pnpm codex:register
 
-# 输出 claim_code 后，到 Web 面板 /admin/devices 审批该设备
+# 输出 claim_code 后，登录目标账号并到 /settings/connect 绑定该设备
 
 TEAMPULSE_SERVER_URL=http://localhost:3002 pnpm codex:poll
 pnpm codex:status
 ```
+
+### Claude Code 接入
+
+仓库内的 Claude Code 插件位于 `packages/plugin`，插件声明文件是 `packages/plugin/.claude-plugin/plugin.json`。
+
+1. 在 Claude Code 中安装或启用该插件。
+2. 重启 Claude Code，并在任意 git 仓库打开会话。
+3. 会话上下文出现 `[TeamPulse 待认领]` 时，把 Claim code 填到 `/settings/connect`。
+4. 再开启一次 Claude Code 会话，插件会自动领取凭据并开始上报任务。
+
+### OpenClaw / 通用 Agent 接入
+
+只要 Agent 能执行终端命令，就可以用和 Codex 相同的 CLI 流程接入：
+
+```bash
+teampulse-codex register --server-url http://localhost:3002
+# 把输出的 claim_code 填到 /settings/connect
+teampulse-codex poll --server-url http://localhost:3002
+```
+
+如果通过 Skillhub 这类商店分发，可以把上面两条命令包装成 Skill：先让 Agent 注册设备并返回 `claim_code`，由用户在 TeamPulse 当前账号页确认绑定，再让 Agent 执行 poll。
 
 手动上报当前 Codex 任务：
 
@@ -102,7 +123,7 @@ pnpm --filter @teampulse/codex-plugin end-session
 - **展示 presence，而不是自动判定冲突**：TeamPulse 只展示“谁在做什么”，具体是否协调由人和 Claude 决定。
 - **单进程后端**：Next.js 14 App Router 同时承载页面和 API。SSE 使用进程内 `EventEmitter`，不依赖 Redis，适合小团队规模。
 - **无 ML 依赖**：没有 embedding、pgvector 或 LLM judge。基础栈是 Postgres、Drizzle、Tailwind。
-- **设备优先认证**：开发者设备自注册，管理员审批后插件拿到 bearer token。开发者偶尔访问 Web 时可通过 magic link 登录。
+- **账号认领认证**：开发者设备自注册后生成认领码，由当前登录账号在 `/settings/connect` 确认绑定。插件拿到 bearer token 后保存本机凭据。
 
 ## 目录说明
 
@@ -115,7 +136,7 @@ apps/web/
       login/                         管理员密码登录
       admin/
         layout.tsx                   管理员导航和权限保护
-        devices/page.tsx             设备审批页面
+        devices/page.tsx             设备管理页面
         users/page.tsx               用户管理页面
       projects/
         page.tsx                     项目列表
@@ -179,7 +200,7 @@ packages/teampulse-codex/
 
 ## 已完成功能
 
-- Phase 1：认证、设备注册、管理员审批流、插件骨架。
+- Phase 1：认证、设备注册、账号认领流、插件骨架。
 - Phase 2：Projects API、Tasks CRUD、SSE fanout、核心页面、活动流。
 - Phase 3：
   - LWW 记忆同步：`/api/v1/memory/:projectId`，支持 ETag 和冲突检测。

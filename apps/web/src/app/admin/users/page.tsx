@@ -38,7 +38,7 @@ export default async function AdminUsersPage() {
       <div>
         <h1 className="text-2xl font-semibold">用户管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          管理成员角色和访问权限。管理员审批设备认领码时，会自动创建对应用户。
+          管理成员角色和访问权限。团队成员用自己的账号到“我的接入”绑定各自的 Agent 设备。
         </p>
       </div>
       <UsersTable users={enriched} />

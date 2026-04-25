@@ -45,7 +45,7 @@ export function deviceStatusLabel(status: string): string {
     case "active":
       return "已启用";
     case "pending":
-      return "待审批";
+      return "待认领";
     case "revoked":
       return "已撤销";
     case "rejected":

@@ -139,10 +139,10 @@ export default async function Home() {
             <div className="mt-3 grid gap-2">
               <QuickLink href="/projects" label="项目" title="项目列表" description="按仓库查看活跃任务和历史。" />
               <QuickLink href="/activity" label="动态" title="团队动态" description="筛选、审计和导出任务记录。" />
-              <QuickLink href="/settings/connect" label="接入" title="我的接入" description="按当前账号绑定 Claude Code / Codex 设备。" />
+              <QuickLink href="/settings/connect" label="接入" title="我的接入" description="按当前账号绑定 Codex、Claude Code 或通用 Agent。" />
               <QuickLink href="/settings/devices" label="设备" title="我的设备" description="查看并撤销个人插件设备。" />
               {user.role === "admin" && (
-                <QuickLink href="/admin/devices" label="审批" title="设备审批" description="审批新接入的 Claude Code / Codex 设备。" />
+                <QuickLink href="/admin/devices" label="设备" title="设备管理" description="查看待认领设备，必要时由管理员代为绑定。" />
               )}
             </div>
           </div>
@@ -159,7 +159,7 @@ export default async function Home() {
           <div className="mt-3 overflow-hidden rounded-lg border bg-white shadow-sm">
             {teamRecent.length === 0 && (
               <div className="p-4 text-sm text-muted-foreground">
-                暂时没有团队动态。管理员可以先到设备审批页邀请成员接入。
+                暂时没有团队动态。成员可以先到“我的接入”绑定自己的 Agent 设备。
               </div>
             )}
             <ul className="divide-y">

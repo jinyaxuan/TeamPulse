@@ -42,9 +42,9 @@ export default async function DevicesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">设备审批</h1>
+        <h1 className="text-2xl font-semibold">设备管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Claude Code 和 Codex 插件注册的新设备会在这里等待审批。审批后设备会绑定到指定用户。
+          Claude Code、Codex 和通用 Agent 注册的新设备会在这里等待认领。管理员也可以在这里代成员绑定设备。
         </p>
       </div>
       <DevicesClient

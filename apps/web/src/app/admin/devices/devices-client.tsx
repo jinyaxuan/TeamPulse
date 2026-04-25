@@ -48,7 +48,7 @@ export function DevicesClient({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "审批失败");
+      setError(body.error ?? "绑定失败");
       return;
     }
     startTransition(() => router.refresh());
@@ -77,12 +77,12 @@ export function DevicesClient({
 
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          待审批 ({pending.length})
+          待认领 ({pending.length})
         </h2>
         <div className="mt-3 space-y-3">
           {pending.length === 0 && (
             <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-              暂无待审批设备。成员安装 Claude Code 或 Codex 插件后，会自动出现在这里。
+              暂无待认领设备。成员安装或运行 Agent 接入命令后，会自动出现在这里。
             </p>
           )}
           {pending.map((d) => (
@@ -110,7 +110,7 @@ export function DevicesClient({
                 <th className="px-4 py-2 text-left">用户</th>
                 <th className="px-4 py-2 text-left">系统</th>
                 <th className="px-4 py-2 text-left">最近使用</th>
-                <th className="px-4 py-2 text-left">审批时间</th>
+                <th className="px-4 py-2 text-left">绑定时间</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -219,7 +219,7 @@ function PendingCard({
           disabled={disabled || !name.trim()}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          审批通过
+          绑定到用户
         </button>
         <button
           onClick={() => onReject(device.id)}

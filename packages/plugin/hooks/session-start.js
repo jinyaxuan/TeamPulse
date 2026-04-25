@@ -35,16 +35,16 @@ async function main() {
     try {
       const device = await registerDevice();
       emitContext(
-        `[TeamPulse 待认领] This device is pending admin approval.\n` +
+        `[TeamPulse 待认领] This device is waiting to be bound to a TeamPulse account.\n` +
           `Claim code: ${device.claim_code}\n` +
-          `Server: ${device.server_url}/admin/devices\n` +
-          `Share this 6-char code with your admin to finish setup.`
+          `Server: ${device.server_url}/settings/connect\n` +
+          `Open this page while logged into the target account and enter the claim code.`
       );
       // Also kick off a single poll to pick up an already-approved device.
       try {
         const result = await pollClaimCode(device);
         if (result.status === "active") {
-          emitContext(`[TeamPulse] Device approved as user '${result.user?.name}'. Starting to report tasks.`);
+          emitContext(`[TeamPulse] Device bound as user '${result.user?.name}'. Starting to report tasks.`);
         }
       } catch {
         // Ignore — next session will poll again.

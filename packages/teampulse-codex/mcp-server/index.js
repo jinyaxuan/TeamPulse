@@ -60,7 +60,7 @@ const TOOLS = [
   {
     name: "teampulse_register_device",
     description:
-      "Register this Codex environment as a TeamPulse device and return the claim code an admin must approve.",
+      "Register this Codex environment as a TeamPulse device and return the claim code the user must bind from /settings/connect.",
     inputSchema: {
       type: "object",
       properties: {
@@ -74,7 +74,7 @@ const TOOLS = [
   {
     name: "teampulse_poll_device",
     description:
-      "Poll TeamPulse after admin approval. Saves ~/.teampulse/credentials.json when approved.",
+      "Poll TeamPulse after the claim code is bound. Saves ~/.teampulse/credentials.json when active.",
     inputSchema: {
       type: "object",
       properties: {
@@ -200,7 +200,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           server_url: device.server_url,
           device_id: device.device_id,
           claim_code: device.claim_code,
-          next_step: "Open TeamPulse /admin/devices and approve this claim code.",
+          next_step:
+            "Open TeamPulse /settings/connect while logged into the target account and bind this claim code.",
         });
       }
 
@@ -315,7 +316,8 @@ async function statusPayload() {
     return {
       configured: false,
       credentials_path: paths.CREDENTIALS_PATH,
-      next_step: "Call teampulse_register_device and approve the claim code in TeamPulse.",
+      next_step:
+        "Call teampulse_register_device, then bind the claim code in TeamPulse /settings/connect while logged into the target account.",
     };
   }
   return {

@@ -50,7 +50,7 @@ function notConfiguredResult() {
       {
         type: "text",
         text:
-          "TeamPulse is not configured on this device yet. The SessionStart hook should have shown a claim code; ask your admin to approve it at the server's /admin/devices page.",
+          "TeamPulse is not configured on this device yet. The SessionStart hook should have shown a claim code; open /settings/connect while logged into the target account and bind that code.",
       },
     ],
     isError: true,

@@ -56,7 +56,7 @@ export function ProfileForm({ current }: { current: Current }) {
 
   return (
     <form onSubmit={save} className="space-y-4">
-      <ReadOnlyField label="用户名" value={current.name} hint="设备审批时设置，当前不可修改" />
+      <ReadOnlyField label="用户名" value={current.name} hint="账号创建后不可修改" />
       {current.email && <ReadOnlyField label="邮箱" value={current.email} />}
       <ReadOnlyField label="角色" value={roleLabel(current.role)} />
 

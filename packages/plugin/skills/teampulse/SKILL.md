@@ -54,14 +54,16 @@ No action needed — hooks handle `teampulse_end_task` automatically on session 
 ## If TeamPulse is not configured
 
 If the SessionStart context says `[TeamPulse 待认领]` or `[TeamPulse not configured]`,
-the plugin needs admin approval to work. Tell the user:
+the plugin needs to be claimed by the currently logged-in TeamPulse account.
+Tell the user:
 
 > "TeamPulse needs approval on this device. Your device code is **AB-CD-EF**.
->  Ask your admin to open `<server_url>/admin/devices` and approve it with your
->  name. This is a one-time setup."
+>  Open `<server_url>/settings/connect` while logged into the correct account,
+>  enter this code, then start a new Claude Code session. This is a one-time setup."
 
-Use the exact claim code from the context. Once admin approves, the plugin
-auto-configures within ~10 seconds — no further action needed from the user.
+Use the exact claim code from the context. The account that submits the code
+owns this device. Once claimed, the plugin auto-configures on the next session
+by writing `~/.teampulse/credentials.json`.
 
 ## Opting out
 

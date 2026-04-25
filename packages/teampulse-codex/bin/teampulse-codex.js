@@ -104,7 +104,8 @@ async function register() {
     server_url: device.server_url,
     device_id: device.device_id,
     claim_code: device.claim_code,
-    next_step: "Approve this claim code in TeamPulse /admin/devices, then run teampulse-codex poll.",
+    next_step:
+      "Open TeamPulse /settings/connect while logged into the target account, bind this claim code, then run teampulse-codex poll.",
   });
 }
 

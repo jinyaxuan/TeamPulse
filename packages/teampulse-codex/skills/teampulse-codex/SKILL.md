@@ -14,8 +14,9 @@ If `teampulse_status` says TeamPulse is not configured:
 
 1. Call `teampulse_register_device`.
 2. Tell the user the returned `claim_code`.
-3. Ask an admin to approve the code in TeamPulse `/admin/devices`.
-4. Call `teampulse_poll_device` after approval.
+3. Ask the user to open TeamPulse `/settings/connect` while logged into the
+   account that should own this device, then enter the code.
+4. Call `teampulse_poll_device` after the user confirms the code is bound.
 
 Credentials are saved in `~/.teampulse/credentials.json`.
 
