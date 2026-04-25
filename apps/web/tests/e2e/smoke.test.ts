@@ -126,8 +126,8 @@ test("e2e: full happy path", async (t) => {
     adminCookie = cookie!;
   });
 
-  const deviceSecret = randomBytes(32).toString("base64url");
-  const claimCode = randomClaimCode();
+  let deviceSecret!: string;
+  let claimCode!: string;
   let deviceId!: string;
 
   await t.test("device: self claim binds to current account", async () => {
@@ -174,15 +174,16 @@ test("e2e: full happy path", async (t) => {
     const res = await http("/api/v1/devices/register", {
       method: "POST",
       body: {
-        claim_code: claimCode,
-        device_secret: deviceSecret,
         hostname: `e2e-${adminName}`,
         os: "linux",
-        git_email: `${adminName}+dev@example.com`,
       },
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.status, "pending");
+    assert.match(res.body.claim_code, /^[A-Z0-9]{2}-[A-Z0-9]{2}-[A-Z0-9]{2}$/);
+    assert.ok(res.body.device_secret?.length >= 32);
+    claimCode = res.body.claim_code;
+    deviceSecret = res.body.device_secret;
     deviceId = res.body.device_id;
   });
 

@@ -47,16 +47,41 @@ pnpm dev
 
 1. 登录自己的 TeamPulse 账号，打开 `/settings/connect`。
 2. 根据页面选择 Agent 类型：Codex、Claude Code 或 OpenClaw / 通用 Agent。
-3. 在需要接入的机器上注册设备，拿到 6 位认领码，例如 `AB-CD-EF`。
-4. 把认领码填到“我的接入”页面。哪个账号提交认领码，设备就归属到哪个账号。
-5. 回到终端执行 poll 或重新打开 Agent 会话，凭据会保存到 `~/.teampulse/credentials.json`。
+3. 推荐让 Agent 直接用 curl 调用注册接口，拿到 `claim_code` 和 `device_secret`。
+4. 把 `claim_code` 填到“我的接入”页面。哪个账号提交认领码，设备就归属到哪个账号。
+5. 绑定后让 Agent 用同一个 `claim_code` 和 `device_secret` 调用领取接口，拿到后续上报用的 token。
 6. 后续该设备上报的任务、心跳和文件触碰记录都会归到当前账号下。
 
 管理员仍可在 `/admin/devices` 查看待认领设备，并在必要时代为绑定。
 
+### 通用 curl 接入
+
+这是最通用的协议层接入方式，适合 Codex、OpenClaw、Skillhub Skill 或其它能执行终端命令的 Agent。
+
+```bash
+# 1. Agent 在本机注册设备
+curl -sS -X POST "http://localhost:3002/api/v1/devices/register" \
+  -H "Content-Type: application/json" \
+  -d "{\"hostname\":\"$(hostname)\",\"os\":\"$(uname -s)\"}"
+
+# 响应里会返回 claim_code 和 device_secret：
+# {"device_id":"...","claim_code":"AB-CD-EF","device_secret":"...","status":"pending"}
+```
+
+用户登录 TeamPulse 后，把 `claim_code` 填到 `/settings/connect`。绑定完成后，Agent 再领取 token：
+
+```bash
+CLAIM_CODE="AB-CD-EF"
+DEVICE_SECRET="把注册响应里的 device_secret 粘到这里"
+
+curl -sS -X POST "http://localhost:3002/api/v1/devices/claim-code/$CLAIM_CODE" \
+  -H "Content-Type: application/json" \
+  -d "{\"device_secret\":\"$DEVICE_SECRET\"}"
+```
+
 ### Codex 接入
 
-项目内置了一个 Codex 适配插件：`packages/teampulse-codex`。它复用 TeamPulse 的设备认领和 bearer token 机制，凭据同样保存到 `~/.teampulse/credentials.json`。
+项目内置了一个 Codex 适配插件：`packages/teampulse-codex`。它复用 TeamPulse 的设备认领和 bearer token 机制，凭据同样保存到 `~/.teampulse/credentials.json`。如果需要插件自动写入凭据，可以用下面的 CLI：
 
 首次接入：
 
@@ -81,15 +106,7 @@ pnpm codex:status
 
 ### OpenClaw / 通用 Agent 接入
 
-只要 Agent 能执行终端命令，就可以用和 Codex 相同的 CLI 流程接入：
-
-```bash
-teampulse-codex register --server-url http://localhost:3002
-# 把输出的 claim_code 填到 /settings/connect
-teampulse-codex poll --server-url http://localhost:3002
-```
-
-如果通过 Skillhub 这类商店分发，可以把上面两条命令包装成 Skill：先让 Agent 注册设备并返回 `claim_code`，由用户在 TeamPulse 当前账号页确认绑定，再让 Agent 执行 poll。
+只要 Agent 能执行终端命令，就走“通用 curl 接入”。如果通过 Skillhub 这类商店分发，可以把两次 curl 包装成 Skill：先让 Agent 注册设备并返回 `claim_code`，由用户在 TeamPulse 当前账号页确认绑定，再让 Agent 用 `device_secret` 领取 token。
 
 手动上报当前 Codex 任务：
 
