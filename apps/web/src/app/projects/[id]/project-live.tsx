@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 /**
  * Subscribes to SSE for the given project and triggers a server-component
- * refresh when task events arrive. Also shows a small "live" status dot.
+ * refresh when task events arrive. Also shows a small live status dot.
  */
 export function ProjectLiveUpdates({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -17,7 +17,7 @@ export function ProjectLiveUpdates({ projectId }: { projectId: string }) {
     const onOpen = () => setConnected(true);
     const onError = () => setConnected(false);
     const handle = (type: string) => (e: MessageEvent) => {
-      setLastEvent(`${type} @ ${new Date().toLocaleTimeString()}`);
+      setLastEvent(`${eventLabel(type)} · ${new Date().toLocaleTimeString("zh-CN")}`);
       router.refresh();
       void e;
     };
@@ -40,10 +40,23 @@ export function ProjectLiveUpdates({ projectId }: { projectId: string }) {
           "mr-2 inline-block h-2 w-2 rounded-full " +
           (connected ? "bg-green-500" : "bg-gray-400")
         }
-        aria-label={connected ? "live" : "disconnected"}
+        aria-label={connected ? "实时连接正常" : "实时连接断开"}
       />
-      {connected ? "Live updates connected" : "Offline"}
-      {lastEvent && <span className="ml-2">· last: {lastEvent}</span>}
+      {connected ? "实时更新已连接" : "实时更新离线"}
+      {lastEvent && <span className="ml-2">· 最近事件：{lastEvent}</span>}
     </div>
   );
+}
+
+function eventLabel(type: string): string {
+  switch (type) {
+    case "task.started":
+      return "任务开始";
+    case "task.updated":
+      return "任务更新";
+    case "task.ended":
+      return "任务结束";
+    default:
+      return type;
+  }
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { User } from "@/db";
+import { roleLabel } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
 
 export function AppShell({
@@ -15,10 +16,10 @@ export function AppShell({
     <Link
       href={href}
       className={
-        "rounded-md px-2 py-1 text-sm transition-colors " +
+        "rounded-md px-3 py-1.5 text-sm transition-colors " +
         (activeNav === key
-          ? "bg-accent text-accent-foreground font-medium"
-          : "text-muted-foreground hover:text-foreground")
+          ? "bg-slate-900 text-white shadow-sm"
+          : "text-muted-foreground hover:bg-slate-100 hover:text-foreground")
       }
     >
       {label}
@@ -27,34 +28,43 @@ export function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+      <header className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex min-w-0 items-center gap-6">
-            <Link href="/" className="flex-shrink-0 text-sm font-semibold">
-              TeamPulse
+            <Link href="/" className="flex flex-shrink-0 items-center gap-2 text-sm font-semibold">
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-xs text-white">
+                TP
+              </span>
+              <span>TeamPulse</span>
             </Link>
-            <nav className="flex items-center gap-1">
-              {navItem("/", "Home", "home")}
-              {navItem("/projects", "Projects", "projects")}
-              {navItem("/activity", "Activity", "activity")}
-              {navItem("/team", "Team", "team")}
+            <nav className="flex items-center gap-1 overflow-x-auto">
+              {navItem("/", "工作台", "home")}
+              {navItem("/projects", "项目", "projects")}
+              {navItem("/activity", "动态", "activity")}
+              {navItem("/team", "团队", "team")}
               {user.role === "admin" && (
                 <Link
                   href="/admin/devices"
-                  className="ml-4 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                  className="ml-3 rounded-md border bg-white px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:text-foreground"
                 >
-                  Admin
+                  管理
                 </Link>
               )}
             </nav>
           </div>
           <div className="ml-auto flex flex-shrink-0 items-center gap-3 text-xs text-muted-foreground">
-            <span className="max-w-32 truncate whitespace-nowrap">{user.displayName ?? user.name}</span>
+            <Link
+              href="/settings/profile"
+              className="max-w-40 truncate whitespace-nowrap rounded-md px-2 py-1 hover:bg-slate-100 hover:text-foreground"
+            >
+              {user.displayName ?? user.name}
+            </Link>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5">{roleLabel(user.role)}</span>
             <LogoutButton />
           </div>
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+      <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
     </div>
   );
 }

@@ -43,6 +43,10 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-slate-50 text-foreground antialiased;
+  }
+
+  ::selection {
+    @apply bg-slate-900 text-white;
   }
 }

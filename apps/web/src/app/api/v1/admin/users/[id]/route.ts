@@ -23,11 +23,11 @@ export const PATCH = handler<{ id: string }>(async (request, params) => {
   const body = await parseBody(request, patchSchema);
 
   const [target] = await db.select().from(users).where(eq(users.id, params.id)).limit(1);
-  if (!target) throw new ApiError("user not found", 404);
+  if (!target) throw new ApiError("用户不存在", 404);
 
   // Prevent admin from demoting themselves — they'd lose access.
   if (body.role === "member" && target.id === ctx.user.id) {
-    throw new ApiError("cannot demote yourself", 400);
+    throw new ApiError("不能降级自己的管理员权限", 400);
   }
 
   const updates: Partial<typeof users.$inferInsert> = {};

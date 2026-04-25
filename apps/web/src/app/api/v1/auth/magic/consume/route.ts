@@ -32,7 +32,7 @@ export const POST = handler(async (request) => {
     )
     .limit(1);
 
-  if (!link) throw new ApiError("invalid or expired magic link", 401);
+  if (!link) throw new ApiError("登录链接无效或已过期", 401);
 
   await db
     .update(magicLinks)
@@ -44,7 +44,7 @@ export const POST = handler(async (request) => {
     .from(users)
     .where(and(eq(users.id, link.userId), isNull(users.revokedAt)))
     .limit(1);
-  if (!user) throw new ApiError("user no longer valid", 401);
+  if (!user) throw new ApiError("用户已失效", 401);
 
   const session = await createSession(user.id);
   await setSessionCookie(session.id, session.expiresAt);

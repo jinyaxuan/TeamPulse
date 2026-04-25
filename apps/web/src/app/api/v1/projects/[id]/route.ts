@@ -13,7 +13,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
   await requireAuth(request);
 
   const [project] = await db.select().from(projects).where(eq(projects.id, params.id)).limit(1);
-  if (!project) throw new ApiError("project not found", 404);
+  if (!project) throw new ApiError("项目不存在", 404);
 
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);

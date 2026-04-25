@@ -14,13 +14,13 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const ctx = await getAuthFromRequest(request);
   if (!ctx) {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response("未登录或认证已失效", { status: 401 });
   }
 
   const url = new URL(request.url);
   const projectId = url.searchParams.get("project");
   if (!projectId) {
-    return new Response("project query param required", { status: 400 });
+    return new Response("需要 project 查询参数", { status: 400 });
   }
 
   const encoder = new TextEncoder();

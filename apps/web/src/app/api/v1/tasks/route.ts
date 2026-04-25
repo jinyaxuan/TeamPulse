@@ -39,7 +39,7 @@ export const POST = handler(async (request) => {
     projectId = p?.id;
   }
   if (!projectId) {
-    return json({ error: "project_id or git_remote_hash required" }, { status: 400 });
+    return json({ error: "需要提供 project_id 或 git_remote_hash" }, { status: 400 });
   }
 
   const intent = body.intent.trim().slice(0, 500);

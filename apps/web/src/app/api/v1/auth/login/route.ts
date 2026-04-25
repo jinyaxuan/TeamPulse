@@ -22,12 +22,12 @@ export const POST = handler(async (request) => {
     .limit(1);
 
   if (!user || !user.passwordHash) {
-    throw new ApiError("Invalid credentials", 401);
+    throw new ApiError("邮箱或密码不正确", 401);
   }
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {
-    throw new ApiError("Invalid credentials", 401);
+    throw new ApiError("邮箱或密码不正确", 401);
   }
 
   const session = await createSession(user.id);

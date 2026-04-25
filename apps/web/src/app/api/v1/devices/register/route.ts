@@ -53,5 +53,5 @@ export const POST = handler(async (request) => {
     }
   }
   // Unreachable.
-  return json({ error: "failed to register device" }, { status: 500 });
+  return json({ error: "设备注册失败" }, { status: 500 });
 });

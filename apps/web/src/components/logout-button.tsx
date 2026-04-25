@@ -21,7 +21,7 @@ export function LogoutButton() {
       disabled={pending}
       className="whitespace-nowrap text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
     >
-      {pending ? "…" : "Sign out"}
+      {pending ? "退出中…" : "退出"}
     </button>
   );
 }

@@ -11,10 +11,9 @@ export default async function ProfilePage() {
   return (
     <div className="max-w-lg space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Profile</h1>
+        <h1 className="text-2xl font-semibold">个人资料</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your display info. Name is set when your device is approved and can't
-          be changed here.
+          管理你的显示名称、头像和密码。用户名在设备审批时确定，这里不能修改。
         </p>
       </div>
 

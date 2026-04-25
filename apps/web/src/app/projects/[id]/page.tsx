@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { ProjectLiveUpdates } from "./project-live";
 
 export const dynamic = "force-dynamic";
@@ -63,22 +63,34 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   return (
     <AppShell user={user} activeNav="projects">
       <div className="space-y-6">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Project</div>
-          <h1 className="mt-1 text-2xl font-semibold">{project.displayName ?? "(unnamed project)"}</h1>
-          <div className="mt-1 font-mono text-xs text-muted-foreground">
-            {project.gitRemoteHash.slice(0, 16)}…
+        <div className="rounded-lg border bg-card p-5">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">项目详情</div>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold">{project.displayName ?? "未命名项目"}</h1>
+              <div className="mt-1 font-mono text-xs text-muted-foreground">
+                远端哈希：{project.gitRemoteHash.slice(0, 16)}…
+              </div>
+            </div>
+            <div className="flex gap-2 text-xs">
+              <span className="rounded-md border bg-background px-3 py-2">
+                当前进行中 <strong className="ml-1 text-foreground">{active.length}</strong>
+              </span>
+              <span className="rounded-md border bg-background px-3 py-2">
+                7 天记录 <strong className="ml-1 text-foreground">{recent.length}</strong>
+              </span>
+            </div>
           </div>
         </div>
 
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Active Now ({active.length})
+            当前进行中 ({active.length})
           </h2>
           <div className="mt-3 space-y-2">
             {active.length === 0 && (
               <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-                Nobody active right now.
+                当前没有成员在这个项目上工作。
               </div>
             )}
             {active.map((t) => (
@@ -90,12 +102,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       {t.user_display_name ?? t.user_name}
                       {" · "}
                       {formatRelativeTime(t.started_at)}
-                      {t.branch && ` · branch:${t.branch}`}
+                      {t.branch && ` · 分支：${t.branch}`}
                     </div>
                     {t.files_touched.length > 0 && (
                       <div className="mt-1 font-mono text-xs text-muted-foreground">
                         {t.files_touched.slice(0, 5).join(", ")}
-                        {t.files_touched.length > 5 && ` (+${t.files_touched.length - 5} more)`}
+                        {t.files_touched.length > 5 && `（另有 ${t.files_touched.length - 5} 个文件）`}
                       </div>
                     )}
                   </div>
@@ -107,11 +119,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Recent Activity — Last 7 Days
+            最近动态 · 7 天
           </h2>
           <div className="mt-3 overflow-hidden rounded-md border bg-card">
             {recent.length === 0 && (
-              <div className="p-4 text-sm text-muted-foreground">No recent history.</div>
+              <div className="p-4 text-sm text-muted-foreground">最近 7 天没有历史记录。</div>
             )}
             <ul className="divide-y">
               {recent.map((t) => (
@@ -135,7 +147,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                         : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400")
                     }
                   >
-                    {t.status}
+                    {taskStatusLabel(t.status)}
                   </div>
                 </li>
               ))}

@@ -28,10 +28,9 @@ export default async function MyDevicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">My Devices</h1>
+        <h1 className="text-2xl font-semibold">我的设备</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Each Claude Code install on your machines shows up here. Revoke any
-          device you no longer use (e.g. a lost laptop).
+          每个 Claude Code 或 Codex 插件安装实例都会显示在这里。设备不再使用时，可以主动撤销访问。
         </p>
       </div>
 

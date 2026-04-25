@@ -153,7 +153,7 @@ export async function getAuthFromRequest(request: Request): Promise<AuthContext 
 
 export function requireAdmin(ctx: AuthContext): void {
   if (ctx.user.role !== "admin") {
-    throw new AuthError("Admin access required", 403);
+    throw new AuthError("需要管理员权限", 403);
   }
 }
 

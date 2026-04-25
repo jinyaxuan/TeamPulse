@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { formatDateTime, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,15 @@ export default async function ActivityPage({
     .orderBy(desc(tasks.startedAt))
     .limit(200);
 
+  const activeRows = rows.filter((row) => row.status === "active").length;
+  const doneRows = rows.filter((row) => row.status === "done").length;
+  const abandonedRows = rows.filter((row) => row.status === "abandoned").length;
+
+  const projectOptions = await db
+    .select({ id: projects.id, display_name: projects.displayName })
+    .from(projects)
+    .orderBy(projects.displayName);
+
   // Build an export CSV link that preserves current filters.
   const csvQuery = new URLSearchParams({
     days: String(days),
@@ -68,38 +78,50 @@ export default async function ActivityPage({
 
   return (
     <AppShell user={sessionUser} activeNav="activity">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Activity</h1>
+            <h1 className="text-2xl font-semibold">团队动态</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Team task history. Filter by user, project, status, or time range.
+              查看任务历史，按成员、项目、状态和时间范围筛选。
             </p>
           </div>
           <Link
             href={`/api/v1/activity/export?${csvQuery}`}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            className="w-fit rounded-md border bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50"
           >
-            Export CSV
+            导出 CSV
           </Link>
         </div>
 
-        <FilterBar current={{ ...params, days: String(days) }} />
+        <section className="grid gap-3 sm:grid-cols-4">
+          <ActivityStat label="当前结果" value={rows.length} detail={`最近 ${days} 天`} tone="slate" />
+          <ActivityStat label="进行中" value={activeRows} detail="仍在上报心跳" tone="green" />
+          <ActivityStat label="已完成" value={doneRows} detail="正常结束的任务" tone="blue" />
+          <ActivityStat label="已中断" value={abandonedRows} detail="未正常收尾" tone="amber" />
+        </section>
 
-        <div className="overflow-hidden rounded-md border bg-card">
+        <FilterBar current={{ ...params, days: String(days) }} projects={projectOptions} />
+
+        <section>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase text-muted-foreground">动态列表</h2>
+            <span className="text-xs text-muted-foreground">最多显示 200 条</span>
+          </div>
+        <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
           {rows.length === 0 && (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              No activity matches these filters.
+              没有符合筛选条件的动态。
             </div>
           )}
           <ul className="divide-y">
             {rows.map((t) => (
               <li
                 key={t.id}
-                className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-2 text-sm"
+                className="grid gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 lg:grid-cols-[120px_minmax(0,1fr)_180px_88px] lg:items-center"
               >
-                <div className="w-28 flex-shrink-0 text-xs text-muted-foreground">
-                  {new Date(t.started_at).toLocaleString()}
+                <div className="text-xs text-muted-foreground">
+                  {formatDateTime(t.started_at)}
                 </div>
                 <div className="min-w-0">
                   <div className="truncate">
@@ -107,14 +129,14 @@ export default async function ActivityPage({
                     <span className="text-muted-foreground"> — {t.intent}</span>
                   </div>
                   {t.branch && (
-                    <div className="font-mono text-xs text-muted-foreground">branch:{t.branch}</div>
+                    <div className="font-mono text-xs text-muted-foreground">分支：{t.branch}</div>
                   )}
                 </div>
                 <Link
                   href={`/projects/${t.project_id}`}
-                  className="w-28 flex-shrink-0 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
                 >
-                  {t.project_name ?? "project"}
+                  {t.project_name ?? "项目"}
                 </Link>
                 <div
                   className={
@@ -126,53 +148,112 @@ export default async function ActivityPage({
                       : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400")
                   }
                 >
-                  {t.status}
+                  {taskStatusLabel(t.status)}
                 </div>
               </li>
             ))}
           </ul>
         </div>
+        </section>
       </div>
     </AppShell>
   );
 }
 
-function FilterBar({ current }: { current: SearchParams }) {
+function ActivityStat({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  tone: "slate" | "green" | "blue" | "amber";
+}) {
+  const toneClass =
+    tone === "green"
+      ? "border-t-emerald-500"
+      : tone === "blue"
+        ? "border-t-blue-500"
+        : tone === "amber"
+          ? "border-t-amber-500"
+          : "border-t-slate-400";
+
   return (
-    <form action="/activity" method="get" className="flex flex-wrap gap-2 text-sm">
-      <input
-        name="user"
-        placeholder="user name (e.g. alice)"
-        defaultValue={current.user ?? ""}
-        className="rounded-md border border-input bg-background px-3 py-1.5"
-      />
-      <select
-        name="days"
-        defaultValue={current.days ?? "7"}
-        className="rounded-md border border-input bg-background px-3 py-1.5"
-      >
-        <option value="1">Last 24h</option>
-        <option value="3">Last 3 days</option>
-        <option value="7">Last 7 days</option>
-        <option value="14">Last 2 weeks</option>
-        <option value="30">Last 30 days</option>
-      </select>
-      <select
-        name="status"
-        defaultValue={current.status ?? ""}
-        className="rounded-md border border-input bg-background px-3 py-1.5"
-      >
-        <option value="">All statuses</option>
-        <option value="active">Active only</option>
-        <option value="done">Done only</option>
-        <option value="abandoned">Abandoned only</option>
-      </select>
-      <button
-        type="submit"
-        className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
-      >
-        Apply
-      </button>
+    <div className={`rounded-lg border border-t-4 bg-white p-4 shadow-sm ${toneClass}`}>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-2 text-2xl font-semibold">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function FilterBar({
+  current,
+  projects: projectOptions,
+}: {
+  current: SearchParams;
+  projects: Array<{ id: string; display_name: string | null }>;
+}) {
+  return (
+    <form action="/activity" method="get" className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">筛选条件</h2>
+          <p className="mt-1 text-xs text-muted-foreground">组合成员、项目、时间和状态来定位任务。</p>
+        </div>
+        <Link href="/activity" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          清空筛选
+        </Link>
+      </div>
+      <div className="grid gap-3 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px_160px_auto]">
+        <input
+          name="user"
+          placeholder="成员用户名，例如 alice"
+          defaultValue={current.user ?? ""}
+          className="rounded-md border border-input bg-background px-3 py-2"
+        />
+        <select
+          name="project"
+          defaultValue={current.project ?? ""}
+          className="rounded-md border border-input bg-background px-3 py-2"
+        >
+          <option value="">全部项目</option>
+          {projectOptions.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.display_name ?? "未命名项目"}
+            </option>
+          ))}
+        </select>
+        <select
+          name="days"
+          defaultValue={current.days ?? "7"}
+          className="rounded-md border border-input bg-background px-3 py-2"
+        >
+          <option value="1">最近 24 小时</option>
+          <option value="3">最近 3 天</option>
+          <option value="7">最近 7 天</option>
+          <option value="14">最近 2 周</option>
+          <option value="30">最近 30 天</option>
+        </select>
+        <select
+          name="status"
+          defaultValue={current.status ?? ""}
+          className="rounded-md border border-input bg-background px-3 py-2"
+        >
+          <option value="">全部状态</option>
+          <option value="active">只看进行中</option>
+          <option value="done">只看已完成</option>
+          <option value="abandoned">只看已中断</option>
+        </select>
+        <button
+          type="submit"
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
+        >
+          应用筛选
+        </button>
+      </div>
     </form>
   );
 }

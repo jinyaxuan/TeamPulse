@@ -77,7 +77,7 @@ export const POST = handler<{ code: string }>(async (request, params) => {
     .limit(1);
 
   if (!row) {
-    throw new ApiError("unknown claim code", 404);
+    throw new ApiError("认领码不存在", 404);
   }
 
   if (row.status === "rejected") {

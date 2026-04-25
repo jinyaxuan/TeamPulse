@@ -48,7 +48,7 @@ export function DevicesClient({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Approve failed");
+      setError(body.error ?? "审批失败");
       return;
     }
     startTransition(() => router.refresh());
@@ -61,7 +61,7 @@ export function DevicesClient({
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Revoke failed");
+      setError(body.error ?? "撤销失败");
       return;
     }
     startTransition(() => router.refresh());
@@ -77,12 +77,12 @@ export function DevicesClient({
 
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Pending ({pending.length})
+          待审批 ({pending.length})
         </h2>
         <div className="mt-3 space-y-3">
           {pending.length === 0 && (
             <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-              No pending devices. When a teammate installs the Claude Code plugin, they'll show up here.
+              暂无待审批设备。成员安装 Claude Code 或 Codex 插件后，会自动出现在这里。
             </p>
           )}
           {pending.map((d) => (
@@ -100,17 +100,17 @@ export function DevicesClient({
 
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Active Devices ({active.length})
+          已启用设备 ({active.length})
         </h2>
         <div className="mt-3 overflow-x-auto rounded-md border bg-card">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="px-4 py-2 text-left">Device</th>
-                <th className="px-4 py-2 text-left">User</th>
-                <th className="px-4 py-2 text-left">OS</th>
-                <th className="px-4 py-2 text-left">Last seen</th>
-                <th className="px-4 py-2 text-left">Approved</th>
+                <th className="px-4 py-2 text-left">设备</th>
+                <th className="px-4 py-2 text-left">用户</th>
+                <th className="px-4 py-2 text-left">系统</th>
+                <th className="px-4 py-2 text-left">最近使用</th>
+                <th className="px-4 py-2 text-left">审批时间</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -118,20 +118,20 @@ export function DevicesClient({
               {active.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    No active devices yet.
+                    暂无已启用设备。
                   </td>
                 </tr>
               )}
               {active.map((d) => (
                 <tr key={d.id} className="border-b last:border-b-0">
-                  <td className="px-4 py-2 font-mono text-xs">{d.hostname ?? "(unknown)"}</td>
+                  <td className="px-4 py-2 font-mono text-xs">{d.hostname ?? "未知设备"}</td>
                   <td className="px-4 py-2">
                     {d.user_display_name ?? d.user_name}{" "}
                     <span className="text-xs text-muted-foreground">@{d.user_name}</span>
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{d.os ?? "—"}</td>
                   <td className="px-4 py-2 text-muted-foreground">
-                    {d.last_used_at ? formatRelativeTime(d.last_used_at) : "never"}
+                    {d.last_used_at ? formatRelativeTime(d.last_used_at) : "暂无"}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">
                     {d.approved_at ? formatRelativeTime(d.approved_at) : "—"}
@@ -142,7 +142,7 @@ export function DevicesClient({
                       disabled={isPending}
                       className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
                     >
-                      Revoke
+                      撤销
                     </button>
                   </td>
                 </tr>
@@ -179,28 +179,28 @@ function PendingCard({
         <div className="flex-1 space-y-1">
           <div className="font-mono text-sm font-semibold">{device.claim_code ?? "—"}</div>
           <div className="text-sm">
-            <span className="font-medium">{device.hostname ?? "(unknown host)"}</span>
+            <span className="font-medium">{device.hostname ?? "未知主机"}</span>
             {device.os && <span className="text-muted-foreground"> · {device.os}</span>}
           </div>
           {device.git_email && (
-            <div className="text-xs text-muted-foreground">git email: {device.git_email}</div>
+            <div className="text-xs text-muted-foreground">Git 邮箱：{device.git_email}</div>
           )}
           <div className="text-xs text-muted-foreground">
-            requested {device.registered_at ? formatRelativeTime(device.registered_at) : "?"}
+            注册于 {device.registered_at ? formatRelativeTime(device.registered_at) : "未知时间"}
           </div>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-2">
         <div className="flex-1 min-w-[12rem]">
           <label className="block text-xs font-medium text-muted-foreground">
-            Claim as user
+            认领为用户
           </label>
           <input
             type="text"
             list={listId}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. alice"
+            placeholder="例如 alice"
             className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           <datalist id={listId}>
@@ -219,14 +219,14 @@ function PendingCard({
           disabled={disabled || !name.trim()}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          Approve
+          审批通过
         </button>
         <button
           onClick={() => onReject(device.id)}
           disabled={disabled}
           className="rounded-md border px-4 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
         >
-          Reject
+          拒绝
         </button>
       </div>
     </div>

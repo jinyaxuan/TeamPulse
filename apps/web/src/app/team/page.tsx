@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
-import { formatRelativeTime } from "@/lib/utils";
+import { clientLabel, formatRelativeTime, roleLabel, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -99,58 +99,68 @@ export default async function TeamPage() {
   return (
     <AppShell user={sessionUser} activeNav="team">
       <div className="space-y-8">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <header className="rounded-lg border bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Team</h1>
+            <h1 className="text-2xl font-semibold">团队</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Who is active now, what they are working on, and recent output over the last 7 days.
+              查看谁正在工作、正在处理什么，以及最近 7 天的团队产出。
             </p>
           </div>
-          <Link href="/activity" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
-            View full activity
+          <Link
+            href="/activity"
+            className="w-fit rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
+          >
+            查看完整动态
           </Link>
+          </div>
         </header>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Members" value={memberStats.length} detail={`${activeMembers} active now`} />
-          <MetricCard label="Live tasks" value={activeTasks.length} detail="heartbeat within 15 min" />
-          <MetricCard label="7-day tasks" value={totalTasks} detail={`${completedTasks} completed`} />
-          <MetricCard label="Recent events" value={recentTasks.length} detail="latest 100 shown in stats" />
+          <MetricCard label="团队成员" value={memberStats.length} detail={`${activeMembers} 人正在活跃`} tone="blue" />
+          <MetricCard label="实时任务" value={activeTasks.length} detail="15 分钟内有心跳" tone="green" />
+          <MetricCard label="7 天任务" value={totalTasks} detail={`${completedTasks} 个已完成`} tone="slate" />
+          <MetricCard label="近期事件" value={recentTasks.length} detail="统计最近 100 条记录" tone="amber" />
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-3">
-            <SectionHeader title="Members" description="Sorted by live activity, then last heartbeat." />
+            <SectionHeader title="成员" description="按实时活跃优先排序，其次按最近心跳排序。" />
             {memberStats.length === 0 && (
-              <EmptyState>No team members yet.</EmptyState>
+              <EmptyState>还没有团队成员。</EmptyState>
             )}
             {memberStats.map((m) => {
               const pct = Math.round((Number(m.task_count) / maxCount) * 100);
               const latest = latestByUser.get(m.id);
               const activeNow = activeCountByUser.get(m.id) ?? 0;
               return (
-                <article key={m.id} className="rounded-md border bg-card p-4">
+                <article key={m.id} className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                        {(m.display_name ?? m.name).slice(0, 1).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{m.display_name ?? m.name}</span>
                         <span className="text-xs text-muted-foreground">@{m.name}</span>
-                        {m.role === "admin" && <RolePill>admin</RolePill>}
-                        {activeNow > 0 && <LivePill>{plural(activeNow, "live task")}</LivePill>}
+                        {m.role === "admin" && <RolePill>{roleLabel(m.role)}</RolePill>}
+                        {activeNow > 0 && <LivePill>{activeNow} 个实时任务</LivePill>}
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        {plural(Number(m.task_count), "task")} in 7 days
-                        {m.last_active && ` · last ${formatRelativeTime(m.last_active)}`}
+                        7 天内 {Number(m.task_count)} 个任务
+                        {m.last_active && ` · 最近活跃 ${formatRelativeTime(m.last_active)}`}
+                      </div>
                       </div>
                     </div>
                     <div className="flex flex-shrink-0 gap-2 text-xs text-muted-foreground">
-                      <span>{Number(m.done_count)} done</span>
-                      <span>{Number(m.abandoned_count)} abandoned</span>
+                      <span>{Number(m.done_count)} 已完成</span>
+                      <span>{Number(m.abandoned_count)} 已中断</span>
                     </div>
                   </div>
 
                   <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                    <div className="h-full bg-slate-900" style={{ width: `${pct}%` }} />
                   </div>
 
                   {latest ? (
@@ -163,12 +173,12 @@ export default async function TeamPage() {
                         href={`/projects/${latest.project_id}`}
                         className="flex-shrink-0 text-xs text-muted-foreground hover:text-foreground hover:underline"
                       >
-                        {latest.project_name ?? "project"} · {formatRelativeTime(latest.started_at)}
+                        {latest.project_name ?? "项目"} · {formatRelativeTime(latest.started_at)}
                       </Link>
                     </div>
                   ) : (
                     <div className="mt-3 border-t pt-3 text-sm text-muted-foreground">
-                      No tasks in the last 7 days.
+                      最近 7 天没有任务。
                     </div>
                   )}
                 </article>
@@ -177,12 +187,12 @@ export default async function TeamPage() {
           </div>
 
           <aside className="space-y-3">
-            <SectionHeader title="Live Now" description="Current tasks with fresh heartbeats." />
+            <SectionHeader title="实时进行中" description="当前仍在持续上报心跳的任务。" />
             {activeTasks.length === 0 && (
-              <EmptyState>No active tasks right now.</EmptyState>
+              <EmptyState>当前没有实时任务。</EmptyState>
             )}
             {activeTasks.map((task) => (
-              <article key={task.id} className="rounded-md border bg-card p-4">
+              <article key={task.id} className="rounded-lg border border-l-4 border-l-emerald-500 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -196,17 +206,17 @@ export default async function TeamPage() {
                 <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                   <div>
                     <Link href={`/projects/${task.project_id}`} className="hover:text-foreground hover:underline">
-                      {task.project_name ?? "project"}
+                      {task.project_name ?? "项目"}
                     </Link>
-                    {" · started "}
+                    {" · 开始于 "}
                     {formatRelativeTime(task.started_at)}
                   </div>
                   <div>
-                    heartbeat {formatRelativeTime(task.heartbeat_at)}
-                    {task.branch && ` · ${task.branch}`}
+                    心跳 {formatRelativeTime(task.heartbeat_at)}
+                    {task.branch && ` · 分支：${task.branch}`}
                   </div>
                   {task.files_touched.length > 0 && (
-                    <div>{plural(task.files_touched.length, "file")} touched</div>
+                    <div>已触碰 {task.files_touched.length} 个文件</div>
                   )}
                 </div>
               </article>
@@ -223,21 +233,28 @@ function timestamp(value: Date | string | null): number {
   return typeof value === "string" ? new Date(value).getTime() : value.getTime();
 }
 
-function plural(value: number, noun: string) {
-  return `${value} ${noun}${value === 1 ? "" : "s"}`;
-}
-
 function MetricCard({
   label,
   value,
   detail,
+  tone,
 }: {
   label: string;
   value: number;
   detail: string;
+  tone: "blue" | "green" | "slate" | "amber";
 }) {
+  const toneClass =
+    tone === "blue"
+      ? "border-t-blue-500"
+      : tone === "green"
+        ? "border-t-emerald-500"
+        : tone === "amber"
+          ? "border-t-amber-500"
+          : "border-t-slate-400";
+
   return (
-    <div className="rounded-md border bg-card p-4">
+    <div className={`rounded-lg border border-t-4 bg-white p-4 shadow-sm ${toneClass}`}>
       <div className="text-xs font-medium uppercase text-muted-foreground">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
       <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
@@ -256,7 +273,7 @@ function SectionHeader({ title, description }: { title: string; description: str
 
 function EmptyState({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-md border bg-card p-6 text-center text-sm text-muted-foreground">
+    <div className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-muted-foreground">
       {children}
     </div>
   );
@@ -288,7 +305,7 @@ function StatusPill({ status }: { status: string }) {
 
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs ${classes}`}>
-      {status}
+      {taskStatusLabel(status)}
     </span>
   );
 }
@@ -296,13 +313,13 @@ function StatusPill({ status }: { status: string }) {
 function ClientPill({ client }: { client: string }) {
   return (
     <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
-      {client}
+      {clientLabel(client)}
     </span>
   );
 }
 
 function LiveDot() {
   return (
-    <span className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-green-500" aria-label="active" />
+    <span className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-green-500" aria-label="进行中" />
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatRelativeTime } from "@/lib/utils";
+import { deviceStatusLabel, formatRelativeTime } from "@/lib/utils";
 
 type MyDevice = {
   id: string;
@@ -21,14 +21,14 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
   const [error, setError] = useState<string | null>(null);
 
   async function revoke(id: string) {
-    if (!confirm("Revoke this device? The Claude Code plugin on it will need to re-register.")) {
+    if (!confirm("确定撤销这个设备吗？该设备上的插件需要重新注册后才能继续使用。")) {
       return;
     }
     setError(null);
     const res = await fetch(`/api/v1/devices/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Revoke failed");
+      setError(body.error ?? "撤销失败");
       return;
     }
     startTransition(() => router.refresh());
@@ -37,7 +37,7 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
   if (devices.length === 0) {
     return (
       <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
-        No devices yet. When you install the Claude Code plugin, it registers a device here.
+        暂无设备。安装 Claude Code 或 Codex 插件后，设备会注册到这里。
       </div>
     );
   }
@@ -53,18 +53,18 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-left">Host</th>
-              <th className="px-4 py-2 text-left">OS</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-left">Last seen</th>
-              <th className="px-4 py-2 text-left">Approved</th>
+              <th className="px-4 py-2 text-left">主机</th>
+              <th className="px-4 py-2 text-left">系统</th>
+              <th className="px-4 py-2 text-left">状态</th>
+              <th className="px-4 py-2 text-left">最近使用</th>
+              <th className="px-4 py-2 text-left">审批时间</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {devices.map((d) => (
               <tr key={d.id} className="border-b last:border-b-0">
-                <td className="px-4 py-2 font-mono text-xs">{d.hostname ?? "(unknown)"}</td>
+                <td className="px-4 py-2 font-mono text-xs">{d.hostname ?? "未知主机"}</td>
                 <td className="px-4 py-2 text-muted-foreground">{d.os ?? "—"}</td>
                 <td className="px-4 py-2">
                   <span
@@ -77,11 +77,11 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
                         : "bg-muted text-muted-foreground")
                     }
                   >
-                    {d.status}
+                    {deviceStatusLabel(d.status)}
                   </span>
                 </td>
                 <td className="px-4 py-2 text-muted-foreground">
-                  {d.last_used_at ? formatRelativeTime(d.last_used_at) : "never"}
+                  {d.last_used_at ? formatRelativeTime(d.last_used_at) : "暂无"}
                 </td>
                 <td className="px-4 py-2 text-muted-foreground">
                   {d.approved_at ? formatRelativeTime(d.approved_at) : "—"}
@@ -93,7 +93,7 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
                       disabled={pending}
                       className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
                     >
-                      Revoke
+                      撤销
                     </button>
                   )}
                 </td>

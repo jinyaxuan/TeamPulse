@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { requireAuth } from "@/lib/api";
+import { taskStatusLabel } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
   try {
     await requireAuth(request);
   } catch {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response("未登录或认证已失效", { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -49,14 +50,14 @@ export async function GET(request: Request) {
     .where(userFilter ? and(...conditions, userFilter) : and(...conditions))
     .orderBy(desc(tasks.startedAt));
 
-  const header = "started_at,ended_at,user,project,status,branch,intent,files\n";
+  const header = "开始时间,结束时间,用户,项目,状态,分支,任务意图,涉及文件\n";
   const lines = rows.map((r) =>
     [
       r.started_at.toISOString(),
       r.ended_at?.toISOString() ?? "",
       csvEscape(r.user_name),
       csvEscape(r.project_name ?? ""),
-      r.status,
+      taskStatusLabel(r.status),
       csvEscape(r.branch ?? ""),
       csvEscape(r.intent),
       csvEscape(r.files_touched.join("; ")),

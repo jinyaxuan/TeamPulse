@@ -27,7 +27,7 @@ export async function GET(
       .where(and(eq(memoryBlobs.userId, ctx.user.id), eq(memoryBlobs.projectId, projectId)))
       .limit(1);
 
-    if (!blob) return new Response("Not found", { status: 404 });
+    if (!blob) return new Response("未找到记忆内容", { status: 404 });
 
     const filename = `MEMORY-${blob.project_name ?? "project"}.md`.replace(/[^a-zA-Z0-9._-]/g, "_");
 
@@ -38,6 +38,6 @@ export async function GET(
       },
     });
   } catch {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response("未登录或认证已失效", { status: 401 });
   }
 }

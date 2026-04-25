@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, roleLabel } from "@/lib/utils";
 
 export type UserRow = {
   id: string;
@@ -29,19 +29,19 @@ export function UsersTable({ users }: { users: UserRow[] }) {
       body: JSON.stringify({ role }),
     });
     if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error ?? "Failed");
+      setError((await res.json().catch(() => ({}))).error ?? "操作失败");
       return;
     }
     startTransition(() => router.refresh());
   }
 
   async function revoke(id: string, name: string) {
-    if (!confirm(`Revoke user '${name}'? They'll be logged out everywhere and their devices disabled.`))
+    if (!confirm(`确定撤销用户「${name}」吗？该用户会被强制退出，所有设备也会被禁用。`))
       return;
     setError(null);
     const res = await fetch(`/api/v1/admin/users/${id}/revoke`, { method: "POST" });
     if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error ?? "Failed");
+      setError((await res.json().catch(() => ({}))).error ?? "操作失败");
       return;
     }
     startTransition(() => router.refresh());
@@ -58,12 +58,12 @@ export function UsersTable({ users }: { users: UserRow[] }) {
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-left">User</th>
-              <th className="px-4 py-2 text-left">Email</th>
-              <th className="px-4 py-2 text-left">Role</th>
-              <th className="px-4 py-2 text-left">Devices</th>
-              <th className="px-4 py-2 text-left">Tasks</th>
-              <th className="px-4 py-2 text-left">Joined</th>
+              <th className="px-4 py-2 text-left">用户</th>
+              <th className="px-4 py-2 text-left">邮箱</th>
+              <th className="px-4 py-2 text-left">角色</th>
+              <th className="px-4 py-2 text-left">设备</th>
+              <th className="px-4 py-2 text-left">任务</th>
+              <th className="px-4 py-2 text-left">加入时间</th>
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
@@ -78,14 +78,14 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                 <td className="px-4 py-2">
                   {u.revoked_at ? (
                     <span className="rounded-full bg-destructive/20 px-2 py-0.5 text-xs text-destructive">
-                      revoked
+                      已撤销
                     </span>
                   ) : u.role === "admin" ? (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                      admin
+                      {roleLabel(u.role)}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">member</span>
+                    <span className="text-muted-foreground">{roleLabel(u.role)}</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-muted-foreground">{u.device_count}</td>
@@ -102,7 +102,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                           disabled={pending}
                           className="rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
                         >
-                          Demote
+                          设为成员
                         </button>
                       ) : (
                         <button
@@ -110,7 +110,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                           disabled={pending}
                           className="rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
                         >
-                          Make admin
+                          设为管理员
                         </button>
                       )}
                       <button
@@ -118,7 +118,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                         disabled={pending}
                         className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       >
-                        Revoke
+                        撤销
                       </button>
                     </div>
                   )}

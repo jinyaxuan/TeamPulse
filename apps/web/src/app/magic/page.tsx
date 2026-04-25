@@ -6,7 +6,7 @@ export default async function MagicPage({ searchParams }: Props) {
   const { token } = await searchParams;
 
   if (!token) {
-    return <MagicError message="Missing token." />;
+    return <MagicError message="缺少登录令牌。" />;
   }
 
   // Consume server-side so the session cookie is set on this response.
@@ -23,13 +23,13 @@ function MagicError({ message }: { message: string }) {
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="max-w-sm rounded-lg border bg-card p-6 text-center">
-        <h1 className="text-lg font-semibold">Magic link error</h1>
+        <h1 className="text-lg font-semibold">登录链接异常</h1>
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         <a
           href="/login"
           className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90"
         >
-          Go to login
+          返回登录页
         </a>
       </div>
     </main>

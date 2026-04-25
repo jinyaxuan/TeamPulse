@@ -20,10 +20,10 @@ export const DELETE = handler<{ id: string }>(async (request, params) => {
     .from(devices)
     .where(eq(devices.id, params.id))
     .limit(1);
-  if (!device) throw new ApiError("device not found", 404);
+  if (!device) throw new ApiError("设备不存在", 404);
 
   if (device.userId !== ctx.user.id && ctx.user.role !== "admin") {
-    throw new ApiError("can only revoke your own devices", 403);
+    throw new ApiError("只能撤销自己的设备", 403);
   }
 
   await db

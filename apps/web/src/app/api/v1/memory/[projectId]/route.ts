@@ -23,7 +23,7 @@ export const GET = handler<{ projectId: string }>(async (request, params) => {
 
   // Optional: verify project exists (cheap guard; not strictly required).
   const [proj] = await db.select().from(projects).where(eq(projects.id, params.projectId)).limit(1);
-  if (!proj) throw new ApiError("project not found", 404);
+  if (!proj) throw new ApiError("项目不存在", 404);
 
   const [blob] = await db
     .select()
@@ -73,7 +73,7 @@ export const PUT = handler<{ projectId: string }>(async (request, params) => {
   const body = await parseBody(request, putSchema);
 
   const [proj] = await db.select().from(projects).where(eq(projects.id, params.projectId)).limit(1);
-  if (!proj) throw new ApiError("project not found", 404);
+  if (!proj) throw new ApiError("项目不存在", 404);
 
   const ifMatch = request.headers.get("if-match");
   const expectedVersion = ifMatch ? Number(ifMatch.replace(/"/g, "")) : null;
@@ -106,7 +106,7 @@ export const PUT = handler<{ projectId: string }>(async (request, params) => {
 
   // Subsequent writes: must provide If-Match equal to current version.
   if (expectedVersion == null) {
-    throw new ApiError("If-Match header required for update", 428);
+    throw new ApiError("更新记忆需要 If-Match 请求头", 428);
   }
   if (existing.version !== expectedVersion) {
     return new Response(

@@ -36,10 +36,9 @@ export default async function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Users</h1>
+        <h1 className="text-2xl font-semibold">用户管理</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Promote to admin, reset password, or revoke access. Users are created
-          implicitly when admins approve device claim codes.
+          管理成员角色和访问权限。管理员审批设备认领码时，会自动创建对应用户。
         </p>
       </div>
       <UsersTable users={enriched} />

@@ -22,13 +22,13 @@ export function LoginForm() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Login failed");
+        setError(body.error ?? "登录失败，请检查邮箱和密码");
         return;
       }
       router.replace("/");
       router.refresh();
     } catch {
-      setError("Network error");
+      setError("网络异常，请稍后重试");
     } finally {
       setSubmitting(false);
     }
@@ -38,7 +38,7 @@ export function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="email" className="block text-sm font-medium">
-          Email
+          邮箱
         </label>
         <input
           id="email"
@@ -52,7 +52,7 @@ export function LoginForm() {
       </div>
       <div>
         <label htmlFor="password" className="block text-sm font-medium">
-          Password
+          密码
         </label>
         <input
           id="password"
@@ -70,7 +70,7 @@ export function LoginForm() {
         disabled={submitting}
         className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
       >
-        {submitting ? "Signing in…" : "Sign in"}
+        {submitting ? "登录中…" : "登录"}
       </button>
     </form>
   );

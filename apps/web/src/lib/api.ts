@@ -27,11 +27,11 @@ export async function parseBody<T extends z.ZodTypeAny>(
   try {
     body = await request.json();
   } catch {
-    throw new ApiError("Invalid JSON body", 400);
+    throw new ApiError("请求体不是有效 JSON", 400);
   }
   const result = schema.safeParse(body);
   if (!result.success) {
-    throw new ApiError(`Validation failed: ${result.error.message}`, 400);
+    throw new ApiError(`参数校验失败：${result.error.message}`, 400);
   }
   return result.data;
 }
@@ -39,7 +39,7 @@ export async function parseBody<T extends z.ZodTypeAny>(
 export async function requireAuth(request: Request): Promise<AuthContext> {
   const ctx = await getAuthFromRequest(request);
   if (!ctx) {
-    throw new ApiError("Unauthorized", 401);
+    throw new ApiError("未登录或认证已失效", 401);
   }
   return ctx;
 }
@@ -47,7 +47,7 @@ export async function requireAuth(request: Request): Promise<AuthContext> {
 export async function requireAdminAuth(request: Request): Promise<AuthContext> {
   const ctx = await requireAuth(request);
   if (ctx.user.role !== "admin") {
-    throw new ApiError("Admin access required", 403);
+    throw new ApiError("需要管理员权限", 403);
   }
   return ctx;
 }
@@ -76,7 +76,7 @@ export function handler<T = unknown>(
         return errorResponse(err.message, err.status);
       }
       console.error("Unhandled route error:", err);
-      return errorResponse("Internal server error", 500);
+      return errorResponse("服务器内部错误", 500);
     }
   };
 }

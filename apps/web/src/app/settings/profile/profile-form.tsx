@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { roleLabel } from "@/lib/utils";
 
 type Current = {
   name: string;
@@ -33,7 +34,7 @@ export function ProfileForm({ current }: { current: Current }) {
       body.current_password = currentPassword;
     }
     if (Object.keys(body).length === 0) {
-      setMessage({ type: "ok", text: "Nothing to save." });
+      setMessage({ type: "ok", text: "没有需要保存的改动。" });
       return;
     }
 
@@ -44,23 +45,23 @@ export function ProfileForm({ current }: { current: Current }) {
     });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      setMessage({ type: "err", text: errBody.error ?? "Save failed" });
+      setMessage({ type: "err", text: errBody.error ?? "保存失败" });
       return;
     }
     setCurrentPassword("");
     setNewPassword("");
-    setMessage({ type: "ok", text: "Saved." });
+    setMessage({ type: "ok", text: "已保存。" });
     startTransition(() => router.refresh());
   }
 
   return (
     <form onSubmit={save} className="space-y-4">
-      <ReadOnlyField label="Username" value={current.name} hint="set at device approval; permanent" />
-      {current.email && <ReadOnlyField label="Email" value={current.email} />}
-      <ReadOnlyField label="Role" value={current.role} />
+      <ReadOnlyField label="用户名" value={current.name} hint="设备审批时设置，当前不可修改" />
+      {current.email && <ReadOnlyField label="邮箱" value={current.email} />}
+      <ReadOnlyField label="角色" value={roleLabel(current.role)} />
 
       <div>
-        <label className="block text-sm font-medium">Display name</label>
+        <label className="block text-sm font-medium">显示名称</label>
         <input
           type="text"
           value={displayName}
@@ -71,7 +72,7 @@ export function ProfileForm({ current }: { current: Current }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium">Avatar URL</label>
+        <label className="block text-sm font-medium">头像 URL</label>
         <input
           type="url"
           value={avatarUrl}
@@ -84,11 +85,11 @@ export function ProfileForm({ current }: { current: Current }) {
       {current.has_password && (
         <fieldset className="rounded-md border p-4">
           <legend className="px-2 text-xs font-medium uppercase text-muted-foreground">
-            Change password
+            修改密码
           </legend>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium">Current password</label>
+              <label className="block text-sm font-medium">当前密码</label>
               <input
                 type="password"
                 value={currentPassword}
@@ -98,7 +99,7 @@ export function ProfileForm({ current }: { current: Current }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">New password</label>
+              <label className="block text-sm font-medium">新密码</label>
               <input
                 type="password"
                 value={newPassword}
@@ -127,7 +128,7 @@ export function ProfileForm({ current }: { current: Current }) {
         disabled={pending}
         className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Saving…" : "Save changes"}
+        {pending ? "保存中…" : "保存改动"}
       </button>
     </form>
   );

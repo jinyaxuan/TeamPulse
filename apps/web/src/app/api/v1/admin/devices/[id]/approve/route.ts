@@ -35,9 +35,9 @@ export const POST = handler<{ id: string }>(async (request, params) => {
   const userName = body.user_name.toLowerCase();
 
   const [device] = await db.select().from(devices).where(eq(devices.id, params.id)).limit(1);
-  if (!device) throw new ApiError("device not found", 404);
+  if (!device) throw new ApiError("设备不存在", 404);
   if (device.status !== "pending") {
-    throw new ApiError(`device is '${device.status}', cannot approve`, 409);
+    throw new ApiError(`设备当前状态为「${device.status}」，不能审批`, 409);
   }
 
   // Upsert user by name.

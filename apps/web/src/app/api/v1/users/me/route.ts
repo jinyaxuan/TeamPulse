@@ -50,15 +50,15 @@ export const PATCH = handler(async (request) => {
   if (body.new_password) {
     if (!ctx.user.passwordHash) {
       throw new ApiError(
-        "no password set on this account — ask an admin to set one",
+        "该账号尚未设置密码，请联系管理员处理",
         400
       );
     }
     if (!body.current_password) {
-      throw new ApiError("current_password required to change password", 400);
+      throw new ApiError("修改密码需要填写当前密码", 400);
     }
     const ok = await verifyPassword(body.current_password, ctx.user.passwordHash);
-    if (!ok) throw new ApiError("current password incorrect", 401);
+    if (!ok) throw new ApiError("当前密码不正确", 401);
     updates.passwordHash = await hashPassword(body.new_password);
   }
 

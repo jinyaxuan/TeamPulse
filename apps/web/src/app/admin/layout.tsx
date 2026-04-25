@@ -16,16 +16,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               TeamPulse
             </Link>
             <nav className="flex items-center gap-4 text-sm text-muted-foreground">
+              <Link href="/" className="hover:text-foreground">
+                工作台
+              </Link>
               <Link href="/admin/devices" className="hover:text-foreground">
-                Devices
+                设备审批
               </Link>
               <Link href="/admin/users" className="hover:text-foreground">
-                Users
+                用户管理
               </Link>
             </nav>
           </div>
           <div className="text-xs text-muted-foreground">
-            {user.displayName ?? user.name} · admin
+            {user.displayName ?? user.name} · 管理员
           </div>
         </div>
       </header>

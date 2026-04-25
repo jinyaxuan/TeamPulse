@@ -22,14 +22,14 @@ export default async function SettingsLayout({
 
   return (
     <AppShell user={user}>
-      <div className="grid grid-cols-[180px_1fr] gap-8">
-        <nav className="space-y-1">
+      <div className="grid gap-6 lg:grid-cols-[180px_1fr] lg:gap-8">
+        <nav className="space-y-1 rounded-md border bg-card p-2 lg:bg-transparent lg:p-0 lg:border-0">
           <div className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Settings
+            设置
           </div>
-          {item("/settings/profile", "Profile")}
-          {item("/settings/devices", "Devices")}
-          {item("/settings/memory", "Memory")}
+          {item("/settings/profile", "个人资料")}
+          {item("/settings/devices", "我的设备")}
+          {item("/settings/memory", "记忆同步")}
         </nav>
         <div>{children}</div>
       </div>

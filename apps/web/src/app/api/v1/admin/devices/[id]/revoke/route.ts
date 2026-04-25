@@ -13,7 +13,7 @@ export const POST = handler<{ id: string }>(async (request, params) => {
   await requireAdminAuth(request);
 
   const [device] = await db.select().from(devices).where(eq(devices.id, params.id)).limit(1);
-  if (!device) throw new ApiError("device not found", 404);
+  if (!device) throw new ApiError("设备不存在", 404);
 
   const nextStatus = device.status === "pending" ? "rejected" : "revoked";
 

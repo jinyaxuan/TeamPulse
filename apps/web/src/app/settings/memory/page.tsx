@@ -28,28 +28,29 @@ export default async function MemoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Memory</h1>
+        <h1 className="text-2xl font-semibold">记忆同步</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your cross-device <code className="rounded bg-muted px-1 font-mono text-xs">MEMORY.md</code> sync for each project.
-          The Claude Code plugin pushes on session end and pulls on session start.
+          每个项目的跨设备 <code className="rounded bg-muted px-1 font-mono text-xs">MEMORY.md</code> 同步记录。
+          Claude Code 插件会在会话结束时推送，在会话开始时拉取。
         </p>
       </div>
 
       {rows.length === 0 ? (
         <div className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground">
-          No memory synced yet. Edit <code className="rounded bg-muted px-1">~/.claude/projects/&lt;repo&gt;/memory/MEMORY.md</code>{" "}
-          in a Claude Code session and it'll show up here.
+          暂无同步记忆。在 Claude Code 会话中编辑{" "}
+          <code className="rounded bg-muted px-1">~/.claude/projects/&lt;repo&gt;/memory/MEMORY.md</code>
+          后，这里会显示同步记录。
         </div>
       ) : (
         <div className="overflow-hidden rounded-md border bg-card">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="px-4 py-2 text-left">Project</th>
-                <th className="px-4 py-2 text-left">Version</th>
-                <th className="px-4 py-2 text-left">Size</th>
-                <th className="px-4 py-2 text-left">Updated</th>
-                <th className="px-4 py-2 text-left">From device</th>
+                <th className="px-4 py-2 text-left">项目</th>
+                <th className="px-4 py-2 text-left">版本</th>
+                <th className="px-4 py-2 text-left">大小</th>
+                <th className="px-4 py-2 text-left">更新时间</th>
+                <th className="px-4 py-2 text-left">来源设备</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -61,7 +62,7 @@ export default async function MemoryPage() {
                       href={`/projects/${m.project_id}`}
                       className="font-medium hover:underline"
                     >
-                      {m.project_name ?? "(unnamed)"}
+                      {m.project_name ?? "未命名项目"}
                     </Link>
                   </td>
                   <td className="px-4 py-2 font-mono text-xs">v{m.version}</td>
@@ -77,7 +78,7 @@ export default async function MemoryPage() {
                       href={`/api/v1/memory/${m.project_id}/download`}
                       className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
                     >
-                      Download
+                      下载
                     </Link>
                   </td>
                 </tr>

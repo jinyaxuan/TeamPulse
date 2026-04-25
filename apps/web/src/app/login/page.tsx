@@ -8,14 +8,17 @@ export default async function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
-      <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">TeamPulse</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Sign in to continue</p>
+      <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-sm">
+        <div className="rounded-md bg-primary px-4 py-3 text-primary-foreground">
+          <h1 className="text-2xl font-semibold">TeamPulse</h1>
+          <p className="mt-1 text-sm opacity-80">团队 AI 协作面板</p>
+        </div>
+        <p className="mt-5 text-sm text-muted-foreground">登录后查看团队实时任务、项目动态和设备接入状态。</p>
         <div className="mt-6">
           <LoginForm />
         </div>
         <p className="mt-6 text-xs text-muted-foreground">
-          Developers without an admin password: install the Claude Code plugin and ask your admin to approve your device.
+          没有管理员密码的开发者：先安装 Claude Code 或 Codex 插件，再让管理员审批你的设备。
         </p>
       </div>
     </main>

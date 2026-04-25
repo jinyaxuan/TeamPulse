@@ -23,13 +23,13 @@ export function MagicConsumer({ token }: { token: string }) {
         if (aborted) return;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          setError(body.error ?? "Link invalid or expired");
+          setError(body.error ?? "链接无效或已过期");
           return;
         }
         router.replace("/");
         router.refresh();
       } catch {
-        if (!aborted) setError("Network error");
+        if (!aborted) setError("网络异常");
       }
     })();
     return () => {
@@ -40,7 +40,7 @@ export function MagicConsumer({ token }: { token: string }) {
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="max-w-sm rounded-lg border bg-card p-6 text-center">
-        <h1 className="text-lg font-semibold">Signing you in…</h1>
+        <h1 className="text-lg font-semibold">正在登录…</h1>
         {error ? (
           <>
             <p className="mt-2 text-sm text-destructive">{error}</p>
@@ -48,12 +48,12 @@ export function MagicConsumer({ token }: { token: string }) {
               href="/login"
               className="mt-4 inline-block rounded-md border px-4 py-2 text-sm hover:bg-accent"
             >
-              Request a new link
+              重新获取链接
             </a>
           </>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
-            One moment while we validate the link.
+            请稍等，正在校验登录链接。
           </p>
         )}
       </div>

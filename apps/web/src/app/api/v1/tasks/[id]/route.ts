@@ -24,10 +24,10 @@ export const PATCH = handler<{ id: string }>(async (request, params) => {
   const body = await parseBody(request, patchTaskSchema);
 
   const [existing] = await db.select().from(tasks).where(eq(tasks.id, params.id)).limit(1);
-  if (!existing) throw new ApiError("task not found", 404);
+  if (!existing) throw new ApiError("任务不存在", 404);
 
   if (existing.userId !== ctx.user.id && ctx.user.role !== "admin") {
-    throw new ApiError("not the task owner", 403);
+    throw new ApiError("只能修改自己的任务", 403);
   }
 
   const updates: Partial<typeof tasks.$inferInsert> = {};
@@ -70,9 +70,9 @@ export const PATCH = handler<{ id: string }>(async (request, params) => {
 export const GET = handler<{ id: string }>(async (request, params) => {
   const ctx = await requireAuth(request);
   const [task] = await db.select().from(tasks).where(eq(tasks.id, params.id)).limit(1);
-  if (!task) throw new ApiError("task not found", 404);
+  if (!task) throw new ApiError("任务不存在", 404);
   if (task.userId !== ctx.user.id && ctx.user.role !== "admin") {
-    throw new ApiError("not authorized", 403);
+    throw new ApiError("没有权限", 403);
   }
   return json({ task });
 });

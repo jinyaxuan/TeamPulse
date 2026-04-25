@@ -19,8 +19,8 @@ export const POST = handler<{ id: string }>(async (request, params) => {
   const ctx = await requireAdminAuth(request);
 
   const [target] = await db.select().from(users).where(eq(users.id, params.id)).limit(1);
-  if (!target) throw new ApiError("user not found", 404);
-  if (target.id === ctx.user.id) throw new ApiError("cannot revoke yourself", 400);
+  if (!target) throw new ApiError("用户不存在", 404);
+  if (target.id === ctx.user.id) throw new ApiError("不能撤销自己", 400);
 
   const now = new Date();
 

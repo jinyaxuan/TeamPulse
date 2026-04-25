@@ -42,9 +42,9 @@ export default async function DevicesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Device Approvals</h1>
+        <h1 className="text-2xl font-semibold">设备审批</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pending devices from Claude Code plugins wait here. Approve to bind them to a user.
+          Claude Code 和 Codex 插件注册的新设备会在这里等待审批。审批后设备会绑定到指定用户。
         </p>
       </div>
       <DevicesClient
