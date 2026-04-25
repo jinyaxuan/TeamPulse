@@ -1,5 +1,6 @@
 import { desc, eq, gt, and, sql } from "drizzle-orm";
 import { db, projects, tasks } from "@/db";
+import { nonTestProjectCondition } from "@/lib/test-data";
 
 export type ProjectStat = {
   id: string;
@@ -15,10 +16,14 @@ export type ProjectStat = {
  * instead of correlated subqueries (clearer SQL + more predictable under
  * Drizzle's raw sql interpolation).
  */
-export async function listProjectsWithStats(): Promise<ProjectStat[]> {
+export async function listProjectsWithStats({
+  includeTestData = false,
+}: {
+  includeTestData?: boolean;
+} = {}): Promise<ProjectStat[]> {
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-  const rows = await db
+  const query = db
     .select({
       id: projects.id,
       display_name: projects.displayName,
@@ -30,7 +35,9 @@ export async function listProjectsWithStats(): Promise<ProjectStat[]> {
       ),
     })
     .from(projects)
-    .leftJoin(tasks, eq(tasks.projectId, projects.id))
+    .leftJoin(tasks, eq(tasks.projectId, projects.id));
+
+  const rows = await (includeTestData ? query : query.where(nonTestProjectCondition()))
     .groupBy(projects.id)
     .orderBy(desc(projects.createdAt));
 

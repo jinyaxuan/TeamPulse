@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
 import { clientLabel, formatRelativeTime, roleLabel, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export default async function TeamPage() {
     })
     .from(users)
     .leftJoin(tasks, and(eq(tasks.userId, users.id), gte(tasks.startedAt, since)))
-    .where(isNull(users.revokedAt))
+    .leftJoin(projects, eq(tasks.projectId, projects.id))
+    .where(and(isNull(users.revokedAt), nonTestUserCondition(), nonTestProjectCondition()))
     .groupBy(users.id);
 
   const activeTasks = await db
@@ -53,7 +55,15 @@ export default async function TeamPage() {
     .from(tasks)
     .innerJoin(users, eq(tasks.userId, users.id))
     .innerJoin(projects, eq(tasks.projectId, projects.id))
-    .where(and(eq(tasks.status, "active"), gt(tasks.heartbeatAt, activeCutoff), isNull(users.revokedAt)))
+    .where(
+      and(
+        eq(tasks.status, "active"),
+        gt(tasks.heartbeatAt, activeCutoff),
+        isNull(users.revokedAt),
+        nonTestProjectCondition(),
+        nonTestUserCondition()
+      )
+    )
     .orderBy(desc(tasks.heartbeatAt))
     .limit(20);
 
@@ -71,7 +81,14 @@ export default async function TeamPage() {
     .from(tasks)
     .innerJoin(users, eq(tasks.userId, users.id))
     .innerJoin(projects, eq(tasks.projectId, projects.id))
-    .where(and(gte(tasks.startedAt, since), isNull(users.revokedAt)))
+    .where(
+      and(
+        gte(tasks.startedAt, since),
+        isNull(users.revokedAt),
+        nonTestProjectCondition(),
+        nonTestUserCondition()
+      )
+    )
     .orderBy(desc(tasks.startedAt))
     .limit(100);
 

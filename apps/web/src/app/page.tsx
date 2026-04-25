@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,8 @@ export default async function Home() {
       and(
         eq(tasks.userId, user.id),
         eq(tasks.status, "active"),
-        gt(tasks.heartbeatAt, activeCutoff)
+        gt(tasks.heartbeatAt, activeCutoff),
+        nonTestProjectCondition()
       )
     )
     .orderBy(desc(tasks.heartbeatAt))
@@ -52,7 +54,7 @@ export default async function Home() {
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
     .innerJoin(users, eq(tasks.userId, users.id))
-    .where(gt(tasks.startedAt, recentCutoff))
+    .where(and(gt(tasks.startedAt, recentCutoff), nonTestProjectCondition(), nonTestUserCondition()))
     .orderBy(desc(tasks.startedAt))
     .limit(20);
 

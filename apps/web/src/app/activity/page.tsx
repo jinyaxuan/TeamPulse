@@ -5,6 +5,12 @@ import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import {
+  nonTestProjectCondition,
+  nonTestUserCondition,
+  shouldShowTestData,
+  SHOW_TEST_DATA_PARAM,
+} from "@/lib/test-data";
 import { formatDateTime, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +20,7 @@ type SearchParams = {
   project?: string;
   days?: string;
   status?: string;
+  showTestData?: string;
 };
 
 export default async function ActivityPage({
@@ -27,9 +34,13 @@ export default async function ActivityPage({
   const params = await searchParams;
   const days = Math.min(Math.max(Number(params.days ?? 7), 1), 30);
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const showTestData = shouldShowTestData(params.showTestData);
 
   const conditions: SQL[] = [gte(tasks.startedAt, since)];
   if (params.project) conditions.push(eq(tasks.projectId, params.project));
+  if (!showTestData) {
+    conditions.push(nonTestProjectCondition(), nonTestUserCondition());
+  }
   if (params.status) {
     const wanted = params.status.split(",").filter((s) => ["active", "done", "abandoned"].includes(s));
     if (wanted.length) conditions.push(inArray(tasks.status, wanted));
@@ -62,10 +73,13 @@ export default async function ActivityPage({
   const doneRows = rows.filter((row) => row.status === "done").length;
   const abandonedRows = rows.filter((row) => row.status === "abandoned").length;
 
-  const projectOptions = await db
+  const projectOptionsQuery = db
     .select({ id: projects.id, display_name: projects.displayName })
-    .from(projects)
-    .orderBy(projects.displayName);
+    .from(projects);
+  const projectOptions = await (showTestData
+    ? projectOptionsQuery
+    : projectOptionsQuery.where(nonTestProjectCondition())
+  ).orderBy(projects.displayName);
 
   // Build an export CSV link that preserves current filters.
   const csvQuery = new URLSearchParams({
@@ -73,6 +87,7 @@ export default async function ActivityPage({
     ...(params.user ? { user: params.user } : {}),
     ...(params.project ? { project: params.project } : {}),
     ...(params.status ? { status: params.status } : {}),
+    ...(showTestData ? { [SHOW_TEST_DATA_PARAM]: "1" } : {}),
     format: "csv",
   }).toString();
 
@@ -101,7 +116,7 @@ export default async function ActivityPage({
           <ActivityStat label="已中断" value={abandonedRows} detail="未正常收尾" tone="amber" />
         </section>
 
-        <FilterBar current={{ ...params, days: String(days) }} projects={projectOptions} />
+        <FilterBar current={{ ...params, days: String(days) }} projects={projectOptions} showTestData={showTestData} />
 
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -192,9 +207,11 @@ function ActivityStat({
 function FilterBar({
   current,
   projects: projectOptions,
+  showTestData,
 }: {
   current: SearchParams;
   projects: Array<{ id: string; display_name: string | null }>;
+  showTestData: boolean;
 }) {
   return (
     <form action="/activity" method="get" className="rounded-lg border bg-white p-4 shadow-sm">
@@ -254,6 +271,21 @@ function FilterBar({
           应用筛选
         </button>
       </div>
+      <label className="mt-3 flex w-fit items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          name={SHOW_TEST_DATA_PARAM}
+          value="1"
+          defaultChecked={showTestData}
+          className="h-4 w-4 rounded border-input"
+        />
+        显示 e2e 测试数据
+      </label>
+      {!showTestData && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          已默认隐藏测试项目和测试成员，避免自动化记录干扰真实团队动态。
+        </p>
+      )}
     </form>
   );
 }

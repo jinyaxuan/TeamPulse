@@ -2,6 +2,11 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { requireAuth } from "@/lib/api";
+import {
+  nonTestProjectCondition,
+  nonTestUserCondition,
+  shouldShowTestData,
+} from "@/lib/test-data";
 import { taskStatusLabel } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,10 +28,14 @@ export async function GET(request: Request) {
   const userName = url.searchParams.get("user");
   const projectId = url.searchParams.get("project");
   const statusParam = url.searchParams.get("status");
+  const showTestData = shouldShowTestData(url.searchParams.get("showTestData"));
 
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const conditions: SQL[] = [gte(tasks.startedAt, since)];
   if (projectId) conditions.push(eq(tasks.projectId, projectId));
+  if (!showTestData) {
+    conditions.push(nonTestProjectCondition(), nonTestUserCondition());
+  }
   if (statusParam) {
     const wanted = statusParam.split(",").filter((s) => ["active", "done", "abandoned"].includes(s));
     if (wanted.length) conditions.push(inArray(tasks.status, wanted));
