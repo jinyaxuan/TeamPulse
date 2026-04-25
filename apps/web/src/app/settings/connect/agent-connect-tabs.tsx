@@ -112,6 +112,6 @@ function buildPrompts(appUrl: string): Record<TabKey, string> {
     skill: basePrompt,
     codex: `请在当前 Codex 环境中根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
     claude: `请在当前 Claude Code 环境中根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
-    openclaw: `请根据 https://skillhub.cn/install/skillhub.md 安装 Skillhub 商店，并根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
+    openclaw: `请根据 https://skillhub.cn/install/skillhub.md 安装 Skillhub 命令行工具并重启 Agent，然后根据 ${connectorUrl} 接入 TeamPulse（${appUrl}），注册后只把 claim_code 返回给我，我绑定后你继续写入凭据并确认账号。`,
   };
 }
