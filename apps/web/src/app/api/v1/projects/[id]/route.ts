@@ -1,7 +1,7 @@
 import { and, desc, eq, gt } from "drizzle-orm";
 import { db, projectMembers, tasks, users } from "@/db";
 import { ApiError, handler, json, requireAuth } from "@/lib/api";
-import { getVisibleProject } from "@/lib/project-access";
+import { canManageProjectMembers, getVisibleProject } from "@/lib/project-access";
 import { findActiveTaskOverlaps } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -87,6 +87,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     },
     active,
     active_overlaps: findActiveTaskOverlaps(active),
+    can_manage_members: await canManageProjectMembers(project.id, ctx.user),
     members,
     recent,
   });

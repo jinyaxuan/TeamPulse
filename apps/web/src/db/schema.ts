@@ -142,8 +142,8 @@ export const projectMembers = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("member"), // member|owner in future
-    source: text("source").notNull().default("activity"), // resolve|activity|manual in future
+    role: text("role").notNull().default("member"), // owner|member|viewer
+    source: text("source").notNull().default("activity"), // resolve|activity|manual
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
   },

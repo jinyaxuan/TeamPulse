@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, memoryBlobs } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
-import { getVisibleProject } from "@/lib/project-access";
+import { canWriteProject, getVisibleProject } from "@/lib/project-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -74,6 +74,9 @@ export const PUT = handler<{ projectId: string }>(async (request, params) => {
 
   const proj = await getVisibleProject(params.projectId, ctx.user);
   if (!proj) throw new ApiError("项目不存在", 404);
+  if (!(await canWriteProject(params.projectId, ctx.user))) {
+    throw new ApiError("你在该项目中是只读角色，不能更新记忆", 403);
+  }
 
   const ifMatch = request.headers.get("if-match");
   const expectedVersion = ifMatch ? Number(ifMatch.replace(/"/g, "")) : null;

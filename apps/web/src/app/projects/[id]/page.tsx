@@ -6,9 +6,10 @@ import { db, projectMembers, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
 import { gitRemoteLinks } from "@/lib/git-remote";
-import { getVisibleProject } from "@/lib/project-access";
+import { canManageProjectMembers, getVisibleProject } from "@/lib/project-access";
 import { findActiveTaskOverlaps, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
+import { ProjectMembersPanel, type ProjectMemberRow } from "./project-members-panel";
 import { ProjectLiveUpdates } from "./project-live";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,7 @@ export default async function ProjectPage({
     .innerJoin(users, eq(projectMembers.userId, users.id))
     .where(eq(projectMembers.projectId, project.id))
     .orderBy(desc(projectMembers.lastSeenAt));
+  const canManageMembers = await canManageProjectMembers(project.id, user);
 
   const activeOverlaps = findActiveTaskOverlaps(active);
   const mergeRiskOverlaps = activeOverlaps.filter((overlap) => overlap.reasons.includes("merge_risk"));
@@ -139,34 +141,12 @@ export default async function ProjectPage({
           </div>
         </div>
 
-        <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">项目成员</h2>
-          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {members.length === 0 && (
-              <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-                还没有成员记录。成员在该仓库启动任务后会自动加入。
-              </div>
-            )}
-            {members.map((member) => (
-              <div key={member.user_id} className="rounded-md border bg-card p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">
-                      {member.user_display_name ?? member.user_name}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">@{member.user_name}</div>
-                  </div>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {projectMemberSourceLabel(member.source)}
-                  </span>
-                </div>
-                <div className="mt-3 text-xs text-muted-foreground">
-                  最近确认 {formatRelativeTime(member.last_seen_at)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <ProjectMembersPanel
+          projectId={project.id}
+          members={members as ProjectMemberRow[]}
+          canManage={canManageMembers}
+          currentUserId={user.id}
+        />
 
         <section>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -465,13 +445,6 @@ function branchLabel(branch: string | null): string {
 
 function isCompareableBranch(branch: string): boolean {
   return branch !== "main" && branch !== "master";
-}
-
-function projectMemberSourceLabel(source: string): string {
-  if (source === "activity") return "任务加入";
-  if (source === "resolve") return "仓库加入";
-  if (source === "manual") return "手动加入";
-  return "成员";
 }
 
 function branchFilterLabel(branchFilter: string | null): string {

@@ -138,6 +138,7 @@ test("e2e: full happy path", async (t) => {
 
   let invitedName!: string;
   let invitedCookie!: string;
+  let invitedUserId!: string;
 
   await t.test("invite registration: admin creates one-use code", async () => {
     invitedName = `e2e_invited_${randomLower(6)}`;
@@ -163,6 +164,7 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(registered.status, 200);
     assert.equal(registered.body.user.name, invitedName);
+    invitedUserId = registered.body.user.id;
     const cookie = extractSessionCookie(registered.setCookies);
     assert.ok(cookie, "expected invited user session cookie");
     invitedCookie = cookie!;
@@ -298,15 +300,57 @@ test("e2e: full happy path", async (t) => {
       detail.body.members.some((member: any) => member.user_name === devUserName),
       "project resolver should add the device user as a project member"
     );
+    assert.equal(
+      detail.body.members.find((member: any) => member.user_name === devUserName)?.role,
+      "owner"
+    );
+    assert.equal(detail.body.can_manage_members, true);
   });
 
-  await t.test("project: membership is scoped by account and same remote joins automatically", async () => {
+  await t.test("project: manual membership roles gate visibility and writes", async () => {
     const beforeJoin = await http(`/api/v1/projects/${projectId}`, {
       cookies: [invitedCookie],
     });
     assert.equal(beforeJoin.status, 404);
 
+    const added = await http(`/api/v1/projects/${projectId}/members`, {
+      method: "POST",
+      cookies: [adminCookie],
+      body: { user: invitedName, role: "viewer" },
+    });
+    assert.equal(added.status, 201);
+    assert.equal(added.body.member.user_name, invitedName);
+    assert.equal(added.body.member.role, "viewer");
+
+    const afterInvite = await http(`/api/v1/projects/${projectId}`, {
+      cookies: [invitedCookie],
+    });
+    assert.equal(afterInvite.status, 200);
+    assert.equal(
+      afterInvite.body.members.find((member: any) => member.user_name === invitedName)?.role,
+      "viewer"
+    );
+
     const sessionId = `e2e-sess-invited-${adminName}`;
+    const readonlyStart = await http("/api/v1/tasks", {
+      method: "POST",
+      cookies: [invitedCookie],
+      body: {
+        git_remote_hash: remoteHash,
+        session_id: `${sessionId}-readonly`,
+        intent: "E2E: viewer cannot start a task",
+      },
+    });
+    assert.equal(readonlyStart.status, 403);
+
+    const promoted = await http(`/api/v1/projects/${projectId}/members/${invitedUserId}`, {
+      method: "PATCH",
+      cookies: [adminCookie],
+      body: { role: "member" },
+    });
+    assert.equal(promoted.status, 200);
+    assert.equal(promoted.body.member.role, "member");
+
     const joined = await http("/api/v1/tasks", {
       method: "POST",
       cookies: [invitedCookie],
@@ -339,6 +383,18 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(ended.status, 200);
     assert.equal(ended.body.ended_count, 1);
+
+    const removed = await http(`/api/v1/projects/${projectId}/members/${invitedUserId}`, {
+      method: "DELETE",
+      cookies: [adminCookie],
+    });
+    assert.equal(removed.status, 200);
+    assert.equal(removed.body.removed, true);
+
+    const afterRemove = await http(`/api/v1/projects/${projectId}`, {
+      cookies: [invitedCookie],
+    });
+    assert.equal(afterRemove.status, 404);
   });
 
   let taskId!: string;

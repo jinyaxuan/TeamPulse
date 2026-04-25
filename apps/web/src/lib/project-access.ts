@@ -1,8 +1,10 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { db, projectMembers, projects, tasks, type Project, type User } from "@/db";
+import { db, projectMembers, projects, tasks, type Project, type ProjectMember, type User } from "@/db";
 
 type Viewer = Pick<User, "id" | "role">;
+export const PROJECT_MEMBER_ROLES = ["owner", "member", "viewer"] as const;
+export type ProjectMemberRole = (typeof PROJECT_MEMBER_ROLES)[number];
 
 export function isAdminUser(user: Viewer): boolean {
   return user.role === "admin";
@@ -31,22 +33,41 @@ export function visibleTasksCondition(user: Viewer): SQL | undefined {
 export async function ensureProjectMember(
   projectId: string,
   userId: string,
-  source: "resolve" | "activity" | "manual" = "activity"
+  source: "resolve" | "activity" | "manual" = "activity",
+  defaultRole?: ProjectMemberRole
 ): Promise<void> {
+  const now = new Date();
+  const [existing] = await db
+    .select({ source: projectMembers.source })
+    .from(projectMembers)
+    .where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, userId)))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(projectMembers)
+      .set({
+        source: existing.source === "manual" ? existing.source : source,
+        lastSeenAt: now,
+      })
+      .where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, userId)));
+    return;
+  }
+
+  const [memberCount] = await db
+    .select({ value: count() })
+    .from(projectMembers)
+    .where(eq(projectMembers.projectId, projectId));
+  const role = defaultRole ?? (Number(memberCount.value) === 0 ? "owner" : "member");
+
   await db
     .insert(projectMembers)
     .values({
       projectId,
       userId,
+      role,
       source,
-      lastSeenAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [projectMembers.projectId, projectMembers.userId],
-      set: {
-        source,
-        lastSeenAt: new Date(),
-      },
+      lastSeenAt: now,
     });
 }
 
@@ -62,6 +83,30 @@ export async function getVisibleProject(projectId: string, user: Viewer): Promis
 
 export async function canAccessProject(projectId: string, user: Viewer): Promise<boolean> {
   return Boolean(await getVisibleProject(projectId, user));
+}
+
+export async function getProjectMembership(
+  projectId: string,
+  user: Viewer
+): Promise<ProjectMember | null> {
+  const [membership] = await db
+    .select()
+    .from(projectMembers)
+    .where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, user.id)))
+    .limit(1);
+  return membership ?? null;
+}
+
+export async function canWriteProject(projectId: string, user: Viewer): Promise<boolean> {
+  if (isAdminUser(user)) return true;
+  const membership = await getProjectMembership(projectId, user);
+  return membership?.role === "owner" || membership?.role === "member";
+}
+
+export async function canManageProjectMembers(projectId: string, user: Viewer): Promise<boolean> {
+  if (isAdminUser(user)) return true;
+  const membership = await getProjectMembership(projectId, user);
+  return membership?.role === "owner";
 }
 
 export async function listVisibleProjectMemberUserIds(user: Viewer): Promise<Set<string> | null> {

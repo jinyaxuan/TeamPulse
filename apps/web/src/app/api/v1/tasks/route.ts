@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, gt, ne } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
-import { ensureProjectMember, getVisibleProject } from "@/lib/project-access";
+import { canWriteProject, ensureProjectMember, getVisibleProject } from "@/lib/project-access";
 import { publishPresence } from "@/lib/presence";
 import { findTaskOverlapWarnings } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
@@ -48,10 +48,16 @@ export const POST = handler(async (request) => {
 
   if (resolvedFromHash) {
     await ensureProjectMember(projectId, ctx.user.id, "activity");
+    if (!(await canWriteProject(projectId, ctx.user))) {
+      throw new ApiError("你在该项目中是只读角色，不能启动任务", 403);
+    }
   } else {
     const project = await getVisibleProject(projectId, ctx.user);
     if (!project) throw new ApiError("项目不存在", 404);
     await ensureProjectMember(projectId, ctx.user.id, "activity");
+    if (!(await canWriteProject(projectId, ctx.user))) {
+      throw new ApiError("你在该项目中是只读角色，不能启动任务", 403);
+    }
   }
 
   const intent = body.intent.trim().slice(0, 500);
