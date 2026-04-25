@@ -28,6 +28,7 @@ export default async function SettingsLayout({
             设置
           </div>
           {item("/settings/profile", "个人资料")}
+          {item("/settings/connect", "我的接入")}
           {item("/settings/devices", "我的设备")}
           {item("/settings/memory", "记忆同步")}
         </nav>

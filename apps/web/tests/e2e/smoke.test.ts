@@ -130,6 +130,46 @@ test("e2e: full happy path", async (t) => {
   const claimCode = randomClaimCode();
   let deviceId!: string;
 
+  await t.test("device: self claim binds to current account", async () => {
+    const selfDeviceSecret = randomBytes(32).toString("base64url");
+    const selfClaimCode = randomClaimCode();
+    const registered = await http("/api/v1/devices/register", {
+      method: "POST",
+      body: {
+        claim_code: selfClaimCode,
+        device_secret: selfDeviceSecret,
+        hostname: `e2e-self-${adminName}`,
+        os: "linux",
+        git_email: adminEmail,
+      },
+    });
+    assert.equal(registered.status, 200);
+
+    const claimed = await http("/api/v1/devices/claim-self", {
+      method: "POST",
+      cookies: [adminCookie],
+      body: { claim_code: selfClaimCode },
+    });
+    assert.equal(claimed.status, 200);
+    assert.equal(claimed.body.user.name, adminName);
+
+    const polled = await http(`/api/v1/devices/claim-code/${selfClaimCode}`, {
+      method: "POST",
+      body: { device_secret: selfDeviceSecret },
+    });
+    assert.equal(polled.status, 200);
+    assert.equal(polled.body.status, "active");
+    assert.equal(polled.body.user.name, adminName);
+    assert.ok(polled.body.token?.startsWith("tp_tok_"));
+
+    const revoked = await http(`/api/v1/devices/${registered.body.device_id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${polled.body.token}` },
+    });
+    assert.equal(revoked.status, 200);
+    assert.equal(revoked.body.status, "revoked");
+  });
+
   await t.test("device: register pending", async () => {
     const res = await http("/api/v1/devices/register", {
       method: "POST",
