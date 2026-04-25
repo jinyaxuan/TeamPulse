@@ -9,6 +9,8 @@ apps/web/            Next.js 14 应用，UI 和 API Route 在同一个代码库�
 packages/plugin/     Claude Code 插件，包含 hooks 和 MCP server
 packages/teampulse-codex/
                      Codex 插件，包含 MCP server 和调试 CLI
+packages/teampulse-agent/
+                     可分发给普通成员的 Agent Skill，负责写入本机凭据
 docker-compose.yml   本地开发用 Postgres
 ```
 
@@ -47,16 +49,41 @@ pnpm dev
 
 1. 登录自己的 TeamPulse 账号，打开 `/settings/connect`。
 2. 根据页面选择 Agent 类型：Codex、Claude Code 或 OpenClaw / 通用 Agent。
-3. 推荐让 Agent 直接用 curl 调用注册接口，拿到 `claim_code` 和 `device_secret`。
+3. 推荐让 Agent 使用 TeamPulse Agent Skill 注册设备，拿到 `claim_code`。
 4. 把 `claim_code` 填到“我的接入”页面。哪个账号提交认领码，设备就归属到哪个账号。
-5. 绑定后让 Agent 用同一个 `claim_code` 和 `device_secret` 调用领取接口，拿到后续上报用的 token。
+5. 绑定后让 Agent 执行 poll，Skill 会领取 token 并写入 `~/.teampulse/credentials.json`。
 6. 后续该设备上报的任务、心跳和文件触碰记录都会归到当前账号下。
 
 管理员仍可在 `/admin/devices` 查看待认领设备，并在必要时代为绑定。
 
-### 通用 curl 接入
+### Agent Skill 接入
 
-这是最通用的协议层接入方式，适合 Codex、OpenClaw、Skillhub Skill 或其它能执行终端命令的 Agent。
+正式给团队成员使用时，不要求他们拥有 TeamPulse 项目源码。把 `packages/teampulse-agent` 发布到 Skillhub 或其它 Skill 分发渠道即可。
+
+Skill 内置 `scripts/teampulse-connect.mjs`，负责：
+
+1. 注册设备并把 `device_secret` 暂存到 `~/.teampulse/device.json`。
+2. 返回 `claim_code` 给用户绑定。
+3. 绑定后领取 token。
+4. 写入 `~/.teampulse/credentials.json` 并删除临时 `device.json`。
+
+没有 Skill 平台时，也可以从 TeamPulse Web 下载独立连接脚本：
+
+```bash
+mkdir -p "$HOME/.teampulse/bin"
+curl -fsSL "http://localhost:3002/agent/teampulse-connect.mjs" \
+  -o "$HOME/.teampulse/bin/teampulse-connect.mjs"
+chmod 700 "$HOME/.teampulse/bin/teampulse-connect.mjs"
+
+node "$HOME/.teampulse/bin/teampulse-connect.mjs" register --server-url http://localhost:3002
+# 把输出的 claim_code 填到 /settings/connect
+node "$HOME/.teampulse/bin/teampulse-connect.mjs" poll --server-url http://localhost:3002
+node "$HOME/.teampulse/bin/teampulse-connect.mjs" status
+```
+
+### curl 协议
+
+curl 是底层协议，适合理解和调试；正式使用建议由 Agent Skill 封装并写入凭据。
 
 ```bash
 # 1. Agent 在本机注册设备
@@ -81,19 +108,8 @@ curl -sS -X POST "http://localhost:3002/api/v1/devices/claim-code/$CLAIM_CODE" \
 
 ### Codex 接入
 
-项目内置了一个 Codex 适配插件：`packages/teampulse-codex`。它复用 TeamPulse 的设备认领和 bearer token 机制，凭据同样保存到 `~/.teampulse/credentials.json`。如果需要插件自动写入凭据，可以用下面的 CLI：
-
-首次接入：
-
-```bash
-# 如果你的本地 TeamPulse 跑在 3002，先指定服务地址
-TEAMPULSE_SERVER_URL=http://localhost:3002 pnpm codex:register
-
-# 输出 claim_code 后，登录目标账号并到 /settings/connect 绑定该设备
-
-TEAMPULSE_SERVER_URL=http://localhost:3002 pnpm codex:poll
-pnpm codex:status
-```
+普通 Codex 用户使用 TeamPulse Agent Skill 接入，不需要 TeamPulse 项目源码。
+`packages/teampulse-codex` 是本仓库维护者调试 Codex MCP tools 用的源码包。
 
 ### Claude Code 接入
 
@@ -106,7 +122,7 @@ pnpm codex:status
 
 ### OpenClaw / 通用 Agent 接入
 
-只要 Agent 能执行终端命令，就走“通用 curl 接入”。如果通过 Skillhub 这类商店分发，可以把两次 curl 包装成 Skill：先让 Agent 注册设备并返回 `claim_code`，由用户在 TeamPulse 当前账号页确认绑定，再让 Agent 用 `device_secret` 领取 token。
+只要 Agent 能执行终端命令，就走 TeamPulse Agent Skill。通过 Skillhub 这类商店分发后，Agent 只需要按 Skill 流程注册、等待用户绑定、poll 并写入凭据。
 
 手动上报当前 Codex 任务：
 
@@ -213,6 +229,10 @@ packages/teampulse-codex/
   skills/teampulse-codex/SKILL.md    Codex 使用 TeamPulse 的行为指引
   mcp-server/index.js                Codex MCP tools
   bin/teampulse-codex.js             手动注册、上报、查询 CLI
+
+packages/teampulse-agent/
+  SKILL.md                           普通 Agent 接入 TeamPulse 的 Skill
+  scripts/teampulse-connect.mjs      无源码环境下注册、poll、写入凭据
 ```
 
 ## 已完成功能
@@ -232,6 +252,9 @@ packages/teampulse-codex/
   - `packages/teampulse-codex` Codex 插件声明。
   - MCP tools 支持注册设备、开始任务、心跳、结束会话、查询活跃任务和历史记录。
   - `teampulse-codex` CLI 支持手动接入和调试。
+- Agent Skill 接入：
+  - `packages/teampulse-agent` 可发布到 Skillhub 或其它 Skill 分发渠道。
+  - `teampulse-connect.mjs` 支持无源码环境下注册设备、等待账号认领、领取 token、写入本机凭据。
 - 部署：
   - 多阶段 Dockerfile。
   - `docker-compose.prod.yml`：Postgres、migrate、app、Caddy、夜间备份。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TeamPulse Agent"
+  short_description: "Connect an agent to TeamPulse and write local credentials."
+  default_prompt: "Connect this agent to TeamPulse."

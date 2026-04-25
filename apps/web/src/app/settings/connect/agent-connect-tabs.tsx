@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
-type TabKey = "curl" | "codex" | "claude" | "openclaw";
+type TabKey = "skill" | "curl" | "codex" | "claude" | "openclaw";
 
 type TabConfig = {
   key: TabKey;
@@ -14,16 +14,22 @@ type TabConfig = {
 
 const TABS: TabConfig[] = [
   {
-    key: "curl",
-    title: "通用 curl",
+    key: "skill",
+    title: "Agent Skill",
     badge: "推荐",
-    description: "最稳定的协议层接入方式，适合任何能执行终端命令的 Agent。",
+    description: "正式接入用 Skill 或独立脚本完成注册、等待绑定、领取 token、写入本机凭据。",
+  },
+  {
+    key: "curl",
+    title: "curl 协议",
+    badge: "底层协议",
+    description: "curl 适合理解和调试协议；正式使用时建议由 Skill 封装并保存凭据。",
   },
   {
     key: "codex",
     title: "Codex",
-    badge: "插件/CLI",
-    description: "Codex 可以直接走 curl 协议，也可以用项目内 Codex 插件自动写入凭据。",
+    badge: "Skill 接入",
+    description: "Codex 推荐使用 TeamPulse Agent Skill，普通用户不需要 TeamPulse 项目源码。",
   },
   {
     key: "claude",
@@ -34,13 +40,13 @@ const TABS: TabConfig[] = [
   {
     key: "openclaw",
     title: "OpenClaw / Skillhub",
-    badge: "可包装",
-    description: "把 curl 注册和领取 token 包装成 Skill，即可让不同 Agent 接入并按账号区分。",
+    badge: "Skillhub",
+    description: "把 TeamPulse Agent Skill 发布到 Skillhub 后，不同 Agent 都能用同一套账号认领流程。",
   },
 ];
 
 export function AgentConnectTabs({ appUrl }: { appUrl: string }) {
-  const [active, setActive] = useState<TabKey>("curl");
+  const [active, setActive] = useState<TabKey>("skill");
   const commands = useMemo(() => buildCommands(appUrl), [appUrl]);
   const activeTab = TABS.find((tab) => tab.key === active) ?? TABS[0];
 
@@ -50,7 +56,7 @@ export function AgentConnectTabs({ appUrl }: { appUrl: string }) {
         <div>
           <h2 className="text-sm font-semibold uppercase text-muted-foreground">选择接入方式</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            推荐先用通用 curl 理解协议；不同 Agent 的差异只在本机如何保存 token。
+            Skill 负责本机落盘，curl 是底层协议；不同 Agent 只需要调用同一套接入流程。
           </p>
         </div>
         <div className="flex overflow-x-auto rounded-md border bg-slate-50 p-1" role="tablist" aria-label="Agent 接入方式">
@@ -83,6 +89,7 @@ export function AgentConnectTabs({ appUrl }: { appUrl: string }) {
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{activeTab.description}</p>
 
+        {active === "skill" && <SkillPanel commands={commands} />}
         {active === "curl" && <CurlPanel commands={commands} />}
         {active === "codex" && <CodexPanel commands={commands} />}
         {active === "claude" && <ClaudePanel commands={commands} />}
@@ -92,13 +99,42 @@ export function AgentConnectTabs({ appUrl }: { appUrl: string }) {
   );
 }
 
+function SkillPanel({ commands }: { commands: ReturnType<typeof buildCommands> }) {
+  return (
+    <div className="mt-5 space-y-5">
+      <Step
+        index={1}
+        title="安装或携带 TeamPulse Agent Skill"
+        description="正式给团队成员使用时，把 packages/teampulse-agent 发布成 Skill。没有 Skill 平台时，也可以下载独立连接脚本。"
+      >
+        <CodeBlock command={commands.installConnector} />
+      </Step>
+      <Step
+        index={2}
+        title="注册并返回 claim_code"
+        description="Agent 执行注册命令。脚本会把 device_secret 暂存到 ~/.teampulse/device.json，并只把 claim_code 返回给用户绑定。"
+      >
+        <CodeBlock command={commands.skillRegister} />
+      </Step>
+      <Step
+        index={3}
+        title="用户绑定后写入凭据"
+        description="用户在本页绑定 claim_code 后，Agent 执行 poll。脚本会领取 token 并写入 ~/.teampulse/credentials.json。"
+      >
+        <CodeBlock command={commands.skillPoll} />
+      </Step>
+      <PromptBlock title="给 Agent 的一句话" text={commands.skillPrompt} />
+    </div>
+  );
+}
+
 function CurlPanel({ commands }: { commands: ReturnType<typeof buildCommands> }) {
   return (
     <div className="mt-5 space-y-5">
       <Step
         index={1}
         title="注册设备并拿到认领码"
-        description="Agent 在本机执行。响应里的 claim_code 给用户绑定，device_secret 由 Agent 暂存到当前任务上下文或本机安全位置。"
+        description="Agent 在本机执行。响应里的 claim_code 给用户绑定，device_secret 必须由 Agent 安全暂存。"
       >
         <CodeBlock command={commands.curlRegister} />
       </Step>
@@ -110,10 +146,15 @@ function CurlPanel({ commands }: { commands: ReturnType<typeof buildCommands> })
       <Step
         index={3}
         title="绑定后领取 token"
-        description="把上一步注册响应里的 claim_code 和 device_secret 填回环境变量，再调用领取接口。"
+        description="把上一步注册响应里的 claim_code 和 device_secret 填回环境变量，再调用领取接口。curl 只返回 token，不负责写凭据。"
       >
         <CodeBlock command={commands.curlPoll} />
       </Step>
+      <Step
+        index={4}
+        title="由 Skill 写入凭据"
+        description="拿到 token 后，不建议让用户手工编辑 JSON；正式流程应交给 Agent Skill 写入 ~/.teampulse/credentials.json。"
+      />
     </div>
   );
 }
@@ -123,18 +164,17 @@ function CodexPanel({ commands }: { commands: ReturnType<typeof buildCommands> }
     <div className="mt-5 space-y-5">
       <Step
         index={1}
-        title="协议层仍然用 curl"
-        description="如果只是让 Codex 注册并返回认领码，用通用 curl 最直观，不依赖本仓库插件是否安装。"
+        title="Codex 也走 Agent Skill"
+        description="普通用户不应该依赖本项目源码里的开发命令。让 Codex 使用 TeamPulse Agent Skill 完成注册和凭据写入。"
       >
-        <CodeBlock command={commands.curlRegister} />
+        <CodeBlock command={commands.skillRegister} />
       </Step>
       <Step
         index={2}
-        title="需要自动写凭据时用 Codex 插件"
-        description="项目内 Codex 插件会复用同一套接口，并把 token 写入 ~/.teampulse/credentials.json。"
+        title="用户绑定后写入凭据"
+        description="用户在本页绑定 claim_code 后，让 Codex 执行 poll。Skill 会写入 ~/.teampulse/credentials.json。"
       >
-        <CodeBlock command={commands.codexRegister} />
-        <CodeBlock command={commands.codexPoll} subtle />
+        <CodeBlock command={commands.skillPoll} />
       </Step>
       <PromptBlock title="给 Codex 的一句话" text={commands.codexPrompt} />
     </div>
@@ -170,9 +210,9 @@ function OpenClawPanel({ commands }: { commands: ReturnType<typeof buildCommands
       <Step
         index={1}
         title="把 curl 包装成 Skill"
-        description="Skillhub / OpenClaw 这类工具不需要专门协议，只要能执行终端命令，就让它先注册设备并返回 claim_code。"
+        description="Skillhub / OpenClaw 这类工具不需要专门协议。安装 TeamPulse Agent Skill 后，注册、暂存 secret、领取 token、写凭据都由 Skill 完成。"
       >
-        <CodeBlock command={commands.curlRegister} />
+        <CodeBlock command={commands.skillRegister} />
       </Step>
       <Step
         index={2}
@@ -181,10 +221,10 @@ function OpenClawPanel({ commands }: { commands: ReturnType<typeof buildCommands
       />
       <Step
         index={3}
-        title="领取 token 后交给 Agent 保存"
-        description="绑定后让 Agent 调用领取接口。返回的 token 是后续上报任务、心跳和文件触碰记录的凭据。"
+        title="领取 token 并写入本机凭据"
+        description="绑定后让 Agent 执行 poll。Skill 会写入 ~/.teampulse/credentials.json，后续上报直接复用。"
       >
-        <CodeBlock command={commands.curlPoll} />
+        <CodeBlock command={commands.skillPoll} />
       </Step>
       <PromptBlock title="给通用 Agent 的一句话" text={commands.genericPrompt} />
     </div>
@@ -241,6 +281,15 @@ function PromptBlock({ title, text }: { title: string; text: string }) {
 }
 
 function buildCommands(appUrl: string) {
+  const connectorUrl = `${appUrl}/agent/teampulse-connect.mjs`;
+  const installConnector = `mkdir -p "$HOME/.teampulse/bin"
+curl -fsSL "${connectorUrl}" -o "$HOME/.teampulse/bin/teampulse-connect.mjs"
+chmod 700 "$HOME/.teampulse/bin/teampulse-connect.mjs"`;
+
+  const skillRegister = `node "$HOME/.teampulse/bin/teampulse-connect.mjs" register --server-url ${appUrl}`;
+  const skillPoll = `node "$HOME/.teampulse/bin/teampulse-connect.mjs" poll --server-url ${appUrl}`;
+  const skillStatus = `node "$HOME/.teampulse/bin/teampulse-connect.mjs" status`;
+
   const curlRegister = `curl -sS -X POST "${appUrl}/api/v1/devices/register" \\
   -H "Content-Type: application/json" \\
   -d "{\\"hostname\\":\\"$(hostname)\\",\\"os\\":\\"$(uname -s)\\"}"`;
@@ -252,29 +301,40 @@ curl -sS -X POST "${appUrl}/api/v1/devices/claim-code/$CLAIM_CODE" \\
   -H "Content-Type: application/json" \\
   -d "{\\"device_secret\\":\\"$DEVICE_SECRET\\"}"`;
 
-  const codexRegister = `pnpm --filter @teampulse/codex-plugin register -- --server-url ${appUrl}`;
-  const codexPoll = `pnpm --filter @teampulse/codex-plugin poll -- --server-url ${appUrl}`;
-
-  const genericPrompt = `请用 curl 为当前机器注册 TeamPulse 设备：
-${curlRegister}
-
-把响应里的 claim_code 返回给我，并暂存 device_secret。
-等我在 TeamPulse “我的接入”页面绑定 claim_code 后，再用同一个 claim_code 和 device_secret 调用领取 token 接口。`;
+  const genericPrompt = `请使用 TeamPulse Agent Skill 接入当前机器。
+先执行注册命令，把 claim_code 返回给我；等我在 TeamPulse “我的接入”页面绑定后，再执行 poll 写入 ~/.teampulse/credentials.json。`;
 
   const codexPrompt = `请为当前 Codex 环境接入 TeamPulse。
-优先用 curl 注册设备并返回 claim_code；如果当前仓库里可以使用 @teampulse/codex-plugin，则绑定完成后执行 poll 写入 ~/.teampulse/credentials.json。`;
+使用 TeamPulse Agent Skill，不要依赖 TeamPulse 项目源码里的开发命令。
+先执行注册命令，把 claim_code 返回给我；等我绑定后再执行 poll 写入 ~/.teampulse/credentials.json。`;
 
   const claudePrompt = `请启用当前仓库的 TeamPulse Claude Code 插件（packages/plugin）。
 重启 Claude Code 后，在任意 Git 仓库开启会话。
 如果会话上下文出现 [TeamPulse 待认领]，请把 Claim code 返回给我。`;
 
+  const skillPrompt = `请使用 TeamPulse Agent Skill 接入当前机器。
+如果还没有连接脚本，先执行：
+${installConnector}
+
+然后执行：
+${skillRegister}
+
+把输出里的 claim_code 返回给我。等我在 TeamPulse 页面绑定后，再执行：
+${skillPoll}
+
+最后用下面命令确认已写入凭据：
+${skillStatus}`;
+
   return {
+    installConnector,
+    skillRegister,
+    skillPoll,
+    skillStatus,
     curlRegister,
     curlPoll,
-    codexRegister,
-    codexPoll,
     genericPrompt,
     codexPrompt,
     claudePrompt,
+    skillPrompt,
   };
 }
