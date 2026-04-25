@@ -14,6 +14,7 @@ WORKDIR /repo
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* .npmrc* ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/plugin/package.json ./packages/plugin/package.json
+COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.json
 
 RUN pnpm install --frozen-lockfile
 
@@ -34,7 +35,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
 # ---- Stage 3: runtime ----
-# We install prod deps fresh (no dev deps) and copy in the built .next.
+# We install prod deps fresh (no dev deps) and copy in the built .next-build.
 # Simpler and more reliable than Next.js standalone in a pnpm monorepo.
 FROM node:${NODE_VERSION}-alpine AS runtime
 RUN apk add --no-cache libc6-compat tini
@@ -43,6 +44,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_DIST_DIR=.next-build
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
@@ -53,10 +55,11 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc* ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/plugin/package.json ./packages/plugin/package.json
+COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.json
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy the built app + static assets + migrations + public.
-COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/.next ./apps/web/.next
+COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/.next-build ./apps/web/.next-build
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/next.config.mjs ./apps/web/next.config.mjs
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/src/db/migrations ./apps/web/src/db/migrations

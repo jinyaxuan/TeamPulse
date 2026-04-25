@@ -7,6 +7,8 @@ TeamPulse 是一个面向 Claude Code 团队使用的 AI 协作面板。它用�
 ```txt
 apps/web/            Next.js 14 应用，UI 和 API Route 在同一个代码库里
 packages/plugin/     Claude Code 插件，包含 hooks 和 MCP server
+packages/teampulse-codex/
+                     Codex 插件，包含 MCP server 和调试 CLI
 docker-compose.yml   本地开发用 Postgres
 ```
 
@@ -271,7 +273,8 @@ pnpm db:push
 
 ## 开发备注
 
-- `pnpm build` 会构建所有 workspace 包。
-- `pnpm --filter @teampulse/web build` 只构建 Web 应用。
+- `pnpm build` 会构建所有 workspace 包；Web 构建输出到 `apps/web/.next-build`，并在构建阶段跳过后台清理任务。
+- `pnpm --filter @teampulse/web build` 只构建 Web 应用，同样使用 `apps/web/.next-build`，不会覆盖开发服务正在使用的 `apps/web/.next`。
+- `pnpm dev` 使用默认的 `apps/web/.next`。如果之前手动构建导致开发服务异常，可删除 `apps/web/.next` 后重新运行 `pnpm dev`。
 - `pnpm --filter @teampulse/web test:e2e` 运行端到端 smoke test，需要本地 Postgres 和 `pnpm dev` 已启动。
 - `pnpm lint` 当前依赖 Next.js ESLint 配置；如需接入 CI，应先补齐 ESLint 配置文件。

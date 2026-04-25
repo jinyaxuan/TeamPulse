@@ -8,4 +8,6 @@
  */
 import { startSweepLoop } from "./sweep";
 
-startSweepLoop();
+if (process.env.TEAMPULSE_SKIP_SWEEP !== "1") {
+  startSweepLoop();
+}

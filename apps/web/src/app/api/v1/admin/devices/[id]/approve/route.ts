@@ -3,6 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { db, devices, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAdminAuth } from "@/lib/api";
 import { generateBearerToken } from "@/lib/auth";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const approveSchema = z.object({
   user_name: z

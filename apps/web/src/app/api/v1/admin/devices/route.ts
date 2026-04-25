@@ -1,6 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 import { db, devices, users } from "@/db";
 import { handler, json, requireAdminAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * GET /api/v1/admin/devices

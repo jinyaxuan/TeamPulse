@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAdminAuth } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const patchSchema = z.object({
   role: z.enum(["admin", "member"]).optional(),

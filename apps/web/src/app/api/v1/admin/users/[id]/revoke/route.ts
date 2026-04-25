@@ -1,6 +1,9 @@
 import { eq } from "drizzle-orm";
 import { db, devices, users, webSessions } from "@/db";
 import { ApiError, handler, json, requireAdminAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * POST /api/v1/admin/users/:id/revoke

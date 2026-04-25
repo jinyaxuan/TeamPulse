@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { handler, json, parseBody, requireAuth, ApiError } from "@/lib/api";
 import { hashPassword, verifyPassword } from "@/lib/auth";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const patchSchema = z.object({
   display_name: z.string().trim().min(1).max(128).optional(),

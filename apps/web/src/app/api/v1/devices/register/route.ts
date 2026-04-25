@@ -2,6 +2,9 @@ import { z } from "zod";
 import { db, devices } from "@/db";
 import { handler, json, parseBody } from "@/lib/api";
 import { generateClaimCode, hashDeviceSecret } from "@/lib/auth";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const registerSchema = z.object({
   claim_code: z

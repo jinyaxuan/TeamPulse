@@ -3,6 +3,9 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { db, magicLinks, users } from "@/db";
 import { ApiError, handler, json, parseBody } from "@/lib/api";
 import { createSession, setSessionCookie } from "@/lib/auth";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const consumeSchema = z.object({
   token: z.string().min(1).max(256),

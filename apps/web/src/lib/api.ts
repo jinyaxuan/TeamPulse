@@ -2,9 +2,9 @@
  * Shared helpers for API route handlers: JSON parsing with Zod, auth gate,
  * typed error responses.
  *
- * Importing this file also triggers the abandoned-task sweep loop (lazy
- * bootstrap). Any API route that uses `handler()` or `requireAuth()` keeps
- * the sweep alive.
+ * Importing this file also triggers the abandoned-task sweep loop at runtime
+ * (lazy bootstrap). The build script disables it so route module analysis
+ * doesn't try to connect to Postgres while producing static assets.
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";

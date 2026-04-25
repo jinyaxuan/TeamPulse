@@ -2,6 +2,9 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { requireAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * GET /api/v1/activity/export?days=&user=&project=&status=

@@ -2,6 +2,9 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, projects } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const resolveSchema = z.object({
   git_remote_hash: z.string().regex(/^[a-f0-9]{64}$/, "expected sha256 hex"),

@@ -1,6 +1,9 @@
 import { and, desc, eq, gt } from "drizzle-orm";
 import { db, tasks, users } from "@/db";
 import { handler, json, requireAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * GET /api/v1/tasks/active?project=X

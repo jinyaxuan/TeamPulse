@@ -1,5 +1,6 @@
 **/node_modules
 **/.next
+**/.next-build
 **/dist
 **/build
 **/coverage
@@ -13,6 +14,10 @@
 .env.local
 .env.*.local
 .env.prod
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.prod
 /Dockerfile
 /docker-compose.yml
 /docker-compose.prod.yml

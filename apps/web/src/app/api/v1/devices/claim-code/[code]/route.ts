@@ -4,6 +4,9 @@ import { db, devices, users } from "@/db";
 import { ApiError, handler, json, parseBody } from "@/lib/api";
 import { hashDeviceSecret } from "@/lib/auth";
 import { env } from "@/lib/env";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const claimCheckSchema = z.object({
   device_secret: z.string().min(32),

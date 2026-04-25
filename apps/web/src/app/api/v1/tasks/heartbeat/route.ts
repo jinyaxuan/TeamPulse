@@ -3,6 +3,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, tasks, users } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
 import { publishPresence } from "@/lib/presence";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const heartbeatSchema = z.object({
   session_id: z.string().min(1).max(128),

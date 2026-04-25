@@ -3,6 +3,9 @@ import { and, desc, eq, gt, ne } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
 import { publishPresence } from "@/lib/presence";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const startTaskSchema = z.object({
   project_id: z.string().uuid().optional(),

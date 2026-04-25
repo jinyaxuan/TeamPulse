@@ -2,6 +2,9 @@ import { and, eq } from "drizzle-orm";
 import { db, devices } from "@/db";
 import { ApiError, handler, json, requireAuth } from "@/lib/api";
 import { publishPresence } from "@/lib/presence";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * DELETE /api/v1/devices/:id

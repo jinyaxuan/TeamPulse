@@ -1,6 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db, devices } from "@/db";
 import { ApiError, handler, json, requireAdminAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * POST /api/v1/admin/devices/:id/revoke

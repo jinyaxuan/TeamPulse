@@ -1,6 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { db, memoryBlobs, projects } from "@/db";
 import { requireAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * GET /api/v1/memory/:projectId/download

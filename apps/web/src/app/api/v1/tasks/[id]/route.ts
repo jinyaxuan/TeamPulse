@@ -3,6 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { db, tasks } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
 import { publishPresence } from "@/lib/presence";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const patchTaskSchema = z.object({
   status: z.enum(["active", "done", "abandoned"]).optional(),

@@ -2,6 +2,9 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, memoryBlobs, projects } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const MAX_MEMORY_BYTES = 512 * 1024; // 512 KB; internal-tool scope
 

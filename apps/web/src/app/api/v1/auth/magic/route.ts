@@ -2,6 +2,9 @@ import { randomBytes } from "node:crypto";
 import { db, magicLinks } from "@/db";
 import { handler, json, requireAuth } from "@/lib/api";
 import { env } from "@/lib/env";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 /**
  * POST /api/v1/auth/magic

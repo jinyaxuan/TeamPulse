@@ -3,6 +3,9 @@ import { db, users } from "@/db";
 import { createSession, setSessionCookie, verifyPassword } from "@/lib/auth";
 import { handler, json, parseBody, ApiError } from "@/lib/api";
 import { z } from "zod";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const loginSchema = z.object({
   email: z.string().email(),

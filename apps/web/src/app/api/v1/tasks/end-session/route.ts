@@ -3,6 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { db, tasks } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
 import { publishPresence } from "@/lib/presence";
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 
 const endSessionSchema = z.object({
   session_id: z.string().min(1).max(128),
