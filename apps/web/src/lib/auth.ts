@@ -48,7 +48,7 @@ export async function setSessionCookie(id: string, expiresAt: Date): Promise<voi
   const cookieStore = cookies();
   cookieStore.set(env.SESSION_COOKIE_NAME, id, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.PUBLIC_APP_URL.startsWith("https://"),
     sameSite: "lax",
     expires: expiresAt,
     path: "/",
