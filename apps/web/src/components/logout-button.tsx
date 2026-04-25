@@ -19,7 +19,7 @@ export function LogoutButton() {
     <button
       onClick={logout}
       disabled={pending}
-      className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+      className="whitespace-nowrap text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
     >
       {pending ? "…" : "Sign out"}
     </button>
