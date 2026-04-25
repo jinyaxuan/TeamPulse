@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import { LoginForm } from "./login-form";
 
@@ -18,7 +19,11 @@ export default async function LoginPage() {
           <LoginForm />
         </div>
         <p className="mt-6 text-xs text-muted-foreground">
-          没有管理员密码的开发者：先让管理员创建账号，再登录账号到“我的接入”绑定自己的设备。
+          没有账号？请让管理员发放邀请码，然后{" "}
+          <Link href="/register" className="font-medium text-foreground hover:underline">
+            使用邀请码注册
+          </Link>
+          。
         </p>
       </div>
     </main>

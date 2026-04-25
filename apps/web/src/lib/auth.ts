@@ -181,5 +181,26 @@ export function generateDeviceSecret(): string {
   return randomBytes(32).toString("base64url");
 }
 
+// ---------- Invite code helpers ----------
+
+export function normalizeInviteCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
+export function hashInviteCode(code: string): Buffer {
+  return createHash("sha256").update(normalizeInviteCode(code)).digest();
+}
+
+export function generateInviteCode(): string {
+  const raw = randomBytes(9)
+    .toString("base64url")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .padEnd(12, "0")
+    .slice(0, 12);
+
+  return `TP-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+}
+
 // Re-export for convenience; kept minimal.
 export { sql };

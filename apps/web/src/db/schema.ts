@@ -3,10 +3,12 @@ import {
   bigint,
   customType,
   index,
+  integer,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -94,6 +96,30 @@ export const magicLinks = pgTable("magic_links", {
 });
 
 /**
+ * invite_codes — admin-created registration tickets. The plaintext code is
+ * shown once when generated; only sha256 is stored.
+ */
+export const inviteCodes = pgTable(
+  "invite_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    codeHash: bytea("code_hash").notNull(),
+    label: text("label"),
+    maxUses: integer("max_uses").notNull().default(1),
+    uses: integer("uses").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("invite_codes_code_hash_unique").on(t.codeHash),
+    index("invite_codes_created_at_idx").on(t.createdAt),
+  ]
+);
+
+/**
  * projects — one per unique git remote.
  */
 export const projects = pgTable("projects", {
@@ -165,3 +191,4 @@ export type NewTask = typeof tasks.$inferInsert;
 export type MemoryBlob = typeof memoryBlobs.$inferSelect;
 export type WebSession = typeof webSessions.$inferSelect;
 export type MagicLink = typeof magicLinks.$inferSelect;
+export type InviteCode = typeof inviteCodes.$inferSelect;

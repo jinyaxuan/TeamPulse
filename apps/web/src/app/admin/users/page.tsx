@@ -1,5 +1,6 @@
 import { desc, eq, count } from "drizzle-orm";
-import { db, devices, tasks, users } from "@/db";
+import { db, devices, inviteCodes, tasks, users } from "@/db";
+import { InviteCodesPanel, type InviteCodeRow } from "./invite-codes-panel";
 import { UsersTable, type UserRow } from "./users-table";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,20 @@ export default async function AdminUsersPage() {
     task_count: taskMap.get(u.id) ?? 0,
   }));
 
+  const inviteRows: InviteCodeRow[] = await db
+    .select({
+      id: inviteCodes.id,
+      label: inviteCodes.label,
+      max_uses: inviteCodes.maxUses,
+      uses: inviteCodes.uses,
+      created_at: inviteCodes.createdAt,
+      expires_at: inviteCodes.expiresAt,
+      last_used_at: inviteCodes.lastUsedAt,
+      revoked_at: inviteCodes.revokedAt,
+    })
+    .from(inviteCodes)
+    .orderBy(desc(inviteCodes.createdAt));
+
   return (
     <div className="space-y-6">
       <div>
@@ -41,6 +56,7 @@ export default async function AdminUsersPage() {
           管理成员角色和访问权限。团队成员用自己的账号到“我的接入”绑定各自的 Agent 设备。
         </p>
       </div>
+      <InviteCodesPanel inviteCodes={inviteRows} />
       <UsersTable users={enriched} />
     </div>
   );

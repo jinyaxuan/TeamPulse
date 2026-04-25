@@ -1,13 +1,14 @@
 /**
  * End-to-end smoke test for the happy paths:
  *   1. admin login → session cookie
- *   2. device register → pending → admin approve → poll returns token
- *   3. project resolve (idempotent)
- *   4. task start → appears in active_tasks → history
- *   5. SSE: new task event fans out to a separate subscriber
- *   6. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   2. invite registration → one-use code creates a member account
+ *   3. device register → pending → admin approve → poll returns token
+ *   4. project resolve (idempotent)
+ *   5. task start → appears in active_tasks → history
+ *   6. SSE: new task event fans out to a separate subscriber
+ *   7. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   7. magic link: bearer issues link → consume returns session cookie
+ *   8. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -124,6 +125,45 @@ test("e2e: full happy path", async (t) => {
     const cookie = extractSessionCookie(res.setCookies);
     assert.ok(cookie, "expected session cookie");
     adminCookie = cookie!;
+  });
+
+  await t.test("invite registration: admin creates one-use code", async () => {
+    const invitedName = `e2e_invited_${randomLower(6)}`;
+    const invitedEmail = `${invitedName}@example.com`;
+    const invitedPassword = randomBytes(16).toString("base64url");
+
+    const invite = await http("/api/v1/admin/invite-codes", {
+      method: "POST",
+      cookies: [adminCookie],
+      body: { label: `Invite ${invitedName}`, max_uses: 1 },
+    });
+    assert.equal(invite.status, 201);
+    assert.match(invite.body.invite_code.code, /^TP-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+
+    const registered = await http("/api/v1/auth/register", {
+      method: "POST",
+      body: {
+        invite_code: invite.body.invite_code.code,
+        name: invitedName,
+        email: invitedEmail,
+        password: invitedPassword,
+      },
+    });
+    assert.equal(registered.status, 200);
+    assert.equal(registered.body.user.name, invitedName);
+    assert.ok(extractSessionCookie(registered.setCookies), "expected invited user session cookie");
+
+    const reused = await http("/api/v1/auth/register", {
+      method: "POST",
+      body: {
+        invite_code: invite.body.invite_code.code,
+        name: `${invitedName}_again`,
+        email: `again-${invitedEmail}`,
+        password: invitedPassword,
+      },
+    });
+    assert.equal(reused.status, 400);
+    assert.equal(reused.body.error, "邀请码无效、已过期或已用完");
   });
 
   let deviceSecret!: string;
