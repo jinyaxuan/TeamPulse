@@ -3,7 +3,7 @@
  *   1. admin login → session cookie
  *   2. invite registration → one-use code creates a member account
  *   3. device register → pending → admin approve → poll returns token
- *   4. project resolve (idempotent)
+ *   4. project resolve stores remote URL (idempotent)
  *   5. task start → appears in active_tasks → history
  *   6. branch-aware overlap warnings distinguish merge risk vs high risk
  *   7. project details expose branch filtering data + merge-risk queue inputs
@@ -282,6 +282,12 @@ test("e2e: full happy path", async (t) => {
     assert.equal(second.status, 200);
     assert.equal(second.body.created, false);
     assert.equal(second.body.project_id, projectId);
+
+    const detail = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.project.git_remote_url, remoteUrl);
   });
 
   let taskId!: string;

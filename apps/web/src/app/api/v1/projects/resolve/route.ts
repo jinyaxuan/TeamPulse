@@ -20,7 +20,8 @@ export const POST = handler(async (request) => {
   await requireAuth(request);
   const body = await parseBody(request, resolveSchema);
 
-  const display = deriveDisplayName(body.git_remote_url);
+  const remoteUrl = normalizeRemoteUrl(body.git_remote_url);
+  const display = deriveDisplayName(remoteUrl);
 
   const [existing] = await db
     .select()
@@ -29,9 +30,18 @@ export const POST = handler(async (request) => {
     .limit(1);
 
   if (existing) {
+    const updates: Partial<typeof projects.$inferInsert> = {};
+    if (remoteUrl && existing.gitRemoteUrl !== remoteUrl) updates.gitRemoteUrl = remoteUrl;
+    if (display && !existing.displayName) updates.displayName = display;
+
+    const [updated] =
+      Object.keys(updates).length > 0
+        ? await db.update(projects).set(updates).where(eq(projects.id, existing.id)).returning()
+        : [existing];
+
     return json({
-      project_id: existing.id,
-      display_name: existing.displayName,
+      project_id: updated.id,
+      display_name: updated.displayName,
       created: false,
     });
   }
@@ -40,6 +50,7 @@ export const POST = handler(async (request) => {
     .insert(projects)
     .values({
       gitRemoteHash: body.git_remote_hash,
+      gitRemoteUrl: remoteUrl,
       displayName: display,
     })
     .returning();
@@ -56,6 +67,11 @@ export const POST = handler(async (request) => {
  *   https://github.com/alice/frontend.git → "alice/frontend"
  *   git@github.com:alice/frontend.git     → "alice/frontend"
  */
+function normalizeRemoteUrl(url: string | undefined): string | undefined {
+  const trimmed = url?.trim();
+  return trimmed || undefined;
+}
+
 function deriveDisplayName(url: string | undefined): string | undefined {
   if (!url) return undefined;
   const cleaned = url.trim().replace(/\.git$/, "").replace(/\/$/, "");

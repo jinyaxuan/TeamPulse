@@ -15,6 +15,13 @@
       "when": 1777099408356,
       "tag": "0001_glorious_the_liberteens",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777118726956,
+      "tag": "0002_perfect_spitfire",
+      "breakpoints": true
     }
   ]
 }

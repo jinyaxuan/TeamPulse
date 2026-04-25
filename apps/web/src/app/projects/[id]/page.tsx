@@ -1,9 +1,11 @@
 import { and, desc, eq, gt } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
+import { gitRemoteLinks } from "@/lib/git-remote";
 import { findActiveTaskOverlaps, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { ProjectLiveUpdates } from "./project-live";
@@ -84,6 +86,7 @@ export default async function ProjectPage({
   const displayedActiveBranchGroups = groupActiveByBranch(filteredActive);
   const activeBranchOptions = getActiveBranchOptions(active, branchFilter);
   const isFiltered = branchFilter !== null;
+  const remoteLinks = gitRemoteLinks(project.gitRemoteUrl);
 
   return (
     <AppShell user={user} activeNav="projects">
@@ -96,6 +99,12 @@ export default async function ProjectPage({
               <div className="mt-1 font-mono text-xs text-muted-foreground">
                 远端哈希：{project.gitRemoteHash.slice(0, 16)}…
               </div>
+              {remoteLinks && (
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <ExternalLinkButton href={remoteLinks.repository_url}>仓库</ExternalLinkButton>
+                  <ExternalLinkButton href={remoteLinks.pulls_url}>PR</ExternalLinkButton>
+                </div>
+              )}
             </div>
             <div className="flex gap-2 text-xs">
               <span className="rounded-md border bg-background px-3 py-2">
@@ -149,9 +158,19 @@ export default async function ProjectPage({
                       <div className="text-xs text-muted-foreground">未从客户端上报到 git branch</div>
                     )}
                   </div>
-                  <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
-                    {group.tasks.length} 个任务
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!group.isUnknown && remoteLinks && (
+                      <>
+                        <ExternalTextLink href={remoteLinks.branch_url(group.key)}>分支</ExternalTextLink>
+                        {isCompareableBranch(group.key) && (
+                          <ExternalTextLink href={remoteLinks.compare_url(group.key)}>比较</ExternalTextLink>
+                        )}
+                      </>
+                    )}
+                    <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                      {group.tasks.length} 个任务
+                    </span>
+                  </div>
                 </div>
                 <div className="divide-y">
                   {group.tasks.map((t) => (
@@ -248,6 +267,32 @@ export default async function ProjectPage({
         <ProjectLiveUpdates projectId={project.id} />
       </div>
     </AppShell>
+  );
+}
+
+function ExternalLinkButton({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="rounded-md border bg-background px-3 py-1.5 font-medium text-muted-foreground hover:text-foreground"
+    >
+      {children}
+    </a>
+  );
+}
+
+function ExternalTextLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+    >
+      {children}
+    </a>
   );
 }
 
@@ -368,6 +413,10 @@ function overlapContextLabel(overlap: ActiveTaskOverlap): string {
 
 function branchLabel(branch: string | null): string {
   return branch?.trim() || "未检测到分支";
+}
+
+function isCompareableBranch(branch: string): boolean {
+  return branch !== "main" && branch !== "master";
 }
 
 function branchFilterLabel(branchFilter: string | null): string {

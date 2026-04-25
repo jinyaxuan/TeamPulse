@@ -125,6 +125,7 @@ export const inviteCodes = pgTable(
 export const projects = pgTable("projects", {
   id: uuid("id").primaryKey().defaultRandom(),
   gitRemoteHash: text("git_remote_hash").notNull().unique(),
+  gitRemoteUrl: text("git_remote_url"),
   displayName: text("display_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

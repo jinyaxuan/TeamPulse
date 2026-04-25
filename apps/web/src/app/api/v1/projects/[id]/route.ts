@@ -66,6 +66,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
       id: project.id,
       display_name: project.displayName,
       git_remote_hash: project.gitRemoteHash,
+      git_remote_url: project.gitRemoteUrl,
       created_at: project.createdAt,
     },
     active,

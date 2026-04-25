@@ -6,6 +6,7 @@ export type ProjectStat = {
   id: string;
   display_name: string | null;
   git_remote_hash: string;
+  git_remote_url: string | null;
   created_at: Date;
   last_activity: Date | null;
   active_count: number;
@@ -28,6 +29,7 @@ export async function listProjectsWithStats({
       id: projects.id,
       display_name: projects.displayName,
       git_remote_hash: projects.gitRemoteHash,
+      git_remote_url: projects.gitRemoteUrl,
       created_at: projects.createdAt,
       last_activity: sql<Date | null>`MAX(${tasks.startedAt})`.as("last_activity"),
       active_count: sql<number>`COUNT(DISTINCT CASE WHEN ${tasks.status} = 'active' AND ${tasks.heartbeatAt} > ${activeCutoff}::timestamptz THEN ${tasks.userId} END)::int`.as(
