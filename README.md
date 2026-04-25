@@ -294,6 +294,39 @@ docker build \
 docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 ```
 
+### Gitea Actions 自动部署
+
+仓库包含 `.gitea/workflows/deploy.yml`。Gitea 实例和当前仓库都启用 Actions，
+且有可用的 `ubuntu-latest` act runner 后，每次 push 到 `main` 会打包当前 commit，
+上传到生产机，并在生产机执行
+`scripts/deploy/remote-deploy.sh`：
+
+1. 保留生产机上的 `.env.prod`、`.env.app`、`docker-compose.deploy.yml` 和
+   `backups/`。
+2. 替换 `/opt/teampulse` 为新版本，并保留最近 3 个
+   `/opt/teampulse.prev.*` 回滚目录。
+3. 构建 `teampulse-web:latest`。
+4. 执行数据库迁移并重启 `postgres`、`migrate`、`app` 三个 TeamPulse 服务。
+5. 通过 `http://127.0.0.1:${APP_PORT}${NEXT_PUBLIC_BASE_PATH}/agent/skill.md`
+   做健康检查。
+
+需要在 Gitea 仓库 Settings → Actions → Secrets 配置：
+
+- `DEPLOY_SSH_KEY`：推荐，能登录生产机的私钥内容。
+- 或 `DEPLOY_PASSWORD`：备用，生产机 SSH 密码。
+
+如果两个 secret 都没有配置，workflow 会正常跳过部署，避免首次 push 直接失败。
+
+可选 secrets：
+
+- `DEPLOY_HOST`：默认 `118.195.165.111`。
+- `DEPLOY_USER`：默认 `root`。
+- `DEPLOY_DIR`：默认 `/opt/teampulse`。
+
+生产机如果有额外端口映射，放在 `/opt/teampulse/docker-compose.deploy.yml`。
+当前 111 服务器用它把 app 暴露为 `${APP_PORT:-13002}:3000`，避免影响宿主机
+上已占用 `3000` 的其它容器。
+
 生产环境首次管理员初始化目前建议在能访问生产数据库的维护环境中执行：
 
 ```bash
