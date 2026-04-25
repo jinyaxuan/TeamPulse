@@ -7,9 +7,10 @@
  *   5. task start → appears in active_tasks → history
  *   6. task end-session saves handoff summary → details/project/export
  *   7. SSE: new task event fans out to a separate subscriber
- *   8. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
+ *   8. cleanup closes remaining e2e tasks
+ *   9. memory LWW: PUT creates v1 → PUT with correct If-Match bumps v2 →
  *      PUT with stale If-Match returns 409
- *   9. magic link: bearer issues link → consume returns session cookie
+ *   10. magic link: bearer issues link → consume returns session cookie
  *
  * Requires: `docker-compose up -d postgres` and `pnpm dev` running on :3000.
  * Uses a dedicated test admin (password is random per run).
@@ -278,6 +279,8 @@ test("e2e: full happy path", async (t) => {
   });
 
   let taskId!: string;
+  let overlapTaskId!: string;
+  let sseTaskId!: string;
 
   await t.test("task: start + appears in active", async () => {
     const res = await http("/api/v1/tasks", {
@@ -316,6 +319,7 @@ test("e2e: full happy path", async (t) => {
       },
     });
     assert.equal(res.status, 200);
+    overlapTaskId = res.body.task_id;
     assert.equal(res.body.overlap_warnings.length, 1);
     assert.equal(res.body.overlap_warnings[0].task_id, taskId);
     assert.equal(res.body.overlap_warnings[0].severity, "high");
@@ -419,7 +423,7 @@ test("e2e: full happy path", async (t) => {
     // Small yield so listener is registered.
     await new Promise((r) => setTimeout(r, 100));
 
-    await http("/api/v1/tasks", {
+    const started = await http("/api/v1/tasks", {
       method: "POST",
       headers: { Authorization: `Bearer ${devToken}` },
       body: {
@@ -428,6 +432,8 @@ test("e2e: full happy path", async (t) => {
         intent: "E2E: second task for SSE",
       },
     });
+    assert.equal(started.status, 200);
+    sseTaskId = started.body.task_id;
 
     await readPromise;
     abort.abort();
@@ -435,6 +441,43 @@ test("e2e: full happy path", async (t) => {
     const blob = events.join("");
     assert.match(blob, /event: task\.started/);
     assert.match(blob, /E2E: second task for SSE/);
+  });
+
+  await t.test("cleanup: closes remaining e2e tasks", async () => {
+    for (const sessionId of [
+      `e2e-sess-overlap-${adminName}`,
+      `e2e-sess-sse-${adminName}`,
+    ]) {
+      const ended = await http("/api/v1/tasks/end-session", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${devToken}` },
+        body: {
+          session_id: sessionId,
+          outcome: "abandoned",
+          summary: "E2E cleanup: closing fixture task so smoke runs do not leave active test data.",
+        },
+      });
+      assert.equal(ended.status, 200);
+      assert.equal(ended.body.ended_count, 1);
+      assert.equal(ended.body.summary_saved, true);
+    }
+
+    const active = await http(`/api/v1/tasks/active?project=${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(active.status, 200);
+    assert.equal(active.body.tasks.length, 0);
+
+    const project = await http(`/api/v1/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${devToken}` },
+    });
+    assert.equal(project.status, 200);
+    assert.deepEqual(project.body.active_overlaps, []);
+
+    const closedIds = new Set([taskId, overlapTaskId, sseTaskId]);
+    const recentlyClosed = project.body.recent.filter((t: any) => closedIds.has(t.id));
+    assert.equal(recentlyClosed.length, 3);
+    assert.ok(recentlyClosed.every((t: any) => t.status !== "active"));
   });
 
   await t.test("memory LWW: create v1, update v2, stale If-Match → 409", async () => {
