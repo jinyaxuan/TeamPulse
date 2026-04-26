@@ -93,9 +93,11 @@ files:
 
 - pause_for_confirmation: high-risk same-branch or unknown-branch file
   overlap. Stop before editing, tell the user who is active and which files
-  overlap, then ask whether to wait,
-  take over, narrow scope, or continue anyway. Do not edit overlapping files
-  until the user gives explicit direction.
+  overlap, then coordinate with the other agent or ask the user whether to wait,
+  take over, narrow scope, or continue anyway. Agent-to-agent confirmation, or
+  explicit user direction through the agent, is enough. Record the outcome with
+  resolve-overlap; no dashboard click is required. Do not edit overlapping
+  files until coordination is confirmed.
 - proceed_with_caution: related work, same-branch parallel work, or
   cross-branch merge risk. Mention it once, keep the implementation narrow, and
   avoid expanding into the related task.
@@ -153,6 +155,9 @@ node "$HOME/.teampulse/bin/teampulse-connect.mjs" message --cwd "<repo cwd>" --t
   --thread "overlap:<key>" --text "I can take the migration; you keep the UI."
 node "$HOME/.teampulse/bin/teampulse-connect.mjs" reply --cwd "<repo cwd>" \\
   --thread "task:<task id>" --text "Done with this side; safe to continue."
+node "$HOME/.teampulse/bin/teampulse-connect.mjs" resolve-overlap --cwd "<repo cwd>" \\
+  --first-task-id "<task id>" --second-task-id "<task id>" \\
+  --action acknowledged --note "Agents coordinated; continuing with split ownership."
 \`\`\`
 
 Use messages for concrete coordination and handoffs. Do not paste secrets,

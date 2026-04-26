@@ -218,6 +218,30 @@ const TOOLS = [
     },
   },
   {
+    name: "teampulse_resolve_overlap",
+    description:
+      "Record how an active task overlap was coordinated. Use after agent-to-agent coordination or explicit user direction; no TeamPulse dashboard click is required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        first_task_id: { type: "string" },
+        second_task_id: { type: "string" },
+        action: {
+          type: "string",
+          enum: ["acknowledged", "handoff", "paused"],
+          description: "acknowledged = coordinated and continuing; handoff = one agent takes over; paused = waiting.",
+        },
+        note: {
+          type: "string",
+          description: "Optional short note describing the coordination decision.",
+          maxLength: 1000,
+        },
+      },
+      required: ["first_task_id", "second_task_id", "action"],
+    },
+  },
+  {
     name: "teampulse_inbox",
     description: "Read recent TeamPulse project messages for the current repo.",
     inputSchema: {
@@ -369,6 +393,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           task_id: args.task_id,
           to: args.to,
           to_user_id: args.to_user_id,
+        });
+        if (liveEvents) liveEvents.subscribe(projectId);
+        return res.ok ? textResult(res.data) : errorResult(res.error);
+      }
+
+      case "teampulse_resolve_overlap": {
+        const cwd = currentCwd(args.cwd);
+        const projectId = await resolveProject({ client, cwd });
+        if (!projectId) return errorResult(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+        const res = await client.post(`/api/v1/projects/${projectId}/overlaps`, {
+          first_task_id: args.first_task_id,
+          second_task_id: args.second_task_id,
+          action: args.action,
+          note: args.note ? String(args.note).trim().slice(0, 1000) : undefined,
         });
         if (liveEvents) liveEvents.subscribe(projectId);
         return res.ok ? textResult(res.data) : errorResult(res.error);

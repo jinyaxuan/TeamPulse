@@ -157,6 +157,10 @@ pnpm --filter @teampulse/codex-plugin end-session -- \
 - `teampulse_end_session`
 - `teampulse_list_active_tasks`
 - `teampulse_recent_history`
+- `teampulse_send_message`
+- `teampulse_reply`
+- `teampulse_inbox`
+- `teampulse_resolve_overlap`
 - `teampulse_web_login`
 - `teampulse_recent_events`
 

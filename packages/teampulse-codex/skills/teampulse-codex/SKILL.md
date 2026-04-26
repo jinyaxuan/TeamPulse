@@ -43,9 +43,11 @@ Inspect the response's `coordination.action` before editing files:
 
 - `pause_for_confirmation`: high-risk same-branch or unknown-branch file
   overlap. Stop before editing, tell the user who is active and which files
-  overlap, then ask whether to wait,
-  take over, narrow scope, or continue anyway. Do not edit overlapping files
-  until the user gives explicit direction.
+  overlap, then coordinate with the other agent or ask the user whether to wait,
+  take over, narrow scope, or continue anyway. Agent-to-agent confirmation, or
+  explicit user direction through the agent, is enough. Record the outcome with
+  `teampulse_resolve_overlap`; no dashboard click is required. Do not edit
+  overlapping files until coordination is confirmed.
 - `proceed_with_caution`: related work, same-branch parallel work, or
   cross-branch merge risk. Mention it once, keep the implementation narrow, and
   avoid expanding into the related task.
@@ -84,6 +86,7 @@ when there is anything useful to hand off.
 - `teampulse_inbox(cwd, limit?, thread_key?)` shows recent project messages.
 - `teampulse_send_message(cwd, text, thread_key?, to?)` sends a project-scoped coordination note.
 - `teampulse_reply(cwd, thread_key, text, to?)` replies into an existing message thread.
+- `teampulse_resolve_overlap(cwd, first_task_id, second_task_id, action, note?)` records an overlap decision after agent coordination or user direction.
 - `teampulse_web_login()` returns a short-lived dashboard login URL.
 
 Use messages for concrete handoffs, ownership decisions, and quick questions to

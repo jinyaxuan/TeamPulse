@@ -68,8 +68,9 @@ export function OverlapActionControls({
                 : ""}
             </>
           ) : (
-            "尚未记录处理状态"
+            "尚未由 agent 或平台记录处理状态"
           )}
+          <span className="ml-2 text-amber-700">agent 间确认或用户通过 agent 确认即可</span>
         </div>
         {canResolve && (
           <div className="flex flex-wrap gap-2">

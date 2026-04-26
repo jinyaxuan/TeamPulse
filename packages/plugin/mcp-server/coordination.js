@@ -13,11 +13,12 @@ export function withCoordinationAdvice(payload) {
         action: "pause_for_confirmation",
         severity: "high",
         summary:
-          "Potential file overlap detected. Do not edit the overlapping files until the user confirms how to coordinate.",
+          "Potential file overlap detected. Pause until another agent confirms coordination or the user gives explicit direction through this agent.",
         instructions: [
           "Tell the user which teammate/task is already active and which files overlap.",
-          "Ask whether to wait, take over, narrow the scope, or continue anyway.",
-          "Do not modify overlapping files before the user gives explicit direction.",
+          "Coordinate in an overlap thread with the other agent, or ask the user whether to wait, take over, narrow the scope, or continue anyway.",
+          "After agent-to-agent coordination or user direction, record the decision with teampulse_resolve_overlap when available; no dashboard click is required.",
+          "Do not modify overlapping files before coordination is confirmed.",
         ],
         warnings: highRisk,
       },

@@ -456,6 +456,8 @@ function OverlapAlert({
   const firstName = overlap.first.user_display_name ?? overlap.first.user_name;
   const secondName = overlap.second.user_display_name ?? overlap.second.user_name;
   const isMergeRisk = overlap.reasons.includes("merge_risk");
+  const badgeLabel = overlapBadgeLabel(overlap, resolution, isMergeRisk);
+  const badgeClass = overlapBadgeClass(overlap, resolution);
 
   return (
     <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
@@ -471,13 +473,10 @@ function OverlapAlert({
         </div>
         <span
           className={
-            "w-fit rounded-full px-2 py-0.5 text-xs font-medium " +
-            (overlap.severity === "high"
-              ? "bg-red-100 text-red-800"
-              : "bg-amber-100 text-amber-800")
+            "w-fit rounded-full px-2 py-0.5 text-xs font-medium " + badgeClass
           }
         >
-          {overlap.severity === "high" ? "高风险" : isMergeRisk ? "合并风险" : "需确认"}
+          {badgeLabel}
         </span>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -516,6 +515,34 @@ function overlapReasonLabel(reasons: OverlapReason[]): string {
   if (reasons.includes("branch")) labels.push("同一分支并行");
   if (reasons.includes("merge_risk")) labels.push("跨分支改同一路径");
   return labels.join("、");
+}
+
+function overlapResolutionLabel(action: string): string {
+  if (action === "acknowledged") return "已沟通";
+  if (action === "handoff") return "已接手";
+  if (action === "paused") return "暂停等待";
+  return action;
+}
+
+function overlapBadgeLabel(
+  overlap: ActiveTaskOverlap,
+  resolution: OverlapResolutionRow | undefined,
+  isMergeRisk: boolean
+): string {
+  if (resolution) return overlapResolutionLabel(resolution.action);
+  if (overlap.severity === "high") return "高风险";
+  if (isMergeRisk) return "合并风险";
+  return "需确认";
+}
+
+function overlapBadgeClass(
+  overlap: ActiveTaskOverlap,
+  resolution: OverlapResolutionRow | undefined
+): string {
+  if (resolution?.action === "paused") return "bg-amber-100 text-amber-800";
+  if (resolution) return "bg-green-100 text-green-800";
+  if (overlap.severity === "high") return "bg-red-100 text-red-800";
+  return "bg-amber-100 text-amber-800";
 }
 
 function overlapContextLabel(overlap: ActiveTaskOverlap): string {

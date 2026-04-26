@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * TeamPulse MCP server — runs as a long-lived stdio MCP server that Claude Code
- * starts on demand. Exposes 6 tools for LLM coordination + handles credential
+ * starts on demand. Exposes MCP tools for LLM coordination + handles credential
  * bootstrapping and SSE subscription.
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -206,6 +206,31 @@ const TOOLS = [
     },
   },
   {
+    name: "teampulse_resolve_overlap",
+    description:
+      "Record how an active task overlap was coordinated. Use after agent-to-agent coordination or explicit user direction; no TeamPulse dashboard click is required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string" },
+        project_id: { type: "string" },
+        first_task_id: { type: "string" },
+        second_task_id: { type: "string" },
+        action: {
+          type: "string",
+          enum: ["acknowledged", "handoff", "paused"],
+          description: "acknowledged = coordinated and continuing; handoff = one agent takes over; paused = waiting.",
+        },
+        note: {
+          type: "string",
+          description: "Optional short note describing the coordination decision.",
+          maxLength: 1000,
+        },
+      },
+      required: ["first_task_id", "second_task_id", "action"],
+    },
+  },
+  {
     name: "teampulse_inbox",
     description: "Read recent TeamPulse project messages for the current repo.",
     inputSchema: {
@@ -349,6 +374,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         task_id: args.task_id,
         to: args.to,
         to_user_id: args.to_user_id,
+      });
+      const le = getLiveEvents();
+      if (le) le.subscribe(projectId);
+      return res.ok ? textResult(res.data) : errorResult(res.error);
+    }
+
+    case "teampulse_resolve_overlap": {
+      const cwd = args.cwd || process.env.PWD || process.cwd();
+      const projectId = args.project_id || (await resolveProject({ client, cwd }));
+      if (!projectId) return errorResult(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+      const res = await client.post(`/api/v1/projects/${projectId}/overlaps`, {
+        first_task_id: args.first_task_id,
+        second_task_id: args.second_task_id,
+        action: args.action,
+        note: args.note ? String(args.note).trim().slice(0, 1000) : undefined,
       });
       const le = getLiveEvents();
       if (le) le.subscribe(projectId);

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { homedir, hostname, platform } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 
-const CONNECTOR_VERSION = "0.4.0";
+const CONNECTOR_VERSION = "0.4.1";
 const CONNECTOR_MARKER = "TEAMPULSE_CONNECTOR_SCRIPT";
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -57,6 +57,9 @@ async function main() {
     case "reply":
       await sendMessage({ requireThread: true });
       return;
+    case "resolve-overlap":
+      await resolveOverlap();
+      return;
     case "inbox":
       await inbox();
       return;
@@ -82,6 +85,7 @@ Usage:
   node scripts/teampulse-connect.mjs inbox [--limit 20] [--thread project]
   node scripts/teampulse-connect.mjs message --text "FYI: ..." [--to alice] [--thread project]
   node scripts/teampulse-connect.mjs reply --thread "task:<id>" --text "..."
+  node scripts/teampulse-connect.mjs resolve-overlap --first-task-id <id> --second-task-id <id> --action acknowledged|handoff|paused [--note "..."]
 
 Credentials are stored in ${credentialsPath}.
 `);
@@ -352,6 +356,32 @@ async function sendMessage({ requireThread = false } = {}) {
   );
 }
 
+async function resolveOverlap() {
+  const firstTaskId = option("first-task-id");
+  const secondTaskId = option("second-task-id");
+  const action = option("action");
+  if (!firstTaskId || !secondTaskId) {
+    throw new Error("--first-task-id and --second-task-id are required");
+  }
+  if (!["acknowledged", "handoff", "paused"].includes(action || "")) {
+    throw new Error("--action must be acknowledged, handoff, or paused");
+  }
+
+  const { serverUrl, token } = await credentialsOrThrow();
+  const cwd = currentCwd();
+  const projectId = await resolveProject({ serverUrl, token, cwd });
+  if (!projectId) throw new Error(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
+  writeJson(
+    await apiPost(serverUrl, token, `/api/v1/projects/${projectId}/overlaps`, {
+      first_task_id: firstTaskId,
+      second_task_id: secondTaskId,
+      action,
+      note: await noteText(),
+    })
+  );
+}
+
 async function inbox() {
   const { serverUrl, token } = await credentialsOrThrow();
   const cwd = currentCwd();
@@ -500,6 +530,13 @@ async function messageText() {
   return value ? value.trim().slice(0, 2000) : undefined;
 }
 
+async function noteText() {
+  const file = option("note-file");
+  const inline = option("note");
+  const value = file ? await readFile(file, "utf8") : inline;
+  return value ? value.trim().slice(0, 1000) : undefined;
+}
+
 async function ensureDir() {
   await mkdir(teampulseDir, { recursive: true, mode: 0o700 });
 }
@@ -619,11 +656,12 @@ function withCoordinationAdvice(payload) {
         action: "pause_for_confirmation",
         severity: "high",
         summary:
-          "Potential file overlap detected. Do not edit the overlapping files until the user confirms how to coordinate.",
+          "Potential file overlap detected. Pause until another agent confirms coordination or the user gives explicit direction through this agent.",
         instructions: [
           "Tell the user which teammate/task is already active and which files overlap.",
-          "Ask whether to wait, take over, narrow the scope, or continue anyway.",
-          "Do not modify overlapping files before the user gives explicit direction.",
+          "Coordinate in an overlap thread with the other agent, or ask the user whether to wait, take over, narrow the scope, or continue anyway.",
+          "After agent-to-agent coordination or user direction, record the decision with resolve-overlap when available; no dashboard click is required.",
+          "Do not modify overlapping files before coordination is confirmed.",
         ],
         warnings: highRisk,
       },

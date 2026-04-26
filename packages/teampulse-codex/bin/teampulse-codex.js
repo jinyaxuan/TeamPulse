@@ -66,6 +66,10 @@ async function main() {
       await sendMessage({ requireThread: true });
       break;
 
+    case "resolve-overlap":
+      await resolveOverlap();
+      break;
+
     case "inbox":
       await inbox();
       break;
@@ -94,6 +98,7 @@ Usage:
   teampulse-codex inbox [--limit 20] [--thread project]
   teampulse-codex message --text "FYI: ..." [--to alice] [--thread project]
   teampulse-codex reply --thread "task:<id>" --text "..."
+  teampulse-codex resolve-overlap --first-task-id <id> --second-task-id <id> --action acknowledged|handoff|paused [--note "..."]
   teampulse-codex web-login
 
 Credentials are stored in ${paths.CREDENTIALS_PATH}.
@@ -222,6 +227,32 @@ async function sendMessage({ requireThread = false } = {}) {
   writeJson(res.data);
 }
 
+async function resolveOverlap() {
+  const client = await clientOrThrow();
+  const cwd = currentCwd();
+  const projectId = await resolveProject({ client, cwd });
+  if (!projectId) throw new Error(`Could not resolve TeamPulse project from cwd: ${cwd}`);
+
+  const firstTaskId = option("first-task-id");
+  const secondTaskId = option("second-task-id");
+  const action = option("action");
+  if (!firstTaskId || !secondTaskId) {
+    throw new Error("--first-task-id and --second-task-id are required");
+  }
+  if (!["acknowledged", "handoff", "paused"].includes(action || "")) {
+    throw new Error("--action must be acknowledged, handoff, or paused");
+  }
+
+  const res = await client.post(`/api/v1/projects/${projectId}/overlaps`, {
+    first_task_id: firstTaskId,
+    second_task_id: secondTaskId,
+    action,
+    note: await noteText(),
+  });
+  if (!res.ok) throw new Error(res.error);
+  writeJson(res.data);
+}
+
 async function inbox() {
   const client = await clientOrThrow();
   const cwd = currentCwd();
@@ -302,6 +333,13 @@ async function messageText() {
   const inline = option("text");
   const value = file ? await readFile(file, "utf8") : inline;
   return value ? value.trim().slice(0, 2000) : undefined;
+}
+
+async function noteText() {
+  const file = option("note-file");
+  const inline = option("note");
+  const value = file ? await readFile(file, "utf8") : inline;
+  return value ? value.trim().slice(0, 1000) : undefined;
 }
 
 function writeJson(value) {

@@ -18,6 +18,7 @@ const QUEUEABLE_PATHS = [
   /^\/api\/v1\/tasks\/[^/]+$/,
   /^\/api\/v1\/memory\/[^/]+$/,
   /^\/api\/v1\/projects\/[^/]+\/messages$/,
+  /^\/api\/v1\/projects\/[^/]+\/overlaps$/,
 ];
 
 function isQueueable(method, path) {
