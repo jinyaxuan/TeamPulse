@@ -6,15 +6,30 @@ import { fileURLToPath } from "node:url";
 import { homedir, hostname, platform } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 
-const CONNECTOR_VERSION = "0.4.1";
+const CONNECTOR_VERSION = "0.4.2";
 const CONNECTOR_MARKER = "TEAMPULSE_CONNECTOR_SCRIPT";
+const AUTO_UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const AUTO_UPDATE_COMMANDS = new Set([
+  "active",
+  "start",
+  "heartbeat",
+  "end",
+  "history",
+  "message",
+  "reply",
+  "resolve-overlap",
+  "inbox",
+]);
 const args = process.argv.slice(2);
 const command = args[0] || "help";
 const teampulseDir = join(homedir(), ".teampulse");
 const devicePath = join(teampulseDir, "device.json");
 const credentialsPath = join(teampulseDir, "credentials.json");
+const connectorStatePath = join(teampulseDir, "connector-state.json");
 
 async function main() {
+  await maybeAutoUpdate();
+
   switch (command) {
     case "help":
     case "--help":
@@ -258,6 +273,11 @@ async function updateConnector() {
   await chmod(tmpPath, 0o700);
   await rename(tmpPath, currentPath);
   await chmod(currentPath, 0o700);
+  await writeConnectorState({
+    last_auto_update_check_at: new Date().toISOString(),
+    last_auto_update_at: new Date().toISOString(),
+    connector_version: nextVersion,
+  });
 
   writeJson({
     status: "updated",
@@ -266,6 +286,63 @@ async function updateConnector() {
     script_path: currentPath,
     script_url: scriptUrl,
   });
+}
+
+async function maybeAutoUpdate() {
+  if (!AUTO_UPDATE_COMMANDS.has(command)) return;
+  if (process.env.TEAMPULSE_AUTO_UPDATE === "0" || process.env.TEAMPULSE_SKIP_AUTO_UPDATE === "1") {
+    return;
+  }
+
+  try {
+    await autoUpdateIfNeeded();
+  } catch (err) {
+    if (process.env.TEAMPULSE_DEBUG) {
+      process.stderr.write(`[TeamPulse] connector auto-update skipped: ${err?.message || err}\n`);
+    }
+  }
+}
+
+async function autoUpdateIfNeeded() {
+  const state = await readJson(connectorStatePath);
+  const lastCheck = Date.parse(state?.last_auto_update_check_at || "");
+  if (Number.isFinite(lastCheck) && Date.now() - lastCheck < AUTO_UPDATE_INTERVAL_MS) return;
+
+  const now = new Date().toISOString();
+  await writeConnectorState({
+    ...state,
+    last_auto_update_check_at: now,
+    connector_version: CONNECTOR_VERSION,
+  });
+
+  const credentials = await readJson(credentialsPath);
+  if (!credentials?.server_url) return;
+
+  const serverUrl = normalizeServerUrl(credentials.server_url);
+  const scriptUrl = `${serverUrl}/agent/teampulse-connect.mjs`;
+  const next = await fetchText(scriptUrl);
+  validateConnectorScript(next, scriptUrl);
+
+  const currentPath = connectorPath();
+  const current = await readFile(currentPath, "utf8").catch(() => "");
+  if (current === next) return;
+
+  const nextVersion = extractConnectorVersion(next) || "unknown";
+  const tmpPath = `${currentPath}.tmp-${process.pid}`;
+  await writeFile(tmpPath, next, { mode: 0o700 });
+  await chmod(tmpPath, 0o700);
+  await rename(tmpPath, currentPath);
+  await chmod(currentPath, 0o700);
+  await writeConnectorState({
+    ...state,
+    last_auto_update_check_at: now,
+    last_auto_update_at: now,
+    connector_version: nextVersion,
+  });
+
+  process.stderr.write(
+    `[TeamPulse] connector auto-updated ${CONNECTOR_VERSION} -> ${nextVersion}; current command continues.\n`
+  );
 }
 
 async function activeTasks() {
@@ -539,6 +616,12 @@ async function noteText() {
 
 async function ensureDir() {
   await mkdir(teampulseDir, { recursive: true, mode: 0o700 });
+}
+
+async function writeConnectorState(value) {
+  await ensureDir();
+  await writeFile(connectorStatePath, JSON.stringify(value, null, 2), { mode: 0o600 });
+  await chmod(connectorStatePath, 0o600);
 }
 
 async function readJson(path) {

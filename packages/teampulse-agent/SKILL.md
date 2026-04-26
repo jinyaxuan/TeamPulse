@@ -57,7 +57,10 @@ credentials path.
 
 ## Updating
 
-Update the connector script without rebinding the device:
+The connector automatically checks for updates when running daily task commands
+such as `start`, `heartbeat`, `message`, and `resolve-overlap`.
+
+Force an immediate connector update without rebinding the device:
 
 ```bash
 node scripts/teampulse-connect.mjs update

@@ -81,14 +81,14 @@ node "$HOME/.teampulse/bin/teampulse-connect.mjs" poll --server-url http://local
 node "$HOME/.teampulse/bin/teampulse-connect.mjs" status
 ```
 
-后续 TeamPulse 服务升级后，已安装连接脚本的用户不需要重新认领设备，直接更新脚本即可：
+后续 TeamPulse 服务升级后，已安装连接脚本的用户不需要重新认领设备。连接脚本会在日常任务命令启动时自动检查并更新自身；需要立即强制更新时也可以手动执行：
 
 ```bash
 node "$HOME/.teampulse/bin/teampulse-connect.mjs" update
 node "$HOME/.teampulse/bin/teampulse-connect.mjs" version
 ```
 
-`update` 会优先使用 `~/.teampulse/credentials.json` 里的 `server_url` 下载最新版脚本，并保留现有凭据。通过 Skillhub 或其它 Skill 分发渠道安装的用户，还需要按该平台的方式更新 Skill 本体，以拿到新的 `SKILL.md` 行为规则。
+自动更新和 `update` 都会优先使用 `~/.teampulse/credentials.json` 里的 `server_url` 下载最新版脚本，并保留现有凭据。通过 Skillhub 或其它 Skill 分发渠道安装的用户，连接脚本可自更新；Skill 本体是否自动更新取决于分发平台。
 
 ### curl 协议
 
