@@ -1,114 +1,30 @@
 name: Deploy TeamPulse
-
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
-      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
-
     steps:
-      - name: Checkout
-        shell: bash
+      - name: Pull latest code
         run: |
-          set -euo pipefail
+          cd /opt/teampulse
+          git pull origin main
 
-          server_url="${GITHUB_SERVER_URL:-${GITEA_SERVER_URL:-https://gitea.tangchaolizi.com}}"
-          repository="${GITHUB_REPOSITORY:-${GITEA_REPOSITORY:-kindong/TeamPulse}}"
-          revision="${GITHUB_SHA:-${GITEA_SHA:-}}"
-
-          if [ -z "$revision" ]; then
-            echo "GITHUB_SHA or GITEA_SHA is required"
-            exit 1
-          fi
-
-          find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-          git init .
-          git remote add origin "${server_url%/}/${repository}.git"
-          git fetch --depth=1 origin "$revision"
-          git checkout --detach "$revision"
-
-      - name: Check deployment credentials
-        id: deploy_creds
-        shell: bash
+      - name: Build Docker image
         run: |
-          set -euo pipefail
-          if [ -z "${DEPLOY_SSH_KEY:-}" ] && [ -z "${DEPLOY_PASSWORD:-}" ]; then
-            echo "No DEPLOY_SSH_KEY or DEPLOY_PASSWORD secret configured; skipping deployment."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          cd /opt/teampulse
+          docker build -f apps/web/Dockerfile \
+            --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com \
+            -t teampulse-web:latest .
 
-      - name: Package source
-        if: steps.deploy_creds.outputs.skip != 'true'
+      - name: Deploy
         run: |
-          set -euo pipefail
-          revision="${GITHUB_SHA}"
-          git archive --format=tar.gz -o "/tmp/teampulse-${revision}.tgz" "${revision}"
-          chmod +x scripts/deploy/remote-deploy.sh
+          cd /opt/teampulse
+          docker compose -f docker-compose.prod.yml up -d
 
-      - name: Deploy over SSH
-        if: steps.deploy_creds.outputs.skip != 'true'
-        shell: bash
+      - name: Verify
         run: |
-          set -euo pipefail
-
-          host="${DEPLOY_HOST:-118.195.165.111}"
-          user="${DEPLOY_USER:-root}"
-          deploy_dir="${DEPLOY_DIR:-/opt/teampulse}"
-          revision="${GITHUB_SHA}"
-          archive="/tmp/teampulse-${revision}.tgz"
-          remote_archive="/tmp/teampulse-${revision}.tgz"
-          remote_script="/tmp/teampulse-remote-deploy-${revision}.sh"
-
-          mkdir -p "$HOME/.ssh"
-          chmod 700 "$HOME/.ssh"
-          ssh-keyscan -H "$host" >> "$HOME/.ssh/known_hosts"
-
-          ssh_base=(ssh -o BatchMode=yes)
-          scp_base=(scp -o BatchMode=yes)
-
-          if [ -n "${DEPLOY_SSH_KEY:-}" ]; then
-            key_path="$HOME/.ssh/teampulse_deploy_key"
-            printf '%s\n' "$DEPLOY_SSH_KEY" > "$key_path"
-            chmod 600 "$key_path"
-            ssh_base=(ssh -i "$key_path" -o BatchMode=yes)
-            scp_base=(scp -i "$key_path" -o BatchMode=yes)
-          elif [ -n "${DEPLOY_PASSWORD:-}" ]; then
-            if ! command -v sshpass >/dev/null 2>&1; then
-              if command -v apt-get >/dev/null 2>&1; then
-                export DEBIAN_FRONTEND=noninteractive
-                if command -v sudo >/dev/null 2>&1; then
-                  sudo apt-get update
-                  sudo apt-get install -y sshpass
-                else
-                  apt-get update
-                  apt-get install -y sshpass
-                fi
-              else
-                echo "sshpass is required when DEPLOY_PASSWORD is used"
-                exit 1
-              fi
-            fi
-            ssh_base=(sshpass -p "$DEPLOY_PASSWORD" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no)
-            scp_base=(sshpass -p "$DEPLOY_PASSWORD" scp -o PreferredAuthentications=password -o PubkeyAuthentication=no)
-          else
-            echo "Set DEPLOY_SSH_KEY or DEPLOY_PASSWORD in Gitea repository secrets."
-            exit 1
-          fi
-
-          "${scp_base[@]}" "$archive" "${user}@${host}:${remote_archive}"
-          "${scp_base[@]}" scripts/deploy/remote-deploy.sh "${user}@${host}:${remote_script}"
-          "${ssh_base[@]}" "${user}@${host}" \
-            "chmod +x '${remote_script}' && '${remote_script}' '${revision}' '${remote_archive}' '${deploy_dir}'"
+          sleep 5
+          curl -sf http://localhost:3020/ > /dev/null && echo "Deploy OK" || echo "Deploy FAILED"
