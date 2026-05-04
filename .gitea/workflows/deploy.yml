@@ -22,8 +22,7 @@ jobs:
       - name: Deploy
         run: |
           cd /opt/teampulse
-          rm -f docker-compose.yml docker-compose.override.yml
-          docker compose -f docker-compose.prod.yml up -d
+          docker compose up -d
 
       - name: Verify
         run: |
