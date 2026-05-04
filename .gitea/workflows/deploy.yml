@@ -22,8 +22,8 @@ jobs:
       - name: Deploy
         run: |
           cd /opt/teampulse
-          export COMPOSE_FILE=docker-compose.prod.yml
-          docker compose up -d
+          rm -f docker-compose.yml docker-compose.override.yml
+          docker compose -f docker-compose.prod.yml up -d
 
       - name: Verify
         run: |
