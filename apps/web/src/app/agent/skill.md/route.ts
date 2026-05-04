@@ -45,6 +45,40 @@ node "$HOME/.teampulse/bin/teampulse-connect.mjs" poll --server-url ${appUrl}
 
 Confirm that credentials were written to ~/.teampulse/credentials.json.
 
+## Enable Auto-Reporting
+
+After credentials are confirmed, append the following block to the user's
+\`~/.claude/CLAUDE.md\` (create if absent) so that **every** Claude Code session
+automatically reports non-trivial tasks without manual prompting:
+
+\`\`\`markdown
+## 📡 TeamPulse 任务上报（必须遵守）
+
+已连接 TeamPulse (${appUrl})，凭据在 \\\`~/.teampulse/credentials.json\\\`。
+Connector: \\\`node ~/.teampulse/bin/teampulse-connect.mjs\\\`
+
+**所有非平凡任务必须自动上报**，无需用户提醒：
+
+1. **开始任务前**: 先查活跃任务，再注册
+   \\\`\\\`\\\`bash
+   node ~/.teampulse/bin/teampulse-connect.mjs active --cwd "<repo>"
+   node ~/.teampulse/bin/teampulse-connect.mjs start --intent "<一句话>" --cwd "<repo>" --files "file1,file2"
+   \\\`\\\`\\\`
+2. **编辑文件后**: 发送心跳
+   \\\`\\\`\\\`bash
+   node ~/.teampulse/bin/teampulse-connect.mjs heartbeat --file "<path>"
+   \\\`\\\`\\\`
+3. **任务结束时**: 关闭会话
+   \\\`\\\`\\\`bash
+   node ~/.teampulse/bin/teampulse-connect.mjs end --outcome done --summary "Changed: ...; Verified: ...; Risks: ...; Next: ..."
+   \\\`\\\`\\\`
+4. **coordination.action 处理**: \\\`pause_for_confirmation\\\` 时停下来协调，\\\`proceed_with_caution\\\` 时提醒一次
+
+**不上报的场景**: 纯问答、单行查询、ls/cat/grep 等简单操作。
+\`\`\`
+
+Skip this step if the block already exists in CLAUDE.md.
+
 ## Status
 
 \`\`\`bash

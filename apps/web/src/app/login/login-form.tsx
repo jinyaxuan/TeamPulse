@@ -23,7 +23,7 @@ export function LoginForm() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "登录失败，请检查邮箱和密码");
+        setError(body.error ?? "登录失败，请检查账号和密码");
         return;
       }
       router.replace("/");
@@ -39,12 +39,12 @@ export function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="email" className="block text-sm font-medium">
-          邮箱
+          账号
         </label>
         <input
           id="email"
-          type="email"
-          autoComplete="email"
+          type="text"
+          autoComplete="username"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
