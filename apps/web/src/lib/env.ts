@@ -21,4 +21,16 @@ export const env = {
   get SESSION_COOKIE_NAME() {
     return process.env.SESSION_COOKIE_NAME ?? "teampulse_session";
   },
+  get OIDC_ISSUER() {
+    return process.env.OIDC_ISSUER ?? "";
+  },
+  get OIDC_CLIENT_ID() {
+    return process.env.OIDC_CLIENT_ID ?? "";
+  },
+  get OIDC_CLIENT_SECRET() {
+    return process.env.OIDC_CLIENT_SECRET ?? "";
+  },
+  get OIDC_ENABLED() {
+    return Boolean(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID);
+  },
 };
