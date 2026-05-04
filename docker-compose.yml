@@ -1,25 +1,11 @@
-services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: teampulse-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-teampulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
-      POSTGRES_DB: ${POSTGRES_DB:-teampulse}
-    volumes:
-      - teampulse-pg-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teampulse}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+# TeamPulse production stack - 192.168.100.246
+# Uses shared infra-postgres for database
+# For local dev, use: docker compose -f docker-compose.dev.yml up
 
-  # Apply migrations on startup, then exit. App depends on this completing.
-  # Uses the standalone image's bundled drizzle-orm + postgres-js to run the
-  # migrator directly against the SQL files we shipped into apps/web/src/db/migrations.
+services:
   migrate:
     image: teampulse-web:latest
+    container_name: teampulse-migrate
     init: true
     working_dir: /app/apps/web
     command:
@@ -37,75 +23,36 @@ services:
           console.log('migrations applied');
         })().catch(e => { console.error(e); process.exit(1); });
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-teampulse}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teampulse}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      - DATABASE_URL=postgresql://teampulse:Teampulse@2026@infra-postgres:5432/teampulse
     restart: "no"
+    networks:
+      - teampulse
+      - infra-network
 
   app:
     image: teampulse-web:latest
     container_name: teampulse-web
     init: true
-    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-teampulse}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teampulse}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://teampulse.internal.company.com}
-      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-}
-      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-teampulse_session}
-      NODE_ENV: production
+      - DATABASE_URL=postgresql://teampulse:Teampulse@2026@infra-postgres:5432/teampulse
+      - PUBLIC_APP_URL=https://teampulse.tangchaolizi.com
+      - SESSION_COOKIE_NAME=teampulse_session
+      - NODE_ENV=production
+      - OIDC_ISSUER=https://casdoor.tangchaolizi.com
+      - OIDC_CLIENT_ID=teampulse-oidc-client
+      - OIDC_CLIENT_SECRET=teampulse-oidc-secret-2026
+    ports:
+      - "3020:3000"
     depends_on:
-      postgres:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    expose:
-      - "3000"
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: teampulse-caddy
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - teampulse-caddy-data:/data
-      - teampulse-caddy-config:/config
-    depends_on:
-      - app
+    networks:
+      - teampulse
+      - infra-network
 
-  # Nightly pg_dump to ./backups (mount outside to your NAS/backup target).
-  backup:
-    image: postgres:15-alpine
-    container_name: teampulse-backup
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-teampulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-teampulse}
-      BACKUP_RETENTION_DAYS: "14"
-    volumes:
-      - ./backups:/backups
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        while true; do
-          sleep $((3600*24))   # run once a day
-          TS=$(date -u +%Y%m%dT%H%M%SZ)
-          export PGPASSWORD="$$POSTGRES_PASSWORD"
-          echo "[backup] dumping at $$TS"
-          pg_dump -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -Fc \
-            > "/backups/teampulse-$$TS.dump"
-          find /backups -name 'teampulse-*.dump' -mtime +$${BACKUP_RETENTION_DAYS} -delete || true
-        done
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  teampulse-pg-data:
-  teampulse-caddy-data:
-  teampulse-caddy-config:
+networks:
+  teampulse:
+    driver: bridge
+  infra-network:
+    external: true
