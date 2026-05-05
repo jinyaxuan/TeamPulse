@@ -20,7 +20,7 @@ jobs:
         run: |
           TAG="${GITHUB_SHA::8}"
           IMAGE="192.168.100.26:23030/kindong/teampulse-web:${TAG}"
-          DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com -t ${IMAGE} -t ${IMAGE}/../latest .
+          DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com -t ${IMAGE}  .
           echo "${{ secrets.GITEATOKEN }}" | docker login 192.168.100.26:23030 -u kindong --password-stdin
           docker push ${IMAGE}
 
