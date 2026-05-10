@@ -16,6 +16,12 @@ jobs:
           git clone http://kindong:${{ secrets.GITEATOKEN }}@192.168.100.26:23030/kindong/TeamPulse.git .
           git checkout ${{ github.sha }}
 
+      - name: Build base image (required by Dockerfile FROM ${BASE_IMAGE})
+        run: |
+          # Dockerfile.base 定义 teampulse-node-base:22-bookworm = node:22-bookworm + pnpm 10.25.0
+          # 不在 registry, 每次 CI 本地 build, docker layer cache 命中后秒过
+          DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile.base -t teampulse-node-base:22-bookworm .
+
       - name: Build and push to Gitea Registry
         run: |
           TAG="${GITHUB_SHA::8}"
