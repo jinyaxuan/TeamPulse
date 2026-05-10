@@ -19,17 +19,18 @@ jobs:
       - name: Build and push to Gitea Registry
         run: |
           TAG="${GITHUB_SHA::8}"
-          IMAGE="192.168.100.26:23030/kindong/teampulse-web:${TAG}"
+          IMAGE="gitea.tangchaolizi.com/kindong/teampulse-web:${TAG}"
           DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com -t ${IMAGE}  .
-          echo "${{ secrets.GITEATOKEN }}" | docker login 192.168.100.26:23030 -u kindong --password-stdin
+          echo "${{ secrets.GITEATOKEN }}" | docker login gitea.tangchaolizi.com -u kindong --password-stdin
           docker push ${IMAGE}
 
       - name: Update k3s-manifests
         run: |
           TAG="${GITHUB_SHA::8}"
-          IMAGE="192.168.100.26:23030/kindong/teampulse-web:${TAG}"
+          IMAGE="gitea.tangchaolizi.com/kindong/teampulse-web:${TAG}"
           cd /tmp && git clone http://kindong:${{ secrets.GITEATOKEN }}@192.168.100.26:23030/kindong/k3s-manifests.git && cd k3s-manifests
-          sed -i "s|image: .*teampulse-web:.*|image: ${IMAGE}|g" devops/devops.yaml
+          # 只匹配 6-40 位 hex 的 CI sha tag, 不动手工的自定义 tag (langfuse-* / hotfix-* / latest 等)
+          sed -i -E "s|image: [^[:space:]]*teampulse-web:[0-9a-f]{6,40}|image: ${IMAGE}|g" devops/devops.yaml
           git config user.email "ci@gitea.local" && git config user.name "gitea-ci"
           git add -A && git diff --cached --quiet && exit 0
           git commit -m "deploy: update teampulse-web to ${TAG}" && git push
