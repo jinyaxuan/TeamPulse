@@ -8,6 +8,7 @@ import { visibleTasksCondition } from "@/lib/project-access";
 import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { getInstancePlan } from "@/lib/subscription";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -80,9 +81,15 @@ export default async function Home() {
   const [{ projectCount }] = await db.select({ projectCount: count() }).from(projects);
   const [{ deviceCount }] = await db.select({ deviceCount: count() }).from(devices).where(eq(devices.status, "active"));
 
+  // Onboarding: check if user has any device and any task
+  const [{ userDeviceCount }] = await db.select({ userDeviceCount: count() }).from(devices).where(and(eq(devices.userId, user.id), eq(devices.status, "active")));
+  const [{ userTaskCount }] = await db.select({ userTaskCount: count() }).from(tasks).where(eq(tasks.userId, user.id));
+
   return (
     <AppShell user={user} activeNav="home">
       <div className="space-y-10">
+        <OnboardingChecklist user={user} hasDevice={userDeviceCount > 0} hasTask={userTaskCount > 0} />
+
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
           <div className="rounded-lg border bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
