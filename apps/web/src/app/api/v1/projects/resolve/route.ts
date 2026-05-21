@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, projects } from "@/db";
 import { handler, json, parseBody, requireAuth } from "@/lib/api";
 import { ensureProjectMember } from "@/lib/project-access";
+import { enforceProjectLimit } from "@/lib/plan-limits";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -48,6 +49,8 @@ export const POST = handler(async (request) => {
       created: false,
     });
   }
+
+  await enforceProjectLimit();
 
   const [created] = await db
     .insert(projects)

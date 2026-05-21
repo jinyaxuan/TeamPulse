@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, projects, tasks, users } from "@/db";
 import { requireAuth } from "@/lib/api";
+import { enforceFeature } from "@/lib/plan-limits";
 import { visibleTasksCondition } from "@/lib/project-access";
 import {
   nonTestProjectCondition,
@@ -21,7 +22,11 @@ export async function GET(request: Request) {
   let ctx: Awaited<ReturnType<typeof requireAuth>>;
   try {
     ctx = await requireAuth(request);
-  } catch {
+    await enforceFeature("activity_export", "活动导出");
+  } catch (err) {
+    if (err instanceof Error && "status" in err) {
+      return new Response((err as any).message, { status: (err as any).status });
+    }
     return new Response("未登录或认证已失效", { status: 401 });
   }
 

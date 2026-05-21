@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, devices, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAdminAuth } from "@/lib/api";
 import { generateBearerToken } from "@/lib/auth";
+import { enforceMemberLimit, enforceDeviceLimit } from "@/lib/plan-limits";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -40,9 +41,13 @@ export const POST = handler<{ id: string }>(async (request, params) => {
     throw new ApiError(`设备当前状态为「${device.status}」，不能审批`, 409);
   }
 
+  // Check plan limits before approving
+  await enforceDeviceLimit();
+
   // Upsert user by name.
   let [user] = await db.select().from(users).where(eq(users.name, userName)).limit(1);
   if (!user) {
+    await enforceMemberLimit();
     const [created] = await db
       .insert(users)
       .values({
