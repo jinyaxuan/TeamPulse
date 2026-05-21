@@ -1,12 +1,13 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { db, projects, tasks, users } from "@/db";
+import { db, devices, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
 import { visibleTasksCondition } from "@/lib/project-access";
 import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
+import { getInstancePlan } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,12 @@ export default async function Home() {
   const uniquePeople = new Set(teamRecent.map((t) => t.user_name)).size;
   const uniqueProjects = new Set(teamRecent.map((t) => t.project_id)).size;
 
+  // Plan usage stats
+  const plan = await getInstancePlan();
+  const [{ memberCount }] = await db.select({ memberCount: count() }).from(users).where(isNull(users.revokedAt));
+  const [{ projectCount }] = await db.select({ projectCount: count() }).from(projects);
+  const [{ deviceCount }] = await db.select({ deviceCount: count() }).from(devices).where(eq(devices.status, "active"));
+
   return (
     <AppShell user={user} activeNav="home">
       <div className="space-y-10">
@@ -106,6 +113,26 @@ export default async function Home() {
             <DashboardMetric label="我的进行中任务" value={myActive.length} detail="来自当前登录账号" tone="blue" />
             <DashboardMetric label="团队活跃任务" value={activeTeamTasks} detail="最近 24 小时内" tone="green" />
             <DashboardMetric label="参与项目" value={uniqueProjects} detail={`${uniquePeople} 位成员有动态`} tone="amber" />
+          </div>
+        </section>
+
+        {/* Plan usage */}
+        <section className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium uppercase text-muted-foreground">
+              {"套餐用量"}
+              <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-blue-800 normal-case">
+                {plan.name}
+              </span>
+            </div>
+            <Link href="/settings/billing" className="text-xs text-primary hover:underline">
+              {"管理套餐"}
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <UsageBar label={"成员"} current={memberCount} limit={plan.maxMembers} />
+            <UsageBar label={"项目"} current={projectCount} limit={plan.maxProjects} />
+            <UsageBar label={"活跃设备"} current={deviceCount} limit={plan.maxDevicesPerUser * memberCount} />
           </div>
         </section>
 
@@ -270,5 +297,36 @@ function QuickLink({
       <div className="mt-3 text-sm font-medium">{title}</div>
       <div className="mt-1 text-xs leading-5 text-muted-foreground">{description}</div>
     </Link>
+  );
+}
+
+function UsageBar({ label, current, limit }: { label: string; current: number; limit: number }) {
+  const isUnlimited = limit >= 999999;
+  const pct = isUnlimited ? 0 : Math.min((current / limit) * 100, 100);
+  const isWarning = !isUnlimited && pct >= 80;
+  const isFull = !isUnlimited && pct >= 100;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={isFull ? "font-medium text-red-600" : isWarning ? "text-amber-600" : "text-muted-foreground"}>
+          {current} / {isUnlimited ? "\u221e" : limit}
+        </span>
+      </div>
+      {!isUnlimited && (
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={`h-full rounded-full transition-all ${isFull ? "bg-red-500" : isWarning ? "bg-amber-400" : "bg-blue-400"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+      {isFull && (
+        <Link href="/settings/billing" className="mt-1 block text-xs text-red-600 hover:underline">
+          {"已达上限，升级套餐"}
+        </Link>
+      )}
+    </div>
   );
 }
