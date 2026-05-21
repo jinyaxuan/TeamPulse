@@ -33,4 +33,10 @@ export const env = {
   get OIDC_ENABLED() {
     return Boolean(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID);
   },
+  get XUNHU_APPID() {
+    return process.env.XUNHU_APPID ?? "";
+  },
+  get XUNHU_APPSECRET() {
+    return process.env.XUNHU_APPSECRET ?? "";
+  },
 };
