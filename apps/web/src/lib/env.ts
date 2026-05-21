@@ -39,4 +39,7 @@ export const env = {
   get XUNHU_APPSECRET() {
     return process.env.XUNHU_APPSECRET ?? "";
   },
+  get REGISTRATION_MODE() {
+    return (process.env.REGISTRATION_MODE ?? "open") as "open" | "invite_only";
+  },
 };

@@ -25,7 +25,7 @@ export function RegisterForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          invite_code: inviteCode,
+          invite_code: inviteCode || undefined,
           name,
           display_name: displayName || undefined,
           email,
@@ -52,16 +52,15 @@ export function RegisterForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="invite-code" className="block text-sm font-medium">
-          邀请码
+          邀请码 <span className="font-normal text-muted-foreground">(可选)</span>
         </label>
         <input
           id="invite-code"
           value={inviteCode}
           onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-          required
           autoComplete="one-time-code"
           className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-          placeholder="TP-XXXX-XXXX-XXXX"
+          placeholder="有邀请码可填写，没有可跳过"
         />
       </div>
 

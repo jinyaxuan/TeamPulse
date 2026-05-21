@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const registerSchema = z.object({
-  invite_code: z.string().trim().min(1).max(64),
+  invite_code: z.string().trim().max(64).optional(),
   name: z
     .string()
     .trim()
@@ -67,9 +67,15 @@ async function syncToCasdoor(name: string, email: string, password: string, disp
 export const POST = handler(async (request) => {
   const body = await parseBody(request, registerSchema);
   const now = new Date();
-  const codeHash = hashInviteCode(body.invite_code);
   const passwordHash = await hashPassword(body.password);
   const userName = body.name.toLowerCase();
+  const isOpenMode = env.REGISTRATION_MODE === "open";
+  const hasInviteCode = Boolean(body.invite_code?.trim());
+
+  // In invite_only mode, invite code is mandatory
+  if (!isOpenMode && !hasInviteCode) {
+    throw new ApiError("当前仅支持邀请码注册", 400);
+  }
 
   const [created] = await db.transaction(async (tx) => {
     const [existing] = await tx
@@ -82,24 +88,28 @@ export const POST = handler(async (request) => {
       throw new ApiError("用户名或邮箱已被占用", 409);
     }
 
-    const [usedInvite] = await tx
-      .update(inviteCodes)
-      .set({
-        uses: sql`${inviteCodes.uses} + 1`,
-        lastUsedAt: now,
-      })
-      .where(
-        and(
-          eq(inviteCodes.codeHash, codeHash),
-          isNull(inviteCodes.revokedAt),
-          or(isNull(inviteCodes.expiresAt), gt(inviteCodes.expiresAt, now)),
-          sql`${inviteCodes.uses} < ${inviteCodes.maxUses}`
+    // Validate invite code if provided
+    if (hasInviteCode) {
+      const codeHash = hashInviteCode(body.invite_code!);
+      const [usedInvite] = await tx
+        .update(inviteCodes)
+        .set({
+          uses: sql`${inviteCodes.uses} + 1`,
+          lastUsedAt: now,
+        })
+        .where(
+          and(
+            eq(inviteCodes.codeHash, codeHash),
+            isNull(inviteCodes.revokedAt),
+            or(isNull(inviteCodes.expiresAt), gt(inviteCodes.expiresAt, now)),
+            sql`${inviteCodes.uses} < ${inviteCodes.maxUses}`
+          )
         )
-      )
-      .returning({ id: inviteCodes.id });
+        .returning({ id: inviteCodes.id });
 
-    if (!usedInvite) {
-      throw new ApiError("邀请码无效、已过期或已用完", 400);
+      if (!usedInvite) {
+        throw new ApiError("邀请码无效、已过期或已用完", 400);
+      }
     }
 
     return tx

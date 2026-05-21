@@ -10,11 +10,11 @@ export default async function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
       <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-sm">
         <div className="rounded-md bg-primary px-4 py-3 text-primary-foreground">
-          <h1 className="text-2xl font-semibold">加入 TeamPulse</h1>
-          <p className="mt-1 text-sm opacity-80">仅支持邀请码注册</p>
+          <h1 className="text-2xl font-semibold">{"加入 TeamPulse"}</h1>
+          <p className="mt-1 text-sm opacity-80">{"免费注册，立即体验 AI Agent 团队协作"}</p>
         </div>
         <p className="mt-5 text-sm text-muted-foreground">
-          使用管理员发放的邀请码创建账号。注册成功后会直接进入“我的接入”，继续绑定你的 Agent。
+          {"创建账号后即可接入 Claude Code、Codex 等 AI 编码助手，实现团队实时协调。"}
         </p>
         <div className="mt-6">
           <RegisterForm />
