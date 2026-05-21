@@ -3,7 +3,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { getSessionUser } from "@/lib/auth";
 import { db, orders, plans as plansTable } from "@/db";
 import { getInstancePlan, getActiveSubscription } from "@/lib/subscription";
-import { UpgradeButton } from "./upgrade-button";
+import { UpgradeButton, CancelButton } from "./upgrade-button";
 import { OrderHistory } from "./order-history";
 
 export const dynamic = "force-dynamic";
@@ -122,25 +122,38 @@ export default async function BillingPage({
 
         {/* Upgrade CTA for free plan */}
         {plan.slug === "free" && (
-          <div className="mt-6 rounded-md bg-slate-50 border border-dashed p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              升级到专业版，解锁 10 名成员、无限项目、冲突检测等高级功能
+          <div className="mt-6 rounded-md bg-slate-50 border border-dashed p-4">
+            <p className="mb-3 text-sm text-muted-foreground">
+              {"升级到专业版，解锁 10 名成员、无限项目、冲突检测等高级功能"}
             </p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">
-              ¥49<span className="text-sm font-normal text-muted-foreground">/月</span>
-            </p>
+            <UpgradeButton planSlug="pro" label="升级到专业版" showMonthSelector />
           </div>
         )}
 
-        {/* Renew for paid plan */}
-        {plan.slug !== "free" && subscription && (
-          <div className="mt-6 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              需要续费？可选择延长 1-12 个月
-            </p>
-            <UpgradeButton planSlug={plan.slug} label="续费" />
-          </div>
-        )}
+        {/* Renew + Cancel for paid plan */}
+        {plan.slug !== "free" && subscription && (() => {
+          const daysLeft = Math.ceil(
+            (new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          );
+          return (
+            <>
+              {daysLeft <= 7 && daysLeft > 0 && (
+                <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {"你的订阅将在 " + daysLeft + " 天后到期，请及时续费以避免服务降级。"}
+                </div>
+              )}
+              <div className="mt-6">
+                <p className="mb-3 text-sm text-muted-foreground">
+                  {"续费可选择 1-12 个月，享受长期折扣"}
+                </p>
+                <UpgradeButton planSlug={plan.slug} label="续费" showMonthSelector />
+              </div>
+              <div className="mt-4 border-t pt-4">
+                <CancelButton />
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       {/* Order History */}
