@@ -31,6 +31,7 @@ export default async function SettingsLayout({
           {item("/settings/connect", "我的接入")}
           {item("/settings/devices", "我的设备")}
           {item("/settings/memory", "记忆同步")}
+          {item("/settings/billing", "订阅计费")}
         </nav>
         <div>{children}</div>
       </div>
