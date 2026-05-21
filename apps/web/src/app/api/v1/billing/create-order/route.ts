@@ -3,6 +3,7 @@ import { handler, json, parseBody, requireAuth, ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
 import { getPlanBySlug, generateTradeOrderId } from "@/lib/subscription";
 import { createPayment } from "@/lib/xunhupay";
+import { rateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,16 @@ const schema = z.object({
 
 export const POST = handler(async (request) => {
   const ctx = await requireAuth(request);
+
+  // Rate limit per user: 10 orders per hour
+  const rl = rateLimit(`billing:${ctx.user.id}`, 10, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ error: "订单创建过于频繁，请稍后再试" }),
+      { status: 429, headers: { "Content-Type": "application/json", "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   const { plan_slug, months } = await parseBody(request, schema);
 
   const plan = await getPlanBySlug(plan_slug);

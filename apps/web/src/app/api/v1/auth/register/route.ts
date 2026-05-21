@@ -4,6 +4,7 @@ import { db, inviteCodes, users } from "@/db";
 import { ApiError, handler, json, parseBody } from "@/lib/api";
 import { createSession, hashInviteCode, hashPassword, setSessionCookie } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -65,6 +66,9 @@ async function syncToCasdoor(name: string, email: string, password: string, disp
 }
 
 export const POST = handler(async (request) => {
+  const rateLimited = checkRateLimit(request, "register", 5, 60 * 60 * 1000);
+  if (rateLimited) return rateLimited;
+
   const body = await parseBody(request, registerSchema);
   const now = new Date();
   const passwordHash = await hashPassword(body.password);

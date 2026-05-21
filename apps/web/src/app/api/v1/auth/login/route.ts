@@ -3,6 +3,7 @@ import { db, users } from "@/db";
 import { createSession, setSessionCookie, verifyPassword } from "@/lib/auth";
 import { handler, json, parseBody, ApiError } from "@/lib/api";
 import { env } from "@/lib/env";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -54,6 +55,9 @@ async function verifyCasdoor(login: string, password: string) {
 }
 
 export const POST = handler(async (request) => {
+  const rateLimited = checkRateLimit(request, "login", 10, 15 * 60 * 1000);
+  if (rateLimited) return rateLimited;
+
   const { email, password } = await parseBody(request, loginSchema);
 
   // 1. Try local DB first (supports email or username)

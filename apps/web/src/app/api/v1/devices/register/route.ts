@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db, devices } from "@/db";
 import { handler, json, parseBody } from "@/lib/api";
 import { generateClaimCode, generateDeviceSecret, hashDeviceSecret } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -24,6 +25,9 @@ const registerSchema = z.object({
  * server generates both the claim code and device secret and returns them once.
  */
 export const POST = handler(async (request) => {
+  const rateLimited = checkRateLimit(request, "device-register", 20, 60 * 60 * 1000);
+  if (rateLimited) return rateLimited;
+
   const body = await parseBody(request, registerSchema);
   const deviceSecret = body.device_secret ?? generateDeviceSecret();
 
