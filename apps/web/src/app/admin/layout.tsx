@@ -25,6 +25,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin/users" className="hover:text-foreground">
                 用户管理
               </Link>
+              <Link href="/admin/billing" className="hover:text-foreground">
+                计费管理
+              </Link>
             </nav>
           </div>
           <div className="text-xs text-muted-foreground">
