@@ -54,6 +54,12 @@ export function AppShell({
           </div>
           <div className="ml-auto flex flex-shrink-0 items-center gap-3 text-xs text-muted-foreground">
             <Link
+              href="/help"
+              className="rounded-md px-2 py-1 hover:bg-slate-100 hover:text-foreground"
+            >
+              帮助
+            </Link>
+            <Link
               href="/settings/profile"
               className="max-w-40 truncate whitespace-nowrap rounded-md px-2 py-1 hover:bg-slate-100 hover:text-foreground"
             >
