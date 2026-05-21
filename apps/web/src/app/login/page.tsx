@@ -17,13 +17,18 @@ export default async function LoginPage() {
         <div className="mt-6">
           <LoginForm />
         </div>
-        <p className="mt-6 text-xs text-muted-foreground">
-          没有账号？请联系管理员在{" "}
-          <a href="https://casdoor.tangchaolizi.com" target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">
-            身份管理平台
+        <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
+          <p>
+            没有账号？请联系管理员在{" "}
+            <a href="https://casdoor.tangchaolizi.com" target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">
+              身份管理平台
+            </a>
+            {" "}创建。
+          </p>
+          <a href="/pricing" className="font-medium text-primary hover:underline">
+            查看定价
           </a>
-          {" "}创建。
-        </p>
+        </div>
       </div>
     </main>
   );
