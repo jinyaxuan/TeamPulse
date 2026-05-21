@@ -50,6 +50,13 @@
       "when": 1777122300000,
       "tag": "0006_special_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779370261806,
+      "tag": "0007_chilly_marvex",
+      "breakpoints": true
     }
   ]
 }

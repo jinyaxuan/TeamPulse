@@ -256,6 +256,83 @@ export const memoryBlobs = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.projectId] })]
 );
 
+/**
+ * plans — pricing tiers (seeded, rarely changes).
+ * Prices stored in fen (分): ¥49.00 = 4900.
+ */
+export const plans = pgTable("plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(), // "free" | "pro" | "enterprise"
+  name: text("name").notNull(), // "免费版" | "专业版" | "企业版"
+  description: text("description"),
+  priceMonthly: integer("price_monthly").notNull().default(0), // in fen (分)
+  maxMembers: integer("max_members").notNull().default(2),
+  maxProjects: integer("max_projects").notNull().default(3),
+  maxDevicesPerUser: integer("max_devices_per_user").notNull().default(1),
+  featuresJson: text("features_json"), // JSON array of feature flags
+  isActive: integer("is_active").notNull().default(1),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * subscriptions — one active subscription per admin user (governs the instance).
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id),
+    status: text("status").notNull().default("active"), // active | expired | cancelled
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("subscriptions_user_idx").on(t.userId),
+    index("subscriptions_status_idx").on(t.status),
+  ]
+);
+
+/**
+ * orders — payment records linked to XunhuPay transactions.
+ * Amounts in fen (分).
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id),
+    tradeOrderId: text("trade_order_id").notNull().unique(), // our order ID sent to XunhuPay
+    amount: integer("amount").notNull(), // in fen (分)
+    months: integer("months").notNull().default(1),
+    title: text("title").notNull(), // "TeamPulse 专业版 - 1个月"
+    status: text("status").notNull().default("pending"), // pending | paid | failed | refunded
+    paymentChannel: text("payment_channel"), // "wechat" | "alipay"
+    xunhuOrderId: text("xunhu_order_id"), // XunhuPay's order ID from callback
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    callbackRaw: text("callback_raw"), // full callback JSON for audit
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("orders_user_idx").on(t.userId),
+    index("orders_trade_order_idx").on(t.tradeOrderId),
+    index("orders_status_idx").on(t.status),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Device = typeof devices.$inferSelect;
@@ -272,3 +349,9 @@ export type MemoryBlob = typeof memoryBlobs.$inferSelect;
 export type WebSession = typeof webSessions.$inferSelect;
 export type MagicLink = typeof magicLinks.$inferSelect;
 export type InviteCode = typeof inviteCodes.$inferSelect;
+export type Plan = typeof plans.$inferSelect;
+export type NewPlan = typeof plans.$inferInsert;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+export type Order = typeof orders.$inferSelect;
+export type NewOrder = typeof orders.$inferInsert;

@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "create-admin": "tsx scripts/create-admin.ts",
+    "seed-plans": "tsx scripts/seed-plans.ts",
     "test:e2e": "tsx --test tests/e2e/*.test.ts"
   },
   "dependencies": {
