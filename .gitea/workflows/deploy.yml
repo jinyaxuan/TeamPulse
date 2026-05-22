@@ -4,9 +4,20 @@ on:
   push:
     branches: [main]
 
+# 2026-05-22: 改成多架构 native 编译
+#   - build matrix [amd64, arm64] 各在对应 runner 上跑 (qemu emulation 会让 host load 飙到 21+, 不可行)
+#   - amd64 runner: gitea-runner (kindong-workstation 130, docker 29.1.3)
+#   - arm64 runner: gitea-runner-arm64 (spark-95ee 104, docker 29.2.1)
+#   - merge: buildx imagetools create → :<sha> + :latest 多架构 manifest list
+#   - k3s-manifests devops.yaml 已经把 image 改 :latest, 任意节点 arch 都能拉
+
 jobs:
-  build-and-deploy:
-    runs-on: linux
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: linux-${{ matrix.arch }}
     steps:
       - name: Install dependencies
         run: apt-get update && apt-get install -y git docker.io
@@ -16,27 +27,54 @@ jobs:
           git clone http://kindong:${{ secrets.GITEATOKEN }}@192.168.100.26:23030/kindong/TeamPulse.git .
           git checkout ${{ github.sha }}
 
-      - name: Build base image (required by Dockerfile FROM ${BASE_IMAGE})
-        run: |
-          # Dockerfile.base 定义 teampulse-node-base:22-bookworm = node:22-bookworm + pnpm 10.25.0
-          # 不在 registry, 每次 CI 本地 build, docker layer cache 命中后秒过
-          DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile.base -t teampulse-node-base:22-bookworm .
+      - name: Build base image
+        run: DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile.base -t teampulse-node-base:22-bookworm .
 
-      - name: Build and push to Gitea Registry
+      - name: Build and push arch-suffixed image
         run: |
           TAG="${GITHUB_SHA::8}"
-          IMAGE="gitea.tangchaolizi.com/kindong/teampulse-web:${TAG}"
-          DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com -t ${IMAGE}  .
+          IMAGE="gitea.tangchaolizi.com/kindong/teampulse-web:${TAG}-${{ matrix.arch }}"
+          DOCKER_BUILDKIT=0 docker build \
+            -f apps/web/Dockerfile \
+            --build-arg BASE_IMAGE=teampulse-node-base:22-bookworm \
+            --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com \
+            -t ${IMAGE} .
           echo "${{ secrets.GITEATOKEN }}" | docker login gitea.tangchaolizi.com -u kindong --password-stdin
           docker push ${IMAGE}
 
-      - name: Update k3s-manifests
+  merge:
+    needs: build
+    runs-on: linux-amd64
+    steps:
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y docker.io docker-buildx-plugin
+
+      - name: Merge multi-arch manifest + tag latest
         run: |
           TAG="${GITHUB_SHA::8}"
+          REPO="gitea.tangchaolizi.com/kindong/teampulse-web"
+          echo "${{ secrets.GITEATOKEN }}" | docker login ${REPO%%/*} -u kindong --password-stdin
+          docker buildx imagetools create \
+            -t ${REPO}:${TAG} \
+            -t ${REPO}:latest \
+            ${REPO}:${TAG}-amd64 \
+            ${REPO}:${TAG}-arm64
+
+      - name: Update k3s-manifests
+        run: |
+          apt-get install -y git
+          TAG="${GITHUB_SHA::8}"
           IMAGE="gitea.tangchaolizi.com/kindong/teampulse-web:${TAG}"
-          cd /tmp && git clone http://kindong:${{ secrets.GITEATOKEN }}@192.168.100.26:23030/kindong/k3s-manifests.git && cd k3s-manifests
-          # 只匹配 6-40 位 hex 的 CI sha tag, 不动手工的自定义 tag (langfuse-* / hotfix-* / latest 等)
-          sed -i -E "s|image: [^[:space:]]*teampulse-web:[0-9a-f]{6,40}|image: ${IMAGE}|g" devops/devops.yaml
+          cd /tmp && rm -rf k3s-manifests
+          git clone http://kindong:${{ secrets.GITEATOKEN }}@192.168.100.26:23030/kindong/k3s-manifests.git
+          cd k3s-manifests
+          # 2026-05-22: regex 放宽, 匹配 sha tag / :latest / :latest-amd64 都行
+          sed -i -E "s|image: gitea\\.tangchaolizi\\.com/kindong/teampulse-web:[A-Za-z0-9_.-]+|image: ${IMAGE}|g" devops/devops.yaml
           git config user.email "ci@gitea.local" && git config user.name "gitea-ci"
-          git add -A && git diff --cached --quiet && exit 0
-          git commit -m "deploy: update teampulse-web to ${TAG}" && git push
+          git add -A
+          if git diff --cached --quiet; then
+            echo "no manifest changes"
+            exit 0
+          fi
+          git commit -m "deploy: teampulse-web → ${TAG} (multi-arch)"
+          git push
