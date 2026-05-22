@@ -41,6 +41,7 @@ services:
       - OIDC_ISSUER=https://casdoor.tangchaolizi.com
       - OIDC_CLIENT_ID=teampulse-oidc-client
       - OIDC_CLIENT_SECRET=teampulse-oidc-secret-2026
+      - REGISTRATION_MODE=open
       - XUNHU_APPID=${XUNHU_APPID:-}
       - XUNHU_APPSECRET=${XUNHU_APPSECRET:-}
     ports:
