@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
+import { TaskSummaryBox } from "@/components/ui/task-summary-box";
 import { getSessionUser } from "@/lib/auth";
 import { visibleProjectsCondition, visibleTasksCondition } from "@/lib/project-access";
 import {
@@ -184,11 +185,7 @@ export default async function ActivityPage({
                       )}
                     </div>
                   )}
-                  {t.summary && (
-                    <div className="mt-1 line-clamp-2 rounded border bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">
-                      {t.summary}
-                    </div>
-                  )}
+                  {t.summary && <TaskSummaryBox summary={t.summary} className="mt-1 rounded border bg-muted/40 p-2" />}
                 </div>
                 <Link
                   href={`/projects/${t.project_id}`}

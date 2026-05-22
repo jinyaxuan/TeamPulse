@@ -10,6 +10,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { EmptyPanel, Panel } from "@/components/ui/panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { RiskBadge, StatusBadge } from "@/components/ui/status-badge";
+import { TaskSummaryBox } from "@/components/ui/task-summary-box";
 import { MonoPath, Workspace } from "@/components/ui/workspace";
 import { getSessionUser } from "@/lib/auth";
 import { gitRemoteLinks } from "@/lib/git-remote";
@@ -420,11 +421,7 @@ export default async function ProjectPage({
                         )}
                       </div>
                     )}
-                    {task.summary && (
-                      <div className="mt-1 line-clamp-3 rounded-[16px] bg-surface p-3 text-xs leading-5 text-muted-foreground">
-                        {task.summary}
-                      </div>
-                    )}
+                    {task.summary && <TaskSummaryBox summary={task.summary} className="mt-1" />}
                   </div>
                   <div className="flex flex-wrap justify-start gap-2 md:justify-end">
                     <StatusBadge tone={task.status === "active" ? "online" : task.status === "done" ? "slate" : "warning"}>

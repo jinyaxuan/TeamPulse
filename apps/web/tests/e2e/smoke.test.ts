@@ -299,6 +299,7 @@ test("e2e: full happy path", async (t) => {
   });
 
   let devToken!: string;
+  let devUserId!: string;
 
   await t.test("device: plugin polls claim-code → active + token", async () => {
     const res = await http(`/api/v1/devices/claim-code/${claimCode}`, {
@@ -806,7 +807,7 @@ test("e2e: full happy path", async (t) => {
       headers: { Authorization: `Bearer ${devToken}` },
     });
     assert.equal(active.status, 200);
-    const devUserId = active.body.tasks.find((task: any) => task.user_name === devUserName)?.user_id;
+    devUserId = active.body.tasks.find((task: any) => task.user_name === devUserName)?.user_id;
     assert.ok(devUserId, "expected active task payload to expose dev user id");
 
     const detail = await http(`/team/${devUserId}?showTestData=1`, {
@@ -873,6 +874,33 @@ test("e2e: full happy path", async (t) => {
     assert.equal(exported.status, 200);
     assert.match(exported.body, /交接摘要/);
     assert.match(exported.body, new RegExp(handoffToken));
+
+    const projectPage = await http(`/projects/${projectId}`, {
+      cookies: [adminCookie],
+      noBody: true,
+    });
+    assert.equal(projectPage.status, 200);
+    assert.match(projectPage.body, /交接摘要/);
+    assert.match(projectPage.body, /overflow-y-auto/);
+    assert.match(projectPage.body, new RegExp(handoffToken));
+
+    const memberPage = await http(`/team/${devUserId}?showTestData=1`, {
+      cookies: [adminCookie],
+      noBody: true,
+    });
+    assert.equal(memberPage.status, 200);
+    assert.match(memberPage.body, /交接摘要/);
+    assert.match(memberPage.body, /overflow-y-auto/);
+    assert.match(memberPage.body, new RegExp(handoffToken));
+
+    const activityPage = await http(
+      `/activity?showTestData=1&project=${projectId}&days=1`,
+      { cookies: [adminCookie], noBody: true }
+    );
+    assert.equal(activityPage.status, 200);
+    assert.match(activityPage.body, /交接摘要/);
+    assert.match(activityPage.body, /overflow-y-auto/);
+    assert.match(activityPage.body, new RegExp(handoffToken));
   });
 
   await t.test("SSE: second task fires task.started to live subscriber", async () => {

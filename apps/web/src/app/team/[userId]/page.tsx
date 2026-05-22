@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { EmptyPanel, Panel } from "@/components/ui/panel";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TaskSummaryBox } from "@/components/ui/task-summary-box";
 import { MonoPath, Workspace } from "@/components/ui/workspace";
 import { getSessionUser } from "@/lib/auth";
 import { agentDisplayName, agentTypeLabel } from "@/lib/agent-display";
@@ -259,11 +260,7 @@ function TaskList({ tasks, empty }: { tasks: TeamMemberTask[]; empty: string }) 
               ))}
             </div>
           )}
-          {task.summary && (
-            <div className="mt-2 line-clamp-2 rounded-[16px] bg-surface px-3 py-2 text-xs leading-5 text-muted-foreground">
-              {task.summary}
-            </div>
-          )}
+          {task.summary && <TaskSummaryBox summary={task.summary} />}
         </Link>
       ))}
     </div>
