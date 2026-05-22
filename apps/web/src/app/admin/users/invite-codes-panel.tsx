@@ -27,6 +27,22 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
   const [expiresAt, setExpiresAt] = useState("");
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredInvites =
+    normalizedQuery.length === 0
+      ? inviteCodes
+      : inviteCodes.filter((invite) =>
+          [
+            invite.label ?? "未备注邀请码",
+            inviteStatusText(invite),
+            `${invite.uses}/${invite.max_uses}`,
+            invite.expires_at ? formatDateTime(invite.expires_at) : "不过期",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedQuery)
+        );
 
   async function createInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +91,12 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
       title="邀请注册"
       description="邀请码明文只在创建后显示一次，数据库只保存哈希。"
       className="h-fit"
+      actions={
+        <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs text-muted-foreground ring-1 ring-black/[0.04]">
+          <span>当前</span>
+          <span className="font-mono font-semibold text-foreground">{filteredInvites.length}</span>
+        </div>
+      }
     >
       {createdCode && (
         <div className="mb-4 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -97,7 +119,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             placeholder="例如 前端同学"
-            className="tp-focus-ring rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+            className="tp-input"
           />
         </label>
         <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
@@ -109,7 +131,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
               max={1000}
               value={maxUses}
               onChange={(event) => setMaxUses(Number(event.target.value))}
-              className="tp-focus-ring rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+              className="tp-input"
               aria-label="可使用次数"
             />
           </label>
@@ -119,7 +141,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
               type="datetime-local"
               value={expiresAt}
               onChange={(event) => setExpiresAt(event.target.value)}
-              className="tp-focus-ring rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+              className="tp-input"
               aria-label="过期时间"
             />
           </label>
@@ -129,12 +151,24 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
         </ActionButton>
       </form>
 
-      <div className="mt-5 space-y-2">
+      <label className="mt-5 block">
+        <span className="sr-only">搜索邀请码</span>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索备注、状态或使用次数"
+          className="tp-input w-full"
+        />
+      </label>
+
+      <div className="mt-3 max-h-[72vh] space-y-2 overflow-y-auto pr-1">
         {inviteCodes.length === 0 ? (
           <EmptyPanel>还没有邀请码。</EmptyPanel>
+        ) : filteredInvites.length === 0 ? (
+          <EmptyPanel>没有匹配的邀请码。</EmptyPanel>
         ) : (
-          inviteCodes.map((invite) => (
-            <div key={invite.id} className="rounded-[20px] bg-white p-4">
+          filteredInvites.map((invite) => (
+            <div key={invite.id} className="tp-list-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">{invite.label ?? "未备注邀请码"}</div>
@@ -157,7 +191,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
                     type="button"
                     onClick={() => revokeInvite(invite.id)}
                     disabled={pending}
-                    className="rounded-full border border-red-200 px-2.5 py-1 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                    className="rounded-full border border-red-200 bg-white/80 px-2.5 py-1 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50"
                   >
                     撤销
                   </button>
@@ -172,17 +206,22 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
 }
 
 function inviteStatus(invite: InviteCodeRow) {
+  const label = inviteStatusText(invite);
+  if (label === "已撤销") {
+    return <StatusBadge tone="risk">{label}</StatusBadge>;
+  }
+  if (label === "可使用") {
+    return <StatusBadge tone="online">{label}</StatusBadge>;
+  }
+  return <StatusBadge>{label}</StatusBadge>;
+}
+
+function inviteStatusText(invite: InviteCodeRow) {
   const expired = invite.expires_at ? new Date(invite.expires_at).getTime() <= Date.now() : false;
   const usedUp = invite.uses >= invite.max_uses;
 
-  if (invite.revoked_at) {
-    return <StatusBadge tone="risk">已撤销</StatusBadge>;
-  }
-  if (expired) {
-    return <StatusBadge>已过期</StatusBadge>;
-  }
-  if (usedUp) {
-    return <StatusBadge>已用完</StatusBadge>;
-  }
-  return <StatusBadge tone="online">可使用</StatusBadge>;
+  if (invite.revoked_at) return "已撤销";
+  if (expired) return "已过期";
+  if (usedUp) return "已用完";
+  return "可使用";
 }

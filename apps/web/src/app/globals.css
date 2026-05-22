@@ -4,12 +4,12 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 24% 98%;
     --foreground: 0 0% 5%;
-    --muted: 220 14% 94%;
-    --muted-foreground: 0 0% 42%;
-    --border: 220 13% 90%;
-    --input: 220 13% 90%;
+    --muted: 210 18% 93%;
+    --muted-foreground: 215 9% 43%;
+    --border: 214 16% 88%;
+    --input: 214 16% 88%;
     --primary: 0 0% 4%;
     --primary-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
@@ -18,7 +18,7 @@
     --accent-foreground: 0 0% 7%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 5%;
-    --surface: 42 22% 97%;
+    --surface: 210 24% 96%;
     --surface-strong: 0 0% 100%;
     --online: 156 56% 38%;
     --warning: 38 88% 48%;
@@ -53,6 +53,7 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     font-family: "PingFang SC", "Inter", "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    text-rendering: geometricPrecision;
   }
 
   ::selection {
@@ -63,18 +64,26 @@
 @layer components {
   .tp-grid-bg {
     background:
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--surface)) 44%, hsl(var(--background)) 100%);
+      linear-gradient(180deg, hsl(210 28% 98%) 0%, hsl(210 24% 96%) 46%, hsl(210 24% 98%) 100%);
   }
 
   .tp-panel {
-    @apply border border-black/5 bg-card text-card-foreground shadow-[0_18px_50px_-38px_rgba(0,0,0,0.28)];
+    @apply border border-black/[0.06] bg-white/90 text-card-foreground shadow-[0_18px_60px_-46px_rgba(15,23,42,0.38)];
   }
 
   .tp-marvis-stage {
-    @apply border border-black/5 bg-white shadow-[0_24px_70px_-46px_rgba(0,0,0,0.34)];
+    @apply border border-black/[0.06] bg-white/95 shadow-[0_24px_80px_-56px_rgba(15,23,42,0.42)];
   }
 
   .tp-focus-ring {
     @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-primary;
+  }
+
+  .tp-list-card {
+    @apply rounded-[22px] border border-black/[0.04] bg-white/80 shadow-[0_16px_42px_-38px_rgba(15,23,42,0.38)] transition duration-300 ease-out hover:-translate-y-0.5 hover:border-black/10 hover:bg-white hover:shadow-[0_24px_58px_-44px_rgba(15,23,42,0.42)];
+  }
+
+  .tp-input {
+    @apply tp-focus-ring rounded-full border border-input bg-white/90 px-4 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] transition placeholder:text-muted-foreground/70 hover:border-black/20;
   }
 }

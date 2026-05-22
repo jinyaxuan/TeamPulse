@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ActionButton } from "@/components/ui/action-link";
 import { withBasePath } from "@/lib/base-path";
 import { type EditableAgentDevice } from "@/lib/agent-display";
 
@@ -61,7 +62,7 @@ export function AgentMetadataForm({
   }
 
   return (
-    <form onSubmit={save} className={compact ? "space-y-3" : "rounded-lg border bg-white p-4 shadow-sm"}>
+    <form onSubmit={save} className={compact ? "space-y-3" : "tp-panel rounded-[22px] p-4"}>
       {!compact && (
         <div>
           <h2 className="text-sm font-semibold">Agent 信息</h2>
@@ -78,7 +79,7 @@ export function AgentMetadataForm({
             value={agentName}
             onChange={(event) => setAgentName(event.target.value)}
             placeholder={placeholderName}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+            className="tp-input mt-1 w-full"
             maxLength={128}
           />
         </label>
@@ -87,7 +88,7 @@ export function AgentMetadataForm({
           <select
             value={agentType}
             onChange={(event) => setAgentType(event.target.value)}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+            className="tp-input mt-1 w-full"
           >
             {agentTypes.map((type) => (
               <option key={type.value} value={type.value}>
@@ -104,7 +105,7 @@ export function AgentMetadataForm({
           value={agentRole}
           onChange={(event) => setAgentRole(event.target.value)}
           placeholder="例如：负责前端实现、回归验证、冲突协调"
-          className="mt-1 min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+          className="tp-input mt-1 min-h-20 w-full resize-y rounded-[18px]"
           maxLength={500}
         />
       </label>
@@ -115,7 +116,7 @@ export function AgentMetadataForm({
           value={capabilitiesText}
           onChange={(event) => setCapabilitiesText(event.target.value)}
           placeholder="例如 React, API, E2E, Review"
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+          className="tp-input mt-1 w-full"
         />
       </label>
 
@@ -124,13 +125,14 @@ export function AgentMetadataForm({
           {message && <span className="text-emerald-700">{message}</span>}
           {error && <span className="text-destructive">{error}</span>}
         </div>
-        <button
+        <ActionButton
           type="submit"
           disabled={pending}
-          className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+          variant="primary"
+          className="px-3 py-2"
         >
           保存 Agent
-        </button>
+        </ActionButton>
       </div>
     </form>
   );

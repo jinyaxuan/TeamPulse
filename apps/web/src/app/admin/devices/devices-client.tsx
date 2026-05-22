@@ -53,6 +53,27 @@ export function DevicesClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [activeQuery, setActiveQuery] = useState("");
+  const normalizedActiveQuery = activeQuery.trim().toLowerCase();
+  const filteredActive =
+    normalizedActiveQuery.length === 0
+      ? active
+      : active.filter((device) =>
+          [
+            agentDisplayName(device),
+            agentTypeLabel(device.agent_type),
+            device.hostname ?? "",
+            device.os ?? "",
+            device.git_email ?? "",
+            device.agent_role ?? "",
+            device.user_name,
+            device.user_display_name ?? "",
+            ...device.capabilities,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedActiveQuery)
+        );
 
   async function approve(deviceId: string, userName: string) {
     setError(null);
@@ -108,13 +129,33 @@ export function DevicesClient({
         </div>
       </Panel>
 
-      <Panel title={`已启用设备 (${active.length})`} description="按最近使用排序，展示成员、职责和能力。">
-        <div className="space-y-3">
+      <Panel
+        title={`已启用设备 (${active.length})`}
+        description="按最近使用排序，展示成员、职责和能力。"
+        actions={
+          <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs text-muted-foreground ring-1 ring-black/[0.04]">
+            <span>当前</span>
+            <span className="font-mono font-semibold text-foreground">{filteredActive.length}</span>
+          </div>
+        }
+      >
+        <label className="mb-3 block">
+          <span className="sr-only">搜索已启用设备</span>
+          <input
+            value={activeQuery}
+            onChange={(event) => setActiveQuery(event.target.value)}
+            placeholder="搜索 Agent、成员、主机、邮箱或能力"
+            className="tp-input w-full"
+          />
+        </label>
+        <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1">
           {active.length === 0 ? (
             <EmptyPanel>暂无已启用设备。</EmptyPanel>
+          ) : filteredActive.length === 0 ? (
+            <EmptyPanel>没有匹配的已启用设备。</EmptyPanel>
           ) : (
-            active.map((d) => (
-              <div key={d.id} className="rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface">
+            filteredActive.map((d) => (
+              <div key={d.id} className="tp-list-card p-4">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_auto] lg:items-start">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -133,7 +174,7 @@ export function DevicesClient({
                     {d.capabilities.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {d.capabilities.map((capability) => (
-                          <span key={capability} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                          <span key={capability} className="rounded-full bg-white/80 px-2 py-0.5 text-xs text-slate-700 ring-1 ring-black/[0.04]">
                             {capability}
                           </span>
                         ))}
@@ -148,7 +189,7 @@ export function DevicesClient({
                   </div>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     <details className="text-left">
-                      <summary className="cursor-pointer rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-surface">
+                      <summary className="cursor-pointer rounded-full border border-black/10 bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-white">
                         编辑
                       </summary>
                       <div className="absolute right-6 z-10 mt-2 w-[min(28rem,calc(100vw-3rem))] rounded-[22px] border border-black/10 bg-white p-4 text-left shadow-[0_24px_70px_-38px_rgba(0,0,0,0.42)]">
@@ -194,7 +235,7 @@ function PendingCard({
   const listId = `users-${device.id}`;
 
   return (
-    <div className="rounded-[22px] bg-white p-4">
+    <div className="tp-list-card p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -228,7 +269,7 @@ function PendingCard({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例如 alice"
-            className="tp-focus-ring mt-1 w-full rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+            className="tp-input mt-1 w-full"
           />
           <datalist id={listId}>
             {existingUsers.map((u) => (
@@ -244,14 +285,14 @@ function PendingCard({
             onApprove(device.id, name.trim());
           }}
           disabled={disabled || !name.trim()}
-          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-black/80 disabled:opacity-50"
+          className="rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:bg-black/80 disabled:opacity-50"
         >
           绑定到用户
         </button>
         <button
           onClick={() => onReject(device.id)}
           disabled={disabled}
-          className="rounded-full border border-red-200 px-4 py-2 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+          className="rounded-full border border-red-200 bg-white/80 px-4 py-2.5 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-50"
         >
           拒绝
         </button>

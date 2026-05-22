@@ -51,8 +51,8 @@ export function ActionButton({
 }
 
 function variantClass(variant: Variant): string {
-  if (variant === "primary") return "bg-primary text-primary-foreground shadow-[0_12px_26px_-18px_rgba(0,0,0,0.8)] hover:bg-black/80";
+  if (variant === "primary") return "bg-foreground text-background shadow-[0_14px_32px_-22px_rgba(15,23,42,0.9)] hover:bg-black/80";
   if (variant === "ghost") return "text-muted-foreground hover:bg-accent hover:text-foreground";
-  if (variant === "danger") return "border border-red-200 bg-white text-red-700 hover:bg-red-50";
-  return "border border-black/10 bg-white text-foreground shadow-[0_10px_24px_-20px_rgba(0,0,0,0.35)] hover:-translate-y-0.5 hover:bg-surface";
+  if (variant === "danger") return "border border-red-200 bg-white/90 text-red-700 hover:bg-red-50";
+  return "border border-black/10 bg-white/90 text-foreground shadow-[0_10px_28px_-22px_rgba(15,23,42,0.38)] hover:-translate-y-0.5 hover:bg-white";
 }

@@ -447,7 +447,7 @@ function AgentStage({
             {workstations.map((item) => (
               <div
                 key={item.label}
-                className="rounded-[24px] bg-white/88 p-3 text-left shadow-[0_16px_38px_-32px_rgba(0,0,0,0.45)] sm:p-4"
+                className="rounded-[24px] bg-white/90 p-3 text-left shadow-[0_16px_38px_-32px_rgba(0,0,0,0.45)] sm:p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-foreground">{item.label}</div>

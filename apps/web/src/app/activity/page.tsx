@@ -4,7 +4,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
+import { ActionLink } from "@/components/ui/action-link";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { TaskSummaryBox } from "@/components/ui/task-summary-box";
+import { MonoPath, Workspace } from "@/components/ui/workspace";
 import { getSessionUser } from "@/lib/auth";
 import { visibleProjectsCondition, visibleTasksCondition } from "@/lib/project-access";
 import {
@@ -104,21 +109,18 @@ export default async function ActivityPage({
 
   return (
     <AppShell user={sessionUser} activeNav="activity">
-      <div className="space-y-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">团队动态</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              查看任务历史，按成员、项目、状态和时间范围筛选。
-            </p>
-          </div>
-          <Link
-            href={`/api/v1/activity/export?${csvQuery}`}
-            className="w-fit rounded-md border bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50"
-          >
-            导出 CSV
-          </Link>
-        </div>
+      <Workspace>
+        <PageHeader
+          eyebrow="任务时间线"
+          title="团队动态"
+          description="查看任务历史，按成员、项目、状态和时间范围筛选；重点先看状态、路径和交接摘要。"
+          actions={
+            <>
+              <ActionLink href="/team">团队视图</ActionLink>
+              <ActionLink href={`/api/v1/activity/export?${csvQuery}`} variant="primary">导出 CSV</ActionLink>
+            </>
+          }
+        />
 
         <section className="grid gap-3 sm:grid-cols-4">
           <ActivityStat label="当前结果" value={rows.length} detail={`最近 ${days} 天`} tone="slate" />
@@ -129,88 +131,69 @@ export default async function ActivityPage({
 
         <FilterBar current={{ ...params, days: String(days) }} projects={projectOptions} showTestData={showTestData} />
 
-        <section>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase text-muted-foreground">动态列表</h2>
-            <span className="text-xs text-muted-foreground">最多显示 200 条</span>
-          </div>
-        <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
-          {rows.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              没有符合筛选条件的动态。
+        <Panel
+          title="动态列表"
+          description="最多显示 200 条，按启动时间倒序排列。"
+          bodyClassName="p-3 sm:p-4"
+        >
+          {rows.length === 0 ? (
+            <EmptyPanel>没有符合筛选条件的动态。</EmptyPanel>
+          ) : (
+            <div className="space-y-3">
+              {rows.map((t) => (
+                <article key={t.id} className="tp-list-card p-4">
+                  <div className="grid gap-4 lg:grid-cols-[128px_minmax(0,1fr)_220px] lg:items-start">
+                    <div className="text-xs text-muted-foreground">
+                      <div className="font-mono text-foreground">{formatDateTime(t.started_at)}</div>
+                      <div className="mt-1">{formatRelativeTime(t.started_at)}</div>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="font-medium">{t.user_display_name ?? t.user_name}</span>
+                        <StatusBadge tone="agent">{clientLabel(t.client)}</StatusBadge>
+                        <StatusBadge tone={statusTone(t.status)} dot={t.status === "active"}>
+                          {taskStatusLabel(t.status)}
+                        </StatusBadge>
+                      </div>
+                      <h2 className="mt-2 text-sm font-medium leading-6 text-foreground">{t.intent}</h2>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        {t.branch && <MonoPath>分支 {t.branch}</MonoPath>}
+                        {t.status === "active" && <span>心跳 {formatRelativeTime(t.heartbeat_at)}</span>}
+                        {t.ended_at && <span>结束 {formatDateTime(t.ended_at)}</span>}
+                        <span>{t.files_touched.length} 条路径</span>
+                      </div>
+                      {t.files_touched.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {t.files_touched.slice(0, 4).map((file) => (
+                            <MonoPath key={file} className="max-w-full rounded-full bg-white/80 px-2.5 py-1 ring-1 ring-black/[0.04]">
+                              {file}
+                            </MonoPath>
+                          ))}
+                          {t.files_touched.length > 4 && (
+                            <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs text-muted-foreground ring-1 ring-black/[0.04]">
+                              +{t.files_touched.length - 4}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {t.summary && <TaskSummaryBox summary={t.summary} className="mt-3 bg-white/70" />}
+                    </div>
+
+                    <Link
+                      href={`/projects/${t.project_id}`}
+                      className="min-w-0 rounded-[18px] border border-black/[0.05] bg-white/70 px-3 py-3 text-xs text-muted-foreground transition hover:bg-white hover:text-foreground"
+                    >
+                      <span className="block text-muted-foreground">项目</span>
+                      <span className="mt-1 block truncate font-medium text-foreground">{t.project_name ?? "项目"}</span>
+                    </Link>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
-          <ul className="divide-y">
-            {rows.map((t) => (
-              <li
-                key={t.id}
-                className="grid gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 lg:grid-cols-[120px_minmax(0,1fr)_180px_88px] lg:items-start"
-              >
-                <div className="text-xs text-muted-foreground">
-                  {formatDateTime(t.started_at)}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-medium">{t.user_display_name ?? t.user_name}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-                      {clientLabel(t.client)}
-                    </span>
-                  </div>
-                  <div className="mt-1 truncate text-muted-foreground">
-                    {t.intent}
-                  </div>
-                  {t.branch && (
-                    <div className="font-mono text-xs text-muted-foreground">分支：{t.branch}</div>
-                  )}
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    {t.status === "active" && <span>心跳 {formatRelativeTime(t.heartbeat_at)}</span>}
-                    {t.ended_at && <span>结束 {formatDateTime(t.ended_at)}</span>}
-                    <span>{t.files_touched.length} 条路径</span>
-                  </div>
-                  {t.files_touched.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {t.files_touched.slice(0, 3).map((file) => (
-                        <span
-                          key={file}
-                          className="max-w-[18rem] truncate rounded-full bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600"
-                          title={file}
-                        >
-                          {file}
-                        </span>
-                      ))}
-                      {t.files_touched.length > 3 && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                          +{t.files_touched.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {t.summary && <TaskSummaryBox summary={t.summary} className="mt-1 rounded border bg-muted/40 p-2" />}
-                </div>
-                <Link
-                  href={`/projects/${t.project_id}`}
-                  className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  {t.project_name ?? "项目"}
-                </Link>
-                <div
-                  className={
-                    "h-fit w-16 flex-shrink-0 self-start rounded-full px-2 py-0.5 text-center text-xs lg:self-center " +
-                    (t.status === "active"
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                      : t.status === "done"
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400")
-                  }
-                >
-                  {taskStatusLabel(t.status)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-        </section>
-      </div>
+        </Panel>
+      </Workspace>
     </AppShell>
   );
 }
@@ -236,7 +219,7 @@ function ActivityStat({
           : "border-t-slate-400";
 
   return (
-    <div className={`rounded-lg border border-t-4 bg-white p-4 shadow-sm ${toneClass}`}>
+    <div className={`tp-panel rounded-[22px] border-t-4 p-4 ${toneClass}`}>
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
       <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
@@ -254,7 +237,7 @@ function FilterBar({
   showTestData: boolean;
 }) {
   return (
-    <form action="/activity" method="get" className="rounded-lg border bg-white p-4 shadow-sm">
+    <form action="/activity" method="get" className="tp-panel rounded-[24px] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">筛选条件</h2>
@@ -269,12 +252,12 @@ function FilterBar({
           name="user"
           placeholder="成员用户名，例如 alice"
           defaultValue={current.user ?? ""}
-          className="rounded-md border border-input bg-background px-3 py-2"
+          className="tp-input"
         />
         <select
           name="project"
           defaultValue={current.project ?? ""}
-          className="rounded-md border border-input bg-background px-3 py-2"
+          className="tp-input"
         >
           <option value="">全部项目</option>
           {projectOptions.map((project) => (
@@ -286,7 +269,7 @@ function FilterBar({
         <select
           name="days"
           defaultValue={current.days ?? "7"}
-          className="rounded-md border border-input bg-background px-3 py-2"
+          className="tp-input"
         >
           <option value="1">最近 24 小时</option>
           <option value="3">最近 3 天</option>
@@ -297,7 +280,7 @@ function FilterBar({
         <select
           name="status"
           defaultValue={current.status ?? ""}
-          className="rounded-md border border-input bg-background px-3 py-2"
+          className="tp-input"
         >
           <option value="">全部状态</option>
           <option value="active">只看进行中</option>
@@ -306,7 +289,7 @@ function FilterBar({
         </select>
         <button
           type="submit"
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
+          className="rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-[0_14px_32px_-22px_rgba(15,23,42,0.9)] transition active:translate-y-px hover:bg-black/80"
         >
           应用筛选
         </button>
@@ -328,4 +311,10 @@ function FilterBar({
       )}
     </form>
   );
+}
+
+function statusTone(status: string): "slate" | "online" | "warning" {
+  if (status === "active") return "online";
+  if (status === "abandoned") return "warning";
+  return "slate";
 }

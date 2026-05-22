@@ -24,6 +24,23 @@ export function UsersTable({ users }: { users: UserRow[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredUsers =
+    normalizedQuery.length === 0
+      ? users
+      : users.filter((u) =>
+          [
+            u.name,
+            u.display_name ?? "",
+            u.email ?? "",
+            roleLabel(u.role),
+            u.revoked_at ? "已撤销" : "可登录",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedQuery)
+        );
 
   async function setRole(id: string, role: "admin" | "member") {
     setError(null);
@@ -52,18 +69,39 @@ export function UsersTable({ users }: { users: UserRow[] }) {
   }
 
   return (
-    <Panel title={`成员账号 (${users.length})`} description="角色、设备和任务贡献按账号汇总。" bodyClassName="p-3 sm:p-4">
+    <Panel
+      title={`成员账号 (${users.length})`}
+      description="角色、设备和任务贡献按账号汇总。"
+      bodyClassName="p-3 sm:p-4"
+      actions={
+        <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs text-muted-foreground ring-1 ring-black/[0.04]">
+          <span>当前</span>
+          <span className="font-mono font-semibold text-foreground">{filteredUsers.length}</span>
+        </div>
+      }
+    >
       {error && (
         <div className="mb-3 rounded-[20px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
-      <div className="space-y-3">
+      <label className="mb-3 block">
+        <span className="sr-only">搜索成员账号</span>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索成员、邮箱、角色或状态"
+          className="tp-input w-full"
+        />
+      </label>
+      <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1">
         {users.length === 0 ? (
           <EmptyPanel>还没有成员账号。</EmptyPanel>
+        ) : filteredUsers.length === 0 ? (
+          <EmptyPanel>没有匹配的成员账号。</EmptyPanel>
         ) : (
-          users.map((u) => (
-            <div key={u.id} className="rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface">
+          filteredUsers.map((u) => (
+            <div key={u.id} className="tp-list-card p-4">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto] lg:items-center">
                 <div className="flex min-w-0 items-start gap-3">
                   <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">
@@ -142,7 +180,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
 
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-full bg-surface px-3 py-2">
+    <div className="rounded-full bg-white/70 px-3 py-2 ring-1 ring-black/[0.04]">
       <span className="text-muted-foreground">{label}</span>
       <span className="ml-2 font-mono font-semibold text-foreground">{value}</span>
     </div>
