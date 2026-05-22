@@ -44,11 +44,10 @@ jobs:
 
   merge:
     needs: build
-    runs-on: linux-amd64
+    # 跑在 arm64: 该 runner 的 base image 是 docker.gitea.com/runner-images, 自带 docker+buildx+git, 不用 apt
+    # (amd64 runner-base 是裸 ubuntu:22.04, 没有 buildx, docker-buildx-plugin 也不在 jammy 默认 apt repo)
+    runs-on: linux-arm64
     steps:
-      - name: Install dependencies
-        run: apt-get update && apt-get install -y docker.io docker-buildx-plugin
-
       - name: Merge multi-arch manifest + tag latest
         run: |
           TAG="${GITHUB_SHA::8}"
@@ -62,7 +61,6 @@ jobs:
 
       - name: Update k3s-manifests
         run: |
-          apt-get install -y git
           TAG="${GITHUB_SHA::8}"
           IMAGE="gitea.tangchaolizi.com/kindong/teampulse-web:${TAG}"
           cd /tmp && rm -rf k3s-manifests
