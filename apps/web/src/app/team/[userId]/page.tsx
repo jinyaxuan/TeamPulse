@@ -73,7 +73,7 @@ export default async function TeamMemberPage({
           }
         />
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="tp-reveal-list grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="实时任务" value={detail.member.active_task_count} detail="15 分钟内有心跳" tone="online" />
           <MetricCard label="7 天任务" value={detail.member.task_count} detail={`${detail.member.done_count} 个已完成`} tone="agent" />
           <MetricCard label="Agent" value={detail.member.active_device_count} detail={`共 ${detail.member.total_device_count} 个设备记录`} tone="agent" />
@@ -90,7 +90,7 @@ export default async function TeamMemberPage({
               {detail.projects.length === 0 ? (
                 <EmptyPanel>还没有参与项目。</EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {detail.projects.map((project) => (
                     <Link
                       key={project.id}
@@ -127,7 +127,7 @@ export default async function TeamMemberPage({
               {detail.devices.length === 0 ? (
                 <EmptyPanel>还没有绑定 Agent。</EmptyPanel>
               ) : (
-                <div className="space-y-3">
+                <div className="tp-reveal-list space-y-3">
                   {detail.devices.map((device) => (
                     <div key={device.id} className="rounded-[22px] bg-white p-4 shadow-[0_14px_34px_-30px_rgba(0,0,0,0.34)]">
                       <div className="flex items-start justify-between gap-3">
@@ -190,7 +190,7 @@ export default async function TeamMemberPage({
               {detail.recentMessages.length === 0 ? (
                 <EmptyPanel>暂无相关 Agent 消息。</EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {detail.recentMessages.map((message) => (
                     <Link
                       key={message.id}
@@ -227,7 +227,7 @@ function TaskList({ tasks, empty }: { tasks: TeamMemberTask[]; empty: string }) 
   if (tasks.length === 0) return <EmptyPanel>{empty}</EmptyPanel>;
 
   return (
-    <div className="space-y-2">
+    <div className="tp-reveal-list space-y-2">
       {tasks.map((task) => (
         <Link
           key={task.id}

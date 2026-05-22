@@ -84,7 +84,7 @@ export default async function AdminUsersPage() {
         }
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="tp-reveal-list grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="可用账号" value={activeUsers} detail={`共 ${enriched.length} 个账号`} tone="online" />
         <MetricCard label="管理员" value={adminUsers} detail="拥有后台权限" tone="agent" />
         <MetricCard label="邀请码" value={usableInvites} detail={`${inviteRows.length} 条历史记录`} tone="warning" />

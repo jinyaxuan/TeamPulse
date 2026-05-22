@@ -136,7 +136,7 @@ export default async function Home() {
           attentionLabel={attentionLabel}
         />
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="tp-reveal-list grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="在线成员" value={activePeople} detail="15 分钟内仍有任务心跳" tone="online" />
           <MetricCard label="活跃任务" value={activeTasks.length} detail={`${myActive.length} 个属于当前账号`} tone="agent" />
           <MetricCard label="冲突预警" value={overlaps.length} detail={highRiskCount > 0 ? `${highRiskCount} 个高风险文件重叠` : "当前没有高风险"} tone={overlaps.length > 0 ? "risk" : "online"} />
@@ -153,7 +153,7 @@ export default async function Home() {
               {overlaps.length === 0 ? (
                 <EmptyPanel>当前没有检测到活跃任务冲突。保持 Agent 心跳和文件触达上报即可。</EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {overlaps.slice(0, 5).map((overlap) => (
                     <Link
                       key={overlap.key}
@@ -199,7 +199,7 @@ export default async function Home() {
                 <EmptyPanel>当前没有实时任务。在 Codex 或 Claude Code 中启动任务后会自动出现。</EmptyPanel>
               ) : (
                 <>
-                  <div className="space-y-2 lg:hidden">
+                  <div className="tp-reveal-list space-y-2 lg:hidden">
                     {activeTasks.slice(0, 10).map((task) => (
                       <Link
                         key={task.id}
@@ -264,7 +264,7 @@ export default async function Home() {
               {activeProjects.length === 0 ? (
                 <EmptyPanel>暂无活跃项目。</EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {activeProjects.slice(0, 6).map((project) => (
                     <Link
                       key={project.id}
@@ -294,7 +294,7 @@ export default async function Home() {
                   你当前没有进行中的任务。
                 </EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {myActive.map((task) => (
                     <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]">
                       <div className="line-clamp-2 text-sm font-medium">{task.intent}</div>
@@ -329,7 +329,7 @@ export default async function Home() {
           {teamRecent.length === 0 ? (
             <EmptyPanel>暂时没有团队动态。成员可以先到“我的接入”绑定自己的 Agent。</EmptyPanel>
           ) : (
-            <ul className="divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
+            <ul className="tp-reveal-list divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
               {teamRecent.map((task) => (
                 <li key={task.id} className="grid gap-2 px-3 py-3 text-sm transition hover:bg-surface md:grid-cols-[minmax(0,1fr)_220px_120px] md:items-center">
                   <div className="min-w-0">

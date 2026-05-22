@@ -161,7 +161,7 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
         />
       </label>
 
-      <div className="mt-3 max-h-[72vh] space-y-2 overflow-y-auto pr-1">
+      <div key={normalizedQuery} className="tp-reveal-list mt-3 max-h-[72vh] space-y-2 overflow-y-auto pr-1">
         {inviteCodes.length === 0 ? (
           <EmptyPanel>还没有邀请码。</EmptyPanel>
         ) : filteredInvites.length === 0 ? (

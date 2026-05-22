@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { User } from "@/db";
 import { cn, roleLabel } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
+import { RouteTransition } from "./route-transition";
 
 export function AppShell({
   user,
@@ -107,7 +108,9 @@ export function AppShell({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:py-8">{children}</main>
+      <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:py-8">
+        <RouteTransition>{children}</RouteTransition>
+      </main>
     </div>
   );
 }

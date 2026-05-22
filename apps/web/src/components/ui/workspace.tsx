@@ -8,7 +8,7 @@ export function Workspace({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn("tp-reveal-stack space-y-6", className)}>
       {children}
     </div>
   );

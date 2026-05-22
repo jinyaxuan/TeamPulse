@@ -94,7 +94,7 @@ export function UsersTable({ users }: { users: UserRow[] }) {
           className="tp-input w-full"
         />
       </label>
-      <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1">
+      <div key={normalizedQuery} className="tp-reveal-list max-h-[72vh] space-y-3 overflow-y-auto pr-1">
         {users.length === 0 ? (
           <EmptyPanel>还没有成员账号。</EmptyPanel>
         ) : filteredUsers.length === 0 ? (

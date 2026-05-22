@@ -112,7 +112,7 @@ export function DevicesClient({
       )}
 
       <Panel title={`待认领 (${pending.length})`} description="新安装的 Agent 会先停在这里，确认身份后绑定成员。">
-        <div className="space-y-3">
+        <div className="tp-reveal-list space-y-3">
           {pending.length === 0 && (
             <EmptyPanel>暂无待认领设备。成员安装或运行 Agent 接入命令后，会自动出现在这里。</EmptyPanel>
           )}
@@ -148,7 +148,7 @@ export function DevicesClient({
             className="tp-input w-full"
           />
         </label>
-        <div className="max-h-[72vh] space-y-3 overflow-y-auto pr-1">
+        <div key={normalizedActiveQuery} className="tp-reveal-list max-h-[72vh] space-y-3 overflow-y-auto pr-1">
           {active.length === 0 ? (
             <EmptyPanel>暂无已启用设备。</EmptyPanel>
           ) : filteredActive.length === 0 ? (

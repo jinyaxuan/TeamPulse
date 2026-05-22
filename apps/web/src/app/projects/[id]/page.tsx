@@ -244,7 +244,7 @@ export default async function ProjectPage({
           }
         />
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="tp-reveal-list grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="当前进行中" value={active.length} detail={isFiltered ? `筛选后 ${filteredActive.length} 个` : "实时心跳任务"} tone="online" />
           <MetricCard label="冲突预警" value={activeOverlaps.length} detail={`${highRiskCount} 个高风险`} tone={activeOverlaps.length > 0 ? "risk" : "online"} />
           <MetricCard label="活跃分支" value={allActiveBranchGroups.length} detail={branchFilter ? branchFilterLabel(branchFilter) : "全部分支"} tone="agent" />
@@ -260,7 +260,7 @@ export default async function ProjectPage({
               {activeOverlaps.length === 0 ? (
                 <EmptyPanel>当前没有检测到冲突。继续保持任务心跳和文件触达上报。</EmptyPanel>
               ) : (
-                <div className="space-y-3">
+                <div className="tp-reveal-list space-y-3">
                   {sortedActiveOverlaps.map(({ overlap, resolution }) => (
                     <OverlapAlert
                       key={overlap.key}
@@ -287,7 +287,7 @@ export default async function ProjectPage({
             >
               {active.length === 0 && <EmptyPanel>当前没有成员在这个项目上工作。</EmptyPanel>}
               {active.length > 0 && filteredActive.length === 0 && <EmptyPanel>当前筛选的分支没有进行中的任务。</EmptyPanel>}
-              <div className="space-y-3">
+              <div key={branchFilter ?? "all"} className="tp-reveal-list space-y-3">
                 {displayedActiveBranchGroups.map((group) => (
                   <div key={group.key} className="overflow-hidden rounded-[22px] bg-white">
                     <div className="flex items-center justify-between gap-3 border-b border-black/5 bg-surface px-4 py-3">
@@ -305,7 +305,7 @@ export default async function ProjectPage({
                         <StatusBadge>{group.tasks.length} 任务</StatusBadge>
                       </div>
                     </div>
-                    <div className="divide-y divide-black/5">
+                    <div className="tp-reveal-list divide-y divide-black/5">
                       {group.tasks.map((task) => (
                         <div key={task.id} className="grid gap-3 p-4 text-sm lg:grid-cols-[minmax(0,1fr)_160px_160px] lg:items-start">
                           <div className="min-w-0">
@@ -346,7 +346,7 @@ export default async function ProjectPage({
               {fileHotspots.length === 0 ? (
                 <EmptyPanel>暂无文件触达数据。</EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {fileHotspots.slice(0, 8).map((hotspot) => (
                     <div key={hotspot.path} className="rounded-[20px] bg-white p-4">
                       <div className="flex items-start justify-between gap-3">
@@ -386,7 +386,7 @@ export default async function ProjectPage({
           {recent.length === 0 ? (
             <EmptyPanel>最近 7 天没有历史记录。</EmptyPanel>
           ) : (
-            <ul className="divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
+            <ul className="tp-reveal-list divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
               {recent.map((task) => (
                 <li key={task.id} className="grid gap-3 px-4 py-3 text-sm transition hover:bg-surface md:grid-cols-[96px_minmax(0,1fr)_150px] md:items-start">
                   <div className="text-xs text-muted-foreground">{formatRelativeTime(task.started_at)}</div>

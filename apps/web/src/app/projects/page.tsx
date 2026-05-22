@@ -45,7 +45,7 @@ export default async function ProjectsPage() {
           {rows.length === 0 ? (
             <EmptyPanel>还没有项目。安装 Claude Code 或 Codex 插件后，在 Git 仓库中启动会话即可自动注册。</EmptyPanel>
           ) : (
-            <div className="grid gap-3">
+            <div className="tp-reveal-list grid gap-3">
               {rows.map((p) => (
                 <Link key={p.id} href={`/projects/${p.id}`} className="tp-list-card block p-4 sm:p-5">
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_150px] lg:items-center">

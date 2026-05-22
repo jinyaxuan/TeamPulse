@@ -189,7 +189,7 @@ export default async function TeamPage({
           }
         />
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="tp-reveal-list grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="团队成员" value={memberStats.length} detail={`${activeMembers} 人正在活跃`} tone="agent" />
           <MetricCard label="实时任务" value={activeTasks.length} detail="15 分钟内有心跳" tone="online" />
           <MetricCard label="活跃 Agent" value={activeAgents} detail="已绑定并可上报任务" tone="agent" />
@@ -203,7 +203,7 @@ export default async function TeamPage({
                 <EmptyPanel>还没有团队成员。</EmptyPanel>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="tp-reveal-list space-y-3">
                 {memberStats.map((member) => {
                   const latest = latestByUser.get(member.id);
                   const activeNow = activeCountByUser.get(member.id) ?? 0;
@@ -273,7 +273,7 @@ export default async function TeamPage({
               {activeTasks.length === 0 ? (
                 <EmptyPanel>当前没有实时任务。</EmptyPanel>
               ) : (
-                <div className="space-y-2">
+                <div className="tp-reveal-list space-y-2">
                   {activeTasks.slice(0, 8).map((task) => (
                     <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]">
                       <div className="flex items-start justify-between gap-3">

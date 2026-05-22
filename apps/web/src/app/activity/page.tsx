@@ -122,7 +122,7 @@ export default async function ActivityPage({
           }
         />
 
-        <section className="grid gap-3 sm:grid-cols-4">
+        <section className="tp-reveal-list grid gap-3 sm:grid-cols-4">
           <ActivityStat label="当前结果" value={rows.length} detail={`最近 ${days} 天`} tone="slate" />
           <ActivityStat label="进行中" value={activeRows} detail="仍在上报心跳" tone="green" />
           <ActivityStat label="已完成" value={doneRows} detail="正常结束的任务" tone="blue" />
@@ -139,7 +139,7 @@ export default async function ActivityPage({
           {rows.length === 0 ? (
             <EmptyPanel>没有符合筛选条件的动态。</EmptyPanel>
           ) : (
-            <div className="space-y-3">
+            <div className="tp-reveal-list space-y-3">
               {rows.map((t) => (
                 <article key={t.id} className="tp-list-card p-4">
                   <div className="grid gap-4 lg:grid-cols-[128px_minmax(0,1fr)_220px] lg:items-start">

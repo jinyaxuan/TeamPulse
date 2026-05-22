@@ -21,7 +21,7 @@ export function StatusBadge({
         className
       )}
     >
-      {dot && <span className={cn("h-1.5 w-1.5 rounded-full", dotClass(tone))} />}
+      {dot && <span className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", dotClass(tone), liveDotClass(tone))} />}
       {children}
     </span>
   );
@@ -52,10 +52,14 @@ function toneClass(tone: Tone): string {
 }
 
 function dotClass(tone: Tone): string {
-  if (tone === "online") return "bg-online";
-  if (tone === "agent") return "bg-agent";
-  if (tone === "warning") return "bg-warning";
-  if (tone === "risk") return "bg-risk";
-  if (tone === "info") return "bg-sky-500";
+  if (tone === "online") return "bg-online text-emerald-500";
+  if (tone === "agent") return "bg-agent text-blue-500";
+  if (tone === "warning") return "bg-warning text-amber-500";
+  if (tone === "risk") return "bg-risk text-red-500";
+  if (tone === "info") return "bg-sky-500 text-sky-500";
   return "bg-slate-500";
+}
+
+function liveDotClass(tone: Tone): string {
+  return tone === "online" || tone === "risk" ? "tp-live-dot" : "";
 }

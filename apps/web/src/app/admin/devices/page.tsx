@@ -82,7 +82,7 @@ export default async function DevicesPage() {
         }
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="tp-reveal-list grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="已启用 Agent" value={active.length} detail={`${recentActive} 台 24 小时内使用`} tone="online" />
         <MetricCard label="待认领" value={pending.length} detail="等待管理员绑定成员" tone="warning" />
         <MetricCard label="Codex / Claude" value={`${codexCount}/${claudeCount}`} detail="按客户端类型统计" tone="agent" />
