@@ -789,7 +789,7 @@ test("e2e: full happy path", async (t) => {
       noBody: true,
     });
     assert.equal(detail.status, 200);
-    assert.match(detail.body, /Member Console/);
+    assert.match(detail.body, /成员工作台/);
     assert.match(detail.body, /Agent 档案/);
     assert.match(detail.body, /参与项目/);
     assert.match(detail.body, /当前任务/);

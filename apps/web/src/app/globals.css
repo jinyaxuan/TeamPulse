@@ -4,27 +4,27 @@
 
 @layer base {
   :root {
-    --background: 210 24% 96%;
-    --foreground: 221 39% 12%;
-    --muted: 214 22% 92%;
-    --muted-foreground: 218 13% 43%;
-    --border: 217 19% 84%;
-    --input: 217 19% 84%;
-    --primary: 199 84% 32%;
-    --primary-foreground: 210 20% 98%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 5%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 0 0% 42%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --primary: 0 0% 4%;
+    --primary-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
-    --accent: 185 42% 89%;
-    --accent-foreground: 190 64% 20%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 0 0% 7%;
     --card: 0 0% 100%;
-    --card-foreground: 221 39% 12%;
-    --surface: 210 24% 98%;
+    --card-foreground: 0 0% 5%;
+    --surface: 42 22% 97%;
     --surface-strong: 0 0% 100%;
-    --online: 151 66% 32%;
-    --warning: 32 95% 44%;
-    --risk: 0 74% 50%;
-    --agent: 181 72% 26%;
-    --idle: 217 19% 48%;
+    --online: 156 56% 38%;
+    --warning: 38 88% 48%;
+    --risk: 355 72% 52%;
+    --agent: 211 86% 45%;
+    --idle: 0 0% 48%;
   }
 
   .dark {
@@ -52,6 +52,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: "PingFang SC", "Inter", "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
   }
 
   ::selection {
@@ -61,15 +62,16 @@
 
 @layer components {
   .tp-grid-bg {
-    background-image:
-      linear-gradient(hsl(var(--border) / 0.55) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--border) / 0.55) 1px, transparent 1px);
-    background-size: 32px 32px;
-    background-position: -1px -1px;
+    background:
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--surface)) 44%, hsl(var(--background)) 100%);
   }
 
   .tp-panel {
-    @apply border border-border bg-card text-card-foreground shadow-[0_16px_40px_-28px_rgba(15,23,42,0.45)];
+    @apply border border-black/5 bg-card text-card-foreground shadow-[0_18px_50px_-38px_rgba(0,0,0,0.28)];
+  }
+
+  .tp-marvis-stage {
+    @apply border border-black/5 bg-white shadow-[0_24px_70px_-46px_rgba(0,0,0,0.34)];
   }
 
   .tp-focus-ring {

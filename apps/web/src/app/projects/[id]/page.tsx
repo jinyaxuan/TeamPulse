@@ -215,7 +215,7 @@ export default async function ProjectPage({
     <AppShell user={user} activeNav="projects">
       <Workspace>
         <PageHeader
-          eyebrow="Project War Room"
+          eyebrow="项目协作现场"
           title={project.displayName ?? "未命名项目"}
           description={`远端哈希 ${project.gitRemoteHash.slice(0, 16)}... · 风险、分支和文件触达都在这里汇总。`}
           actions={
@@ -283,8 +283,8 @@ export default async function ProjectPage({
               {active.length > 0 && filteredActive.length === 0 && <EmptyPanel>当前筛选的分支没有进行中的任务。</EmptyPanel>}
               <div className="space-y-3">
                 {displayedActiveBranchGroups.map((group) => (
-                  <div key={group.key} className="overflow-hidden rounded-md border bg-white">
-                    <div className="flex items-center justify-between gap-3 border-b bg-surface px-3 py-2">
+                  <div key={group.key} className="overflow-hidden rounded-[22px] bg-white">
+                    <div className="flex items-center justify-between gap-3 border-b border-black/5 bg-surface px-4 py-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-sm font-medium">{group.label}</h3>
                         {group.isUnknown && <div className="text-xs text-muted-foreground">未从客户端上报到 git branch</div>}
@@ -299,9 +299,9 @@ export default async function ProjectPage({
                         <StatusBadge>{group.tasks.length} 任务</StatusBadge>
                       </div>
                     </div>
-                    <div className="divide-y">
+                    <div className="divide-y divide-black/5">
                       {group.tasks.map((task) => (
-                        <div key={task.id} className="grid gap-3 p-3 text-sm lg:grid-cols-[minmax(0,1fr)_160px_160px] lg:items-start">
+                        <div key={task.id} className="grid gap-3 p-4 text-sm lg:grid-cols-[minmax(0,1fr)_160px_160px] lg:items-start">
                           <div className="min-w-0">
                             <div className="line-clamp-2 font-medium">{task.intent}</div>
                             <div className="mt-1 text-xs text-muted-foreground">
@@ -310,7 +310,7 @@ export default async function ProjectPage({
                             {task.files_touched.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {task.files_touched.slice(0, 5).map((file) => (
-                                  <MonoPath key={file} className="rounded bg-slate-100 px-2 py-1">
+                                  <MonoPath key={file} className="rounded-full bg-surface px-2.5 py-1">
                                     {file}
                                   </MonoPath>
                                 ))}
@@ -339,12 +339,12 @@ export default async function ProjectPage({
               ) : (
                 <div className="space-y-2">
                   {fileHotspots.slice(0, 8).map((hotspot) => (
-                    <div key={hotspot.path} className="rounded-md border bg-white p-3">
+                    <div key={hotspot.path} className="rounded-[20px] bg-white p-4">
                       <div className="flex items-start justify-between gap-3">
                         <MonoPath className="flex-1 text-foreground">{hotspot.path}</MonoPath>
                         <StatusBadge tone={hotspot.count > 1 ? "warning" : "slate"}>{hotspot.count} 次</StatusBadge>
                       </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface">
                         <div className="h-full rounded-full bg-agent" style={{ width: `${Math.min(hotspot.count * 18, 100)}%` }} />
                       </div>
                     </div>
@@ -377,7 +377,7 @@ export default async function ProjectPage({
           {recent.length === 0 ? (
             <EmptyPanel>最近 7 天没有历史记录。</EmptyPanel>
           ) : (
-            <ul className="divide-y rounded-md border bg-white">
+            <ul className="divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
               {recent.map((task) => (
                 <li key={task.id} className="grid gap-3 px-4 py-3 text-sm transition hover:bg-surface md:grid-cols-[96px_minmax(0,1fr)_120px] md:items-start">
                   <div className="text-xs text-muted-foreground">{formatRelativeTime(task.started_at)}</div>
@@ -387,7 +387,7 @@ export default async function ProjectPage({
                       <span className="text-muted-foreground"> · {task.intent}</span>
                     </div>
                     {task.summary && (
-                      <div className="mt-1 line-clamp-3 rounded border bg-surface p-2 text-xs leading-5 text-muted-foreground">
+                      <div className="mt-1 line-clamp-3 rounded-[16px] bg-surface p-3 text-xs leading-5 text-muted-foreground">
                         {task.summary}
                       </div>
                     )}
@@ -411,7 +411,7 @@ function ExternalLinkButton({ href, children }: { href: string; children: ReactN
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center justify-center rounded-md border bg-white px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-surface"
+      className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-surface"
     >
       {children}
     </a>
@@ -503,7 +503,7 @@ function OverlapAlert({
   const innerBorderClass = isRisk ? "border-red-200" : "border-amber-200";
 
   return (
-    <div className={cn("rounded-md border p-3 text-sm shadow-sm", borderClass)}>
+    <div className={cn("rounded-[22px] border p-4 text-sm", borderClass)}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="font-medium">
@@ -521,7 +521,7 @@ function OverlapAlert({
         <TaskSummary name={secondName} intent={overlap.second.intent} />
       </div>
       {overlap.overlapping_files.length > 0 && (
-        <div className={cn("mt-3 flex flex-wrap gap-1 rounded border bg-white/70 p-2", innerBorderClass)}>
+        <div className={cn("mt-3 flex flex-wrap gap-1 rounded-[18px] border bg-white/70 p-2", innerBorderClass)}>
           {overlap.overlapping_files.slice(0, 6).map((file) => (
             <MonoPath key={file} className={cn("rounded bg-white px-2 py-1", isRisk ? "text-red-900" : "text-amber-900")}>
               {file}

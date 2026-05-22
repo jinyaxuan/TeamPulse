@@ -108,9 +108,10 @@ export default async function Home() {
     <AppShell user={user} activeNav="home">
       <Workspace>
         <PageHeader
-          eyebrow="Agent Command Room"
-          title="团队协作指挥台"
-          description="先看活跃 Agent、文件触达和冲突风险，再决定要认领、通知还是进入项目细节。"
+          variant="marvis"
+          eyebrow="团队 Agent 指挥台"
+          title="团队 Agent 随时在线"
+          description="谁在执行、碰了哪些文件、哪里可能撞车，一屏看清后再进入项目协调。"
           actions={
             <>
               <ActionLink href="/team" variant="primary">查看团队态势</ActionLink>
@@ -118,13 +119,21 @@ export default async function Home() {
             </>
           }
           meta={
-            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex snap-x gap-3 overflow-x-auto pb-1 text-xs text-muted-foreground sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-4">
               <CommandMeta label="当前账号" value={user.displayName ?? user.name} />
               <CommandMeta label="活跃项目" value={`${activeProjects.length} 个`} />
               <CommandMeta label="文件触达" value={`${touchedFiles} 条路径`} />
               <CommandMeta label="关注项" value={attentionLabel} />
             </div>
           }
+        />
+
+        <AgentStage
+          activeTasks={activeTasks}
+          activeProjects={activeProjects}
+          overlaps={overlaps}
+          touchedFiles={touchedFiles}
+          attentionLabel={attentionLabel}
         />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -149,7 +158,7 @@ export default async function Home() {
                     <Link
                       key={overlap.key}
                       href={`/projects/${projectIdByTask.get(overlap.first.task_id) ?? ""}`}
-                      className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                      className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]"
                     >
                       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
@@ -173,7 +182,7 @@ export default async function Home() {
                       {overlap.overlapping_files.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1">
                           {overlap.overlapping_files.slice(0, 4).map((file) => (
-                            <MonoPath key={file} className="rounded bg-slate-100 px-2 py-1">
+                            <MonoPath key={file} className="rounded-full bg-surface px-2.5 py-1">
                               {file}
                             </MonoPath>
                           ))}
@@ -195,7 +204,7 @@ export default async function Home() {
                       <Link
                         key={task.id}
                         href={`/projects/${task.project_id}`}
-                        className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                        className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]"
                       >
                         <div className="line-clamp-2 text-sm font-medium">{task.intent}</div>
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -205,13 +214,13 @@ export default async function Home() {
                         <div className="mt-2 text-xs leading-5 text-muted-foreground">
                           {task.user_display_name ?? task.user_name} · {task.project_name ?? "项目"} · {formatRelativeTime(task.heartbeat_at)}
                         </div>
-                        <MonoPath className="mt-1 rounded bg-slate-100 px-2 py-1">
+                        <MonoPath className="mt-1 rounded-full bg-surface px-2.5 py-1">
                           {task.branch || "未检测分支"}
                         </MonoPath>
                       </Link>
                     ))}
                   </div>
-                  <div className="hidden overflow-x-auto rounded-md border lg:block">
+                  <div className="hidden overflow-x-auto rounded-[22px] bg-white lg:block">
                     <table className="min-w-[760px] w-full text-sm">
                     <thead className="bg-surface text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       <tr>
@@ -221,7 +230,7 @@ export default async function Home() {
                         <th className="px-3 py-2">文件</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y bg-white">
+                    <tbody className="divide-y divide-black/5 bg-white">
                       {activeTasks.slice(0, 10).map((task) => (
                         <tr key={task.id} className="hover:bg-surface">
                           <td className="min-w-0 px-3 py-3">
@@ -260,7 +269,7 @@ export default async function Home() {
                     <Link
                       key={project.id}
                       href={`/projects/${project.id}`}
-                      className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                      className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
@@ -287,7 +296,7 @@ export default async function Home() {
               ) : (
                 <div className="space-y-2">
                   {myActive.map((task) => (
-                    <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-md border bg-white p-3 hover:bg-surface">
+                    <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]">
                       <div className="line-clamp-2 text-sm font-medium">{task.intent}</div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <StatusBadge tone="online" dot>进行中</StatusBadge>
@@ -320,7 +329,7 @@ export default async function Home() {
           {teamRecent.length === 0 ? (
             <EmptyPanel>暂时没有团队动态。成员可以先到“我的接入”绑定自己的 Agent。</EmptyPanel>
           ) : (
-            <ul className="divide-y rounded-md border bg-white">
+            <ul className="divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
               {teamRecent.map((task) => (
                 <li key={task.id} className="grid gap-2 px-3 py-3 text-sm transition hover:bg-surface md:grid-cols-[minmax(0,1fr)_220px_120px] md:items-center">
                   <div className="min-w-0">
@@ -350,10 +359,150 @@ export default async function Home() {
 
 function CommandMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-white/70 px-3 py-2">
+    <div className="flex min-w-[180px] snap-start items-center justify-between gap-3 rounded-full border border-black/10 bg-white/70 px-3 py-2 sm:min-w-0">
       <span>{label}</span>
       <span className="font-medium text-foreground">{value}</span>
     </div>
+  );
+}
+
+function AgentStage({
+  activeTasks,
+  activeProjects,
+  overlaps,
+  touchedFiles,
+  attentionLabel,
+}: {
+  activeTasks: Array<{
+    id: string;
+    intent: string;
+    client: string;
+    branch: string | null;
+    files_touched: string[];
+    user_name: string;
+    user_display_name: string | null;
+  }>;
+  activeProjects: Array<{ id: string; name: string; count: number; files: number; people: Set<string> }>;
+  overlaps: Array<{ key: string; severity: "none" | "medium" | "high"; overlapping_files: string[] }>;
+  touchedFiles: number;
+  attentionLabel: string;
+}) {
+  const leadTask = activeTasks[0];
+  const leadProject = activeProjects[0];
+  const workstations = [
+    {
+      label: "当前任务",
+      value: activeTasks.length > 0 ? `${activeTasks.length} 个任务` : "待接入",
+      tone: activeTasks.length > 0 ? "online" : "slate",
+    },
+    {
+      label: "项目热区",
+      value: leadProject ? leadProject.name : "暂无热区",
+      tone: "agent",
+    },
+    {
+      label: "风险观察",
+      value: overlaps.length > 0 ? `${overlaps.length} 个预警` : "无冲突",
+      tone: overlaps.length > 0 ? "risk" : "online",
+    },
+    {
+      label: "文件触达",
+      value: `${touchedFiles} 条路径`,
+      tone: "slate",
+    },
+    {
+      label: "协作成员",
+      value: leadTask ? leadTask.user_display_name ?? leadTask.user_name : "等待心跳",
+      tone: "agent",
+    },
+    {
+      label: "同步状态",
+      value: "持续观察",
+      tone: "online",
+    },
+  ] as const;
+
+  return (
+    <section className="tp-marvis-stage overflow-hidden rounded-[32px]">
+      <div className="px-5 py-7 text-center sm:px-8 sm:py-8">
+        <div className="mx-auto w-fit rounded-full bg-black px-5 py-2 text-sm font-medium text-white shadow-[0_18px_34px_-24px_rgba(0,0,0,0.9)]">
+          TeamPulse 协作舞台
+        </div>
+        <h2 className="mx-auto mt-4 max-w-3xl text-3xl font-semibold text-foreground sm:text-4xl">
+          把团队 Agent 排成一张可接管的行动图
+        </h2>
+        <p className="mx-auto mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
+          像 Marvis 管电脑任务一样，TeamPulse 管团队 Agent：当前任务、文件触达、项目热区和冲突风险都在一个轻量舞台里。
+        </p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <StatusBadge tone={overlaps.length > 0 ? "risk" : "online"} dot>
+            {attentionLabel}
+          </StatusBadge>
+          <StatusBadge tone="agent">{touchedFiles} 条文件触达</StatusBadge>
+          <StatusBadge>{activeProjects.length} 个项目热区</StatusBadge>
+        </div>
+
+        <div className="mx-auto mt-6 max-w-5xl rounded-[28px] bg-[#f5f5f2] p-3 sm:p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {workstations.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[24px] bg-white/88 p-3 text-left shadow-[0_16px_38px_-32px_rgba(0,0,0,0.45)] sm:p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                  <StatusBadge tone={item.tone} dot={item.tone === "online" || item.tone === "risk"}>
+                    {item.tone === "risk" ? "需看" : item.tone === "online" ? "在线" : "状态"}
+                  </StatusBadge>
+                </div>
+                <div className="mt-2 truncate text-sm text-muted-foreground">{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+            <div className="rounded-[24px] bg-white p-3 text-left shadow-[0_18px_46px_-34px_rgba(0,0,0,0.4)] sm:p-4">
+              <div className="text-xs font-semibold text-muted-foreground">当前任务</div>
+              {leadTask ? (
+                <>
+                  <div className="mt-3 line-clamp-2 text-sm font-semibold">{leadTask.intent}</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <StatusBadge tone="agent">{clientLabel(leadTask.client)}</StatusBadge>
+                    <StatusBadge>{leadTask.branch || "未检测分支"}</StatusBadge>
+                  </div>
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    {leadTask.user_display_name ?? leadTask.user_name} · {leadTask.files_touched.length} 条路径
+                  </div>
+                </>
+              ) : (
+                <div className="mt-3 text-sm leading-6 text-muted-foreground">当前没有实时任务，等待 Agent 接入。</div>
+              )}
+            </div>
+
+            <div className="rounded-[24px] bg-white p-3 text-left shadow-[0_18px_46px_-34px_rgba(0,0,0,0.4)] sm:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold text-muted-foreground">风险与文件</div>
+                <StatusBadge tone={overlaps.some((item) => item.severity === "high") ? "risk" : "online"}>
+                  {overlaps.length > 0 ? "需协调" : "清爽"}
+                </StatusBadge>
+              </div>
+              <div className="mt-4 space-y-2">
+                {(overlaps.length > 0 ? overlaps.slice(0, 3) : [{ key: "clear", severity: "none" as const, overlapping_files: [] }]).map((item) => (
+                  <div key={item.key} className="flex items-center justify-between rounded-full bg-surface px-3 py-2 text-xs">
+                    <span className="font-medium">
+                      {item.severity === "high" ? "高风险冲突" : item.severity === "medium" ? "待确认重叠" : "没有文件冲突"}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {item.overlapping_files.length} 条路径
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -50,7 +50,7 @@ export default async function TeamMemberPage({
     <AppShell user={sessionUser} activeNav="team">
       <Workspace>
         <PageHeader
-          eyebrow="Member Console"
+          eyebrow="成员工作台"
           title={memberName}
           description={`@${detail.member.name}${detail.member.email ? ` · ${detail.member.email}` : ""} · 加入 ${formatRelativeTime(detail.member.created_at)}`}
           actions={
@@ -94,7 +94,7 @@ export default async function TeamMemberPage({
                     <Link
                       key={project.id}
                       href={`/projects/${project.id}`}
-                      className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                      className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -128,7 +128,7 @@ export default async function TeamMemberPage({
               ) : (
                 <div className="space-y-3">
                   {detail.devices.map((device) => (
-                    <div key={device.id} className="rounded-md border bg-white p-3">
+                    <div key={device.id} className="rounded-[22px] bg-white p-4 shadow-[0_14px_34px_-30px_rgba(0,0,0,0.34)]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{agentDisplayName(device)}</div>
@@ -147,7 +147,7 @@ export default async function TeamMemberPage({
                         <div>最近使用 {device.last_used_at ? formatRelativeTime(device.last_used_at) : "暂无"}</div>
                       </div>
                       {device.agent_role && (
-                        <div className="mt-3 rounded-md bg-surface px-2 py-1 text-xs leading-5 text-muted-foreground">
+                        <div className="mt-3 rounded-[16px] bg-surface px-3 py-2 text-xs leading-5 text-muted-foreground">
                           {device.agent_role}
                         </div>
                       )}
@@ -160,7 +160,7 @@ export default async function TeamMemberPage({
                           ))}
                         </div>
                       )}
-                      <div className="mt-3 border-t pt-3">
+                      <div className="mt-3 border-t border-black/5 pt-3">
                         {canAdmin && device.status === "active" && (
                           <div className="mb-3">
                             <RevokeDeviceButton deviceId={device.id} />
@@ -194,7 +194,7 @@ export default async function TeamMemberPage({
                     <Link
                       key={message.id}
                       href={`/projects/${message.project_id}`}
-                      className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                      className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]"
                     >
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">
@@ -231,7 +231,7 @@ function TaskList({ tasks, empty }: { tasks: TeamMemberTask[]; empty: string }) 
         <Link
           key={task.id}
           href={`/projects/${task.project_id}`}
-          className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+          className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -253,14 +253,14 @@ function TaskList({ tasks, empty }: { tasks: TeamMemberTask[]; empty: string }) 
           {task.files_touched.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {task.files_touched.slice(0, 4).map((file) => (
-                <MonoPath key={file} className="rounded bg-slate-100 px-2 py-1">
+                <MonoPath key={file} className="rounded-full bg-surface px-2.5 py-1">
                   {file}
                 </MonoPath>
               ))}
             </div>
           )}
           {task.summary && (
-            <div className="mt-2 line-clamp-2 rounded-md bg-surface px-2 py-1 text-xs leading-5 text-muted-foreground">
+            <div className="mt-2 line-clamp-2 rounded-[16px] bg-surface px-3 py-2 text-xs leading-5 text-muted-foreground">
               {task.summary}
             </div>
           )}

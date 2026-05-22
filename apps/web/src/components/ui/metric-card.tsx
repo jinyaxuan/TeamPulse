@@ -18,13 +18,13 @@ export function MetricCard({
   className?: string;
 }) {
   return (
-    <div className={cn("tp-panel overflow-hidden rounded-lg", className)}>
-      <div className={cn("h-1", toneBarClass(tone))} />
-      <div className="p-4">
-        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+    <div className={cn("tp-panel overflow-hidden rounded-[24px] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_-44px_rgba(0,0,0,0.38)]", className)}>
+      <div className="p-5">
+        <div className={cn("mb-4 h-1.5 w-10 rounded-full", toneBarClass(tone))} />
+        <div className="text-xs font-semibold text-muted-foreground">
           {label}
         </div>
-        <div className="mt-2 font-mono text-3xl font-semibold tracking-tight text-foreground">
+        <div className="mt-2 font-mono text-3xl font-semibold text-foreground sm:text-4xl">
           {value}
         </div>
         {detail && <div className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</div>}

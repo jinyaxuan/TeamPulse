@@ -169,7 +169,8 @@ export default async function TeamPage({
     <AppShell user={sessionUser} activeNav="team">
       <Workspace>
         <PageHeader
-          eyebrow="Team Roster"
+          variant="marvis"
+          eyebrow="团队 Agent 名册"
           title="团队与 Agent"
           description="按成员查看 Agent、任务心跳和文件触达，先识别谁在工作，再决定是否进入项目协调。"
           actions={
@@ -179,7 +180,7 @@ export default async function TeamPage({
             </>
           }
           meta={
-            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex snap-x gap-3 overflow-x-auto pb-1 text-xs text-muted-foreground sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-4">
               <CommandMeta label="成员" value={`${memberStats.length} 人`} />
               <CommandMeta label="活跃成员" value={`${activeMembers} 人`} />
               <CommandMeta label="活跃 Agent" value={`${activeAgents} 个`} />
@@ -196,13 +197,13 @@ export default async function TeamPage({
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <Panel title="成员作战序列" description="实时活跃优先，其次按最近心跳排序。" bodyClassName="p-0">
+          <Panel title="成员作战序列" description="实时活跃优先，其次按最近心跳排序。" bodyClassName="p-3 sm:p-4">
             {memberStats.length === 0 ? (
               <div className="p-4">
                 <EmptyPanel>还没有团队成员。</EmptyPanel>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="space-y-3">
                 {memberStats.map((member) => {
                   const latest = latestByUser.get(member.id);
                   const activeNow = activeCountByUser.get(member.id) ?? 0;
@@ -210,10 +211,10 @@ export default async function TeamPage({
                   const touchedFiles = fileCountByUser.get(member.id) ?? 0;
                   const name = member.display_name ?? member.name;
                   return (
-                    <Link key={member.id} href={`/team/${member.id}`} className="block px-4 py-4 transition hover:bg-surface">
+                    <Link key={member.id} href={`/team/${member.id}`} className="block rounded-[22px] bg-white px-4 py-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]">
                       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_160px_160px_minmax(0,1fr)] lg:items-center">
                         <div className="flex min-w-0 items-start gap-3">
-                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-foreground text-sm font-semibold text-background">
+                          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">
                             {name.slice(0, 1).toUpperCase()}
                           </div>
                           <div className="min-w-0">
@@ -274,7 +275,7 @@ export default async function TeamPage({
               ) : (
                 <div className="space-y-2">
                   {activeTasks.slice(0, 8).map((task) => (
-                    <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-md border bg-white p-3 transition hover:bg-surface">
+                    <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_18px_42px_-34px_rgba(0,0,0,0.32)]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -283,7 +284,7 @@ export default async function TeamPage({
                           </div>
                           <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{task.intent}</p>
                         </div>
-                        <StatusBadge tone="online" dot>Live</StatusBadge>
+                        <StatusBadge tone="online" dot>进行中</StatusBadge>
                       </div>
                       <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                         <div>{task.project_name ?? "项目"} · 心跳 {formatRelativeTime(task.heartbeat_at)}</div>
@@ -306,7 +307,7 @@ export default async function TeamPage({
 
 function CommandMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-white/70 px-3 py-2">
+    <div className="flex min-w-[180px] snap-start items-center justify-between gap-3 rounded-full border border-black/10 bg-white/70 px-3 py-2 sm:min-w-0">
       <span>{label}</span>
       <span className="font-medium text-foreground">{value}</span>
     </div>

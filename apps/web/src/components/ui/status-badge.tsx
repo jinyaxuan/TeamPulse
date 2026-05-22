@@ -16,7 +16,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex w-fit flex-shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+        "inline-flex w-fit flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
         toneClass(tone),
         className
       )}
@@ -42,13 +42,13 @@ export function RiskBadge({
 }
 
 function toneClass(tone: Tone): string {
-  if (tone === "online") return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200";
-  if (tone === "agent") return "bg-teal-50 text-teal-800 ring-1 ring-teal-200";
-  if (tone === "warning") return "bg-amber-50 text-amber-800 ring-1 ring-amber-200";
-  if (tone === "risk") return "bg-red-50 text-red-800 ring-1 ring-red-200";
-  if (tone === "info") return "bg-sky-50 text-sky-800 ring-1 ring-sky-200";
+  if (tone === "online") return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100";
+  if (tone === "agent") return "bg-black/[0.04] text-slate-900 ring-1 ring-black/[0.05]";
+  if (tone === "warning") return "bg-amber-50/80 text-amber-800 ring-1 ring-amber-100";
+  if (tone === "risk") return "bg-red-50 text-red-800 ring-1 ring-red-100";
+  if (tone === "info") return "bg-black/[0.04] text-slate-800 ring-1 ring-black/[0.05]";
   if (tone === "dark") return "bg-slate-900 text-white";
-  return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
+  return "bg-black/[0.04] text-slate-700 ring-1 ring-black/[0.04]";
 }
 
 function dotClass(tone: Tone): string {
