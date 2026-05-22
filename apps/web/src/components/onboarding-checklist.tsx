@@ -48,27 +48,27 @@ export function OnboardingChecklist({
   if (allDone) return null;
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 p-5">
-      <div className="flex items-center justify-between">
+    <div className="tp-panel rounded-lg bg-white/90 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-blue-900">
-            {"欢迎使用 TeamPulse！"}
+          <h3 className="text-sm font-semibold text-foreground">
+            {"接入进度"}
           </h3>
-          <p className="mt-0.5 text-xs text-blue-700">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {"完成以下步骤开始团队协作 — " + completedCount + "/" + steps.length + " 已完成"}
           </p>
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-200 text-xs font-bold text-blue-800">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
           {completedCount}/{steps.length}
         </div>
       </div>
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 grid gap-2 lg:grid-cols-3">
         {steps.map((step) => (
           <Link
             key={step.key}
             href={step.href}
             className={
-              "flex items-center gap-3 rounded-md border bg-white px-4 py-3 text-sm transition hover:bg-slate-50 " +
+              "flex items-center gap-3 rounded-md border bg-white px-3 py-2.5 text-sm transition hover:bg-surface " +
               (step.completed ? "border-emerald-200" : "border-slate-200")
             }
           >

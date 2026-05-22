@@ -4,20 +4,27 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71.4% 4.1%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --primary: 220.9 39.3% 11%;
+    --background: 210 24% 96%;
+    --foreground: 221 39% 12%;
+    --muted: 214 22% 92%;
+    --muted-foreground: 218 13% 43%;
+    --border: 217 19% 84%;
+    --input: 217 19% 84%;
+    --primary: 199 84% 32%;
     --primary-foreground: 210 20% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
+    --accent: 185 42% 89%;
+    --accent-foreground: 190 64% 20%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: 221 39% 12%;
+    --surface: 210 24% 98%;
+    --surface-strong: 0 0% 100%;
+    --online: 151 66% 32%;
+    --warning: 32 95% 44%;
+    --risk: 0 74% 50%;
+    --agent: 181 72% 26%;
+    --idle: 217 19% 48%;
   }
 
   .dark {
@@ -43,10 +50,29 @@
     @apply border-border;
   }
   body {
-    @apply bg-slate-50 text-foreground antialiased;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
   ::selection {
-    @apply bg-slate-900 text-white;
+    @apply bg-primary text-primary-foreground;
+  }
+}
+
+@layer components {
+  .tp-grid-bg {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.55) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.55) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+
+  .tp-panel {
+    @apply border border-border bg-card text-card-foreground shadow-[0_16px_40px_-28px_rgba(15,23,42,0.45)];
+  }
+
+  .tp-focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-primary;
   }
 }

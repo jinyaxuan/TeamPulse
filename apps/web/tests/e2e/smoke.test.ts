@@ -773,7 +773,9 @@ test("e2e: full happy path", async (t) => {
     assert.equal(team.status, 200);
     assert.match(team.body, new RegExp(`/team/[^"]+`));
     assert.match(team.body, new RegExp(devUserName));
-    assert.match(team.body, /查看成员详情/);
+    assert.match(team.body, /团队与 Agent/);
+    assert.match(team.body, /成员作战序列/);
+    assert.match(team.body, /实时任务/);
 
     const active = await http(`/api/v1/tasks/active?project=${projectId}`, {
       headers: { Authorization: `Bearer ${devToken}` },
@@ -787,10 +789,10 @@ test("e2e: full happy path", async (t) => {
       noBody: true,
     });
     assert.equal(detail.status, 200);
-    assert.match(detail.body, /成员详情/);
-    assert.match(detail.body, /Agent/);
+    assert.match(detail.body, /Member Console/);
+    assert.match(detail.body, /Agent 档案/);
     assert.match(detail.body, /参与项目/);
-    assert.match(detail.body, /进行中任务/);
+    assert.match(detail.body, /当前任务/);
     assert.match(detail.body, new RegExp(devUserName));
     assert.match(detail.body, /E2E Codex Builder/);
     assert.match(detail.body, /Owns implementation and verification/);

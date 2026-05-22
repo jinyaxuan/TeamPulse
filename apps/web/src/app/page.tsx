@@ -1,50 +1,64 @@
 import { and, count, desc, eq, gt, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { db, devices, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
+import { ActionLink } from "@/components/ui/action-link";
+import { MetricCard } from "@/components/ui/metric-card";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { PageHeader } from "@/components/ui/page-header";
+import { RiskBadge, StatusBadge } from "@/components/ui/status-badge";
+import { MonoPath, Workspace } from "@/components/ui/workspace";
+import { db, devices, projects, tasks, users } from "@/db";
 import { getSessionUser } from "@/lib/auth";
 import { visibleTasksCondition } from "@/lib/project-access";
-import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
-import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { getInstancePlan } from "@/lib/subscription";
-import { OnboardingChecklist } from "@/components/onboarding-checklist";
+import { findActiveTaskOverlaps } from "@/lib/task-overlap";
+import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
+import { clientLabel, formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const user = await getSessionUser();
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const taskVisibility = visibleTasksCondition(user);
 
-  const myActive = await db
+  const activeTasks = await db
     .select({
       id: tasks.id,
+      task_id: tasks.id,
       project_id: tasks.projectId,
       project_name: projects.displayName,
       intent: tasks.intent,
-      started_at: tasks.startedAt,
+      client: tasks.client,
       branch: tasks.branch,
+      files_touched: tasks.filesTouched,
+      started_at: tasks.startedAt,
+      heartbeat_at: tasks.heartbeatAt,
+      user_id: users.id,
+      user_name: users.name,
+      user_display_name: users.displayName,
     })
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .innerJoin(users, eq(tasks.userId, users.id))
     .where(
       and(
-        eq(tasks.userId, user.id),
         eq(tasks.status, "active"),
         gt(tasks.heartbeatAt, activeCutoff),
         nonTestProjectCondition(),
+        nonTestUserCondition(),
         ...(taskVisibility ? [taskVisibility] : [])
       )
     )
     .orderBy(desc(tasks.heartbeatAt))
-    .limit(10);
+    .limit(40);
 
+  const myActive = activeTasks.filter((task) => task.user_id === user.id);
   const teamRecent = await db
     .select({
       id: tasks.id,
@@ -52,6 +66,7 @@ export default async function Home() {
       project_name: projects.displayName,
       intent: tasks.intent,
       status: tasks.status,
+      branch: tasks.branch,
       started_at: tasks.startedAt,
       user_name: users.name,
       user_display_name: users.displayName,
@@ -70,246 +85,281 @@ export default async function Home() {
     .orderBy(desc(tasks.startedAt))
     .limit(20);
 
-  const activeTeamTasks = teamRecent.filter((t) => t.status === "active").length;
-  const completedRecent = teamRecent.filter((t) => t.status === "done").length;
-  const uniquePeople = new Set(teamRecent.map((t) => t.user_name)).size;
-  const uniqueProjects = new Set(teamRecent.map((t) => t.project_id)).size;
-
-  // Plan usage stats
   const plan = await getInstancePlan();
   const [{ memberCount }] = await db.select({ memberCount: count() }).from(users).where(isNull(users.revokedAt));
   const [{ projectCount }] = await db.select({ projectCount: count() }).from(projects);
   const [{ deviceCount }] = await db.select({ deviceCount: count() }).from(devices).where(eq(devices.status, "active"));
-
-  // Onboarding: check if user has any device and any task
-  const [{ userDeviceCount }] = await db.select({ userDeviceCount: count() }).from(devices).where(and(eq(devices.userId, user.id), eq(devices.status, "active")));
+  const [{ userDeviceCount }] = await db
+    .select({ userDeviceCount: count() })
+    .from(devices)
+    .where(and(eq(devices.userId, user.id), eq(devices.status, "active")));
   const [{ userTaskCount }] = await db.select({ userTaskCount: count() }).from(tasks).where(eq(tasks.userId, user.id));
+
+  const activePeople = new Set(activeTasks.map((task) => task.user_id)).size;
+  const activeProjects = groupProjectHotspots(activeTasks);
+  const projectIdByTask = new Map(activeTasks.map((task) => [task.id, task.project_id]));
+  const touchedFiles = activeTasks.reduce((sum, task) => sum + task.files_touched.length, 0);
+  const overlaps = findActiveTaskOverlaps(activeTasks);
+  const highRiskCount = overlaps.filter((overlap) => overlap.severity === "high").length;
+  const completedRecent = teamRecent.filter((task) => task.status === "done").length;
+  const attentionLabel = highRiskCount > 0 ? `${highRiskCount} 个高风险` : overlaps.length > 0 ? `${overlaps.length} 个待确认` : "无冲突";
 
   return (
     <AppShell user={user} activeNav="home">
-      <div className="space-y-10">
+      <Workspace>
+        <PageHeader
+          eyebrow="Agent Command Room"
+          title="团队协作指挥台"
+          description="先看活跃 Agent、文件触达和冲突风险，再决定要认领、通知还是进入项目细节。"
+          actions={
+            <>
+              <ActionLink href="/team" variant="primary">查看团队态势</ActionLink>
+              <ActionLink href="/settings/connect">接入 Agent</ActionLink>
+            </>
+          }
+          meta={
+            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+              <CommandMeta label="当前账号" value={user.displayName ?? user.name} />
+              <CommandMeta label="活跃项目" value={`${activeProjects.length} 个`} />
+              <CommandMeta label="文件触达" value={`${touchedFiles} 条路径`} />
+              <CommandMeta label="关注项" value={attentionLabel} />
+            </div>
+          }
+        />
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="在线成员" value={activePeople} detail="15 分钟内仍有任务心跳" tone="online" />
+          <MetricCard label="活跃任务" value={activeTasks.length} detail={`${myActive.length} 个属于当前账号`} tone="agent" />
+          <MetricCard label="冲突预警" value={overlaps.length} detail={highRiskCount > 0 ? `${highRiskCount} 个高风险文件重叠` : "当前没有高风险"} tone={overlaps.length > 0 ? "risk" : "online"} />
+          <MetricCard label="24h 动态" value={teamRecent.length} detail={`${completedRecent} 个已完成`} tone="warning" />
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="space-y-6">
+            <Panel
+              title="冲突预警"
+              description="同文件、同分支或跨分支同路径会进入这里。"
+              actions={<ActionLink href="/projects">进入项目</ActionLink>}
+            >
+              {overlaps.length === 0 ? (
+                <EmptyPanel>当前没有检测到活跃任务冲突。保持 Agent 心跳和文件触达上报即可。</EmptyPanel>
+              ) : (
+                <div className="space-y-2">
+                  {overlaps.slice(0, 5).map((overlap) => (
+                    <Link
+                      key={overlap.key}
+                      href={`/projects/${projectIdByTask.get(overlap.first.task_id) ?? ""}`}
+                      className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                    >
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <RiskBadge severity={overlap.severity}>
+                              {overlap.severity === "high" ? "高风险" : "待确认"}
+                            </RiskBadge>
+                            <span className="text-sm font-medium">
+                              {displayName(overlap.first)} / {displayName(overlap.second)}
+                            </span>
+                          </div>
+                          <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                            {overlap.first.intent} 与 {overlap.second.intent}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground md:text-right">
+                          <div>{overlapReasonText(overlap.reasons)}</div>
+                          <div className="mt-1">{overlap.overlapping_files.length} 条重叠路径</div>
+                        </div>
+                      </div>
+                      {overlap.overlapping_files.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {overlap.overlapping_files.slice(0, 4).map((file) => (
+                            <MonoPath key={file} className="rounded bg-slate-100 px-2 py-1">
+                              {file}
+                            </MonoPath>
+                          ))}
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="活跃任务矩阵" description="按心跳排序，优先显示正在改动的工作。">
+              {activeTasks.length === 0 ? (
+                <EmptyPanel>当前没有实时任务。在 Codex 或 Claude Code 中启动任务后会自动出现。</EmptyPanel>
+              ) : (
+                <>
+                  <div className="space-y-2 lg:hidden">
+                    {activeTasks.slice(0, 10).map((task) => (
+                      <Link
+                        key={task.id}
+                        href={`/projects/${task.project_id}`}
+                        className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                      >
+                        <div className="line-clamp-2 text-sm font-medium">{task.intent}</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <StatusBadge tone="agent">{clientLabel(task.client)}</StatusBadge>
+                          <StatusBadge>{task.files_touched.length > 0 ? `${task.files_touched.length} 路径` : "未上报文件"}</StatusBadge>
+                        </div>
+                        <div className="mt-2 text-xs leading-5 text-muted-foreground">
+                          {task.user_display_name ?? task.user_name} · {task.project_name ?? "项目"} · {formatRelativeTime(task.heartbeat_at)}
+                        </div>
+                        <MonoPath className="mt-1 rounded bg-slate-100 px-2 py-1">
+                          {task.branch || "未检测分支"}
+                        </MonoPath>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto rounded-md border lg:block">
+                    <table className="min-w-[760px] w-full text-sm">
+                    <thead className="bg-surface text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2">任务</th>
+                        <th className="px-3 py-2">成员 / Agent</th>
+                        <th className="px-3 py-2">分支</th>
+                        <th className="px-3 py-2">文件</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y bg-white">
+                      {activeTasks.slice(0, 10).map((task) => (
+                        <tr key={task.id} className="hover:bg-surface">
+                          <td className="min-w-0 px-3 py-3">
+                            <div className="line-clamp-2 font-medium">{task.intent}</div>
+                            <Link href={`/projects/${task.project_id}`} className="mt-1 block truncate text-xs text-muted-foreground hover:text-foreground hover:underline">
+                              {task.project_name ?? "项目"} · {formatRelativeTime(task.heartbeat_at)}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="font-medium">{task.user_display_name ?? task.user_name}</div>
+                            <StatusBadge tone="agent">{clientLabel(task.client)}</StatusBadge>
+                          </td>
+                          <td className="px-3 py-3">
+                            <MonoPath>{task.branch || "未检测"}</MonoPath>
+                          </td>
+                          <td className="px-3 py-3 text-xs text-muted-foreground">
+                            {task.files_touched.length > 0 ? `${task.files_touched.length} 条路径` : "未上报"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </Panel>
+          </div>
+
+          <aside className="space-y-6">
+            <Panel title="项目热区" description="当前活跃任务最多的仓库。">
+              {activeProjects.length === 0 ? (
+                <EmptyPanel>暂无活跃项目。</EmptyPanel>
+              ) : (
+                <div className="space-y-2">
+                  {activeProjects.slice(0, 6).map((project) => (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      className="block rounded-md border bg-white p-3 transition hover:border-slate-300 hover:bg-surface"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{project.name}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {project.people.size} 位成员 · {project.files} 条文件触达
+                          </div>
+                        </div>
+                        <StatusBadge tone={project.count > 1 ? "warning" : "online"}>
+                          {project.count} 任务
+                        </StatusBadge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="我的任务" description="当前账号正在运行的 Agent 工作。">
+              {myActive.length === 0 ? (
+                <EmptyPanel action={<ActionLink href="/help">查看启动方式</ActionLink>}>
+                  你当前没有进行中的任务。
+                </EmptyPanel>
+              ) : (
+                <div className="space-y-2">
+                  {myActive.map((task) => (
+                    <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-md border bg-white p-3 hover:bg-surface">
+                      <div className="line-clamp-2 text-sm font-medium">{task.intent}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <StatusBadge tone="online" dot>进行中</StatusBadge>
+                        <StatusBadge>{task.branch || "未检测分支"}</StatusBadge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="系统容量" description={`${plan.name} · 协作资源用量`}>
+              <div className="space-y-3">
+                <UsageBar label="成员" current={memberCount} limit={plan.maxMembers} />
+                <UsageBar label="项目" current={projectCount} limit={plan.maxProjects} />
+                <UsageBar label="活跃 Agent" current={deviceCount} limit={plan.maxDevicesPerUser * memberCount} />
+                <ActionLink href="/settings/billing" className="w-full">管理套餐</ActionLink>
+              </div>
+            </Panel>
+          </aside>
+        </section>
+
         <OnboardingChecklist user={user} hasDevice={userDeviceCount > 0} hasTask={userTaskCount > 0} />
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <div className="text-xs font-medium uppercase text-muted-foreground">工作台</div>
-                <h1 className="mt-2 text-3xl font-semibold tracking-normal">今天团队在做什么</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  聚合你的当前任务、团队最近动态和项目入口，适合每天打开先扫一眼。
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/team"
-                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
-                >
-                  查看团队视图
-                </Link>
-                <Link
-                  href="/activity"
-                  className="rounded-md border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
-                >
-                  筛选动态
-                </Link>
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            <DashboardMetric label="我的进行中任务" value={myActive.length} detail="来自当前登录账号" tone="blue" />
-            <DashboardMetric label="团队活跃任务" value={activeTeamTasks} detail="最近 24 小时内" tone="green" />
-            <DashboardMetric label="参与项目" value={uniqueProjects} detail={`${uniquePeople} 位成员有动态`} tone="amber" />
-          </div>
-        </section>
-
-        {/* Plan usage */}
-        <section className="rounded-lg border bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-medium uppercase text-muted-foreground">
-              {"套餐用量"}
-              <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-blue-800 normal-case">
-                {plan.name}
-              </span>
-            </div>
-            <Link href="/settings/billing" className="text-xs text-primary hover:underline">
-              {"管理套餐"}
-            </Link>
-          </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <UsageBar label={"成员"} current={memberCount} limit={plan.maxMembers} />
-            <UsageBar label={"项目"} current={projectCount} limit={plan.maxProjects} />
-            <UsageBar label={"活跃设备"} current={deviceCount} limit={plan.maxDevicesPerUser * memberCount} />
-          </div>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div>
-            <SectionTitle title={`我的进行中任务 (${myActive.length})`} description="心跳在 15 分钟内的任务会显示在这里。" />
-            <div className="mt-3 space-y-2">
-              {myActive.length === 0 && (
-                <div className="rounded-lg border border-dashed bg-white p-6 text-sm leading-6 text-muted-foreground">
-                  当前没有进行中的任务。在 Claude Code 或 Codex 里开始一次任务后会自动出现在这里。
-                </div>
-              )}
-              {myActive.map((t) => (
-                <div key={t.id} className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{t.intent}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        <Link
-                          href={`/projects/${t.project_id}`}
-                          className="hover:text-foreground hover:underline"
-                        >
-                          {t.project_name ?? "未命名项目"}
-                        </Link>
-                        {" · "}
-                        {formatRelativeTime(t.started_at)}
-                        {t.branch && ` · 分支：${t.branch}`}
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-                      进行中
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <SectionTitle title="快速入口" description="常用的协作面板和管理入口。" />
-            <div className="mt-3 grid gap-2">
-              <QuickLink href="/projects" label="项目" title="项目列表" description="按仓库查看活跃任务和历史。" />
-              <QuickLink href="/activity" label="动态" title="团队动态" description="筛选、审计和导出任务记录。" />
-              <QuickLink href="/settings/connect" label="接入" title="我的接入" description="按当前账号绑定 Codex、Claude Code 或通用 Agent。" />
-              <QuickLink href="/settings/devices" label="设备" title="我的设备" description="查看并撤销个人插件设备。" />
-              {user.role === "admin" && (
-                <QuickLink href="/admin/devices" label="设备" title="设备管理" description="查看待认领设备，必要时由管理员代为绑定。" />
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <SectionTitle title="团队动态 · 最近 24 小时" description="最近启动的任务按时间倒序排列。" />
-            <div className="flex gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">进行中 {activeTeamTasks}</span>
-              <span className="rounded-full bg-slate-100 px-2 py-1">已完成 {completedRecent}</span>
-            </div>
-          </div>
-          <div className="mt-3 overflow-hidden rounded-lg border bg-white shadow-sm">
-            {teamRecent.length === 0 && (
-              <div className="p-4 text-sm text-muted-foreground">
-                暂时没有团队动态。成员可以先到“我的接入”绑定自己的 Agent 设备。
-              </div>
-            )}
-            <ul className="divide-y">
-              {teamRecent.map((t) => (
-                <li key={t.id} className="grid gap-2 px-4 py-3 text-sm transition hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center">
+        <Panel
+          title="团队动态"
+          description="最近 24 小时启动的任务，作为审计线索保留。"
+          actions={<ActionLink href="/activity">筛选动态</ActionLink>}
+        >
+          {teamRecent.length === 0 ? (
+            <EmptyPanel>暂时没有团队动态。成员可以先到“我的接入”绑定自己的 Agent。</EmptyPanel>
+          ) : (
+            <ul className="divide-y rounded-md border bg-white">
+              {teamRecent.map((task) => (
+                <li key={task.id} className="grid gap-2 px-3 py-3 text-sm transition hover:bg-surface md:grid-cols-[minmax(0,1fr)_220px_120px] md:items-center">
                   <div className="min-w-0">
                     <div className="truncate">
-                      <span className="font-medium">{t.user_display_name ?? t.user_name}</span>
-                      <span className="text-muted-foreground"> — {t.intent}</span>
+                      <span className="font-medium">{task.user_display_name ?? task.user_name}</span>
+                      <span className="text-muted-foreground"> · {task.intent}</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {t.status === "active" ? "正在上报心跳" : `启动于 ${formatRelativeTime(t.started_at)}`}
+                      {task.branch ? `分支 ${task.branch}` : "未检测到分支"} · {formatRelativeTime(task.started_at)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground sm:justify-end">
-                    <Link
-                      href={`/projects/${t.project_id}`}
-                      className="truncate hover:text-foreground hover:underline"
-                    >
-                      {t.project_name ?? ""}
-                    </Link>
-                    <span
-                      className={
-                        "rounded-full px-2 py-0.5 " +
-                        (t.status === "active"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : t.status === "done"
-                            ? "bg-slate-100 text-slate-700"
-                            : "bg-amber-100 text-amber-800")
-                      }
-                    >
-                      {t.status === "active" ? taskStatusLabel(t.status) : formatRelativeTime(t.started_at)}
-                    </span>
-                  </div>
+                  <Link href={`/projects/${task.project_id}`} className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline">
+                    {task.project_name ?? "项目"}
+                  </Link>
+                  <StatusBadge tone={task.status === "active" ? "online" : task.status === "done" ? "slate" : "warning"}>
+                    {taskStatusLabel(task.status)}
+                  </StatusBadge>
                 </li>
               ))}
             </ul>
-          </div>
-        </section>
-      </div>
+          )}
+        </Panel>
+      </Workspace>
     </AppShell>
   );
 }
 
-function DashboardMetric({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  tone: "blue" | "green" | "amber";
-}) {
-  const toneClass =
-    tone === "blue"
-      ? "border-t-blue-500"
-      : tone === "green"
-        ? "border-t-emerald-500"
-        : "border-t-amber-500";
-
+function CommandMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-lg border border-t-4 bg-white p-4 shadow-sm ${toneClass}`}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+    <div className="flex items-center justify-between gap-3 rounded-md border bg-white/70 px-3 py-2">
+      <span>{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
-  );
-}
-
-function SectionTitle({ title, description }: { title: string; description: string }) {
-  return (
-    <div>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function QuickLink({
-  href,
-  label,
-  title,
-  description,
-}: {
-  href: string;
-  label: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link href={href} className="group rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
-      <div className="flex items-center justify-between gap-3">
-        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{label}</span>
-        <span className="text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground">→</span>
-      </div>
-      <div className="mt-3 text-sm font-medium">{title}</div>
-      <div className="mt-1 text-xs leading-5 text-muted-foreground">{description}</div>
-    </Link>
   );
 }
 
 function UsageBar({ label, current, limit }: { label: string; current: number; limit: number }) {
   const isUnlimited = limit >= 999999;
-  const pct = isUnlimited ? 0 : Math.min((current / limit) * 100, 100);
+  const pct = isUnlimited ? 0 : Math.min((current / Math.max(limit, 1)) * 100, 100);
   const isWarning = !isUnlimited && pct >= 80;
   const isFull = !isUnlimited && pct >= 100;
 
@@ -317,23 +367,55 @@ function UsageBar({ label, current, limit }: { label: string; current: number; l
     <div>
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className={isFull ? "font-medium text-red-600" : isWarning ? "text-amber-600" : "text-muted-foreground"}>
+        <span className={isFull ? "font-medium text-risk" : isWarning ? "text-warning" : "text-muted-foreground"}>
           {current} / {isUnlimited ? "\u221e" : limit}
         </span>
       </div>
       {!isUnlimited && (
         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
           <div
-            className={`h-full rounded-full transition-all ${isFull ? "bg-red-500" : isWarning ? "bg-amber-400" : "bg-blue-400"}`}
+            className={`h-full rounded-full transition-all ${isFull ? "bg-risk" : isWarning ? "bg-warning" : "bg-primary"}`}
             style={{ width: `${pct}%` }}
           />
         </div>
       )}
-      {isFull && (
-        <Link href="/settings/billing" className="mt-1 block text-xs text-red-600 hover:underline">
-          {"已达上限，升级套餐"}
-        </Link>
-      )}
     </div>
   );
+}
+
+function groupProjectHotspots(
+  rows: Array<{
+    project_id: string;
+    project_name: string | null;
+    user_id: string;
+    files_touched: string[];
+  }>
+) {
+  const map = new Map<string, { id: string; name: string; count: number; files: number; people: Set<string> }>();
+  for (const row of rows) {
+    const current = map.get(row.project_id) ?? {
+      id: row.project_id,
+      name: row.project_name ?? "未命名项目",
+      count: 0,
+      files: 0,
+      people: new Set<string>(),
+    };
+    current.count += 1;
+    current.files += row.files_touched.length;
+    current.people.add(row.user_id);
+    map.set(row.project_id, current);
+  }
+  return Array.from(map.values()).sort((a, b) => b.count - a.count || b.files - a.files);
+}
+
+function displayName(task: { user_display_name: string | null; user_name: string }) {
+  return task.user_display_name ?? task.user_name;
+}
+
+function overlapReasonText(reasons: string[]) {
+  const labels = [];
+  if (reasons.includes("files")) labels.push("同文件");
+  if (reasons.includes("branch")) labels.push("同分支");
+  if (reasons.includes("merge_risk")) labels.push("跨分支同路径");
+  return labels.join(" / ") || "待确认";
 }

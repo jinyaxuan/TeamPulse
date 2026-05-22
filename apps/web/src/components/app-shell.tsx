@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { User } from "@/db";
-import { roleLabel } from "@/lib/utils";
+import { cn, roleLabel } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
 
 export function AppShell({
@@ -15,30 +15,35 @@ export function AppShell({
   const navItem = (href: string, label: string, key: string) => (
     <Link
       href={href}
-      className={
-        "rounded-md px-3 py-1.5 text-sm transition-colors " +
-        (activeNav === key
-          ? "bg-slate-900 text-white shadow-sm"
-          : "text-muted-foreground hover:bg-slate-100 hover:text-foreground")
-      }
+      className={cn(
+        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        activeNav === key
+          ? "bg-primary text-primary-foreground shadow-sm"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
     >
       {label}
     </Link>
   );
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
-          <div className="flex min-w-0 items-center gap-6">
-            <Link href="/" className="flex flex-shrink-0 items-center gap-2 text-sm font-semibold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-xs text-white">
+    <div className="tp-grid-bg min-h-screen">
+      <header className="sticky top-0 z-20 border-b bg-surface-strong/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-1 sm:flex-row sm:items-center">
+            <Link href="/" className="flex flex-shrink-0 items-center gap-2 text-sm font-semibold tracking-tight">
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-xs text-background shadow-sm">
                 TP
               </span>
-              <span>TeamPulse</span>
+              <span className="leading-none">
+                TeamPulse
+                <span className="block text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Agent Ops
+                </span>
+              </span>
             </Link>
-            <nav className="flex items-center gap-1 overflow-x-auto">
-              {navItem("/", "工作台", "home")}
+            <nav className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1 sm:flex-1 sm:pb-0">
+              {navItem("/", "指挥台", "home")}
               {navItem("/projects", "项目", "projects")}
               {navItem("/activity", "动态", "activity")}
               {navItem("/team", "团队", "team")}
@@ -46,39 +51,39 @@ export function AppShell({
                 <>
                   <Link
                     href="/admin/users"
-                    className="ml-3 rounded-md border bg-white px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:text-foreground"
+                    className="ml-3 rounded-md border bg-white px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm hover:text-foreground"
                   >
                     用户管理
                   </Link>
                   <Link
                     href="/admin/devices"
-                    className="rounded-md border bg-white px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:text-foreground"
+                    className="rounded-md border bg-white px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm hover:text-foreground"
                   >
-                    设备管理
+                    Agent 管理
                   </Link>
                 </>
               )}
             </nav>
           </div>
-          <div className="ml-auto flex flex-shrink-0 items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground sm:ml-auto">
             <Link
               href="/help"
-              className="rounded-md px-2 py-1 hover:bg-slate-100 hover:text-foreground"
+              className="rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground"
             >
               帮助
             </Link>
             <Link
               href="/settings/profile"
-              className="max-w-40 truncate whitespace-nowrap rounded-md px-2 py-1 hover:bg-slate-100 hover:text-foreground"
+              className="max-w-40 truncate whitespace-nowrap rounded-md px-2 py-1.5 hover:bg-accent hover:text-foreground"
             >
               {user.displayName ?? user.name}
             </Link>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5">{roleLabel(user.role)}</span>
+            <span className="rounded-full bg-accent px-2 py-0.5 text-accent-foreground">{roleLabel(user.role)}</span>
             <LogoutButton />
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:py-8">{children}</main>
     </div>
   );
 }

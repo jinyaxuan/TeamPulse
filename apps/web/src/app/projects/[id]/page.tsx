@@ -5,6 +5,12 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { db, projectMembers, projectMessages, taskOverlapResolutions, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
+import { ActionLink } from "@/components/ui/action-link";
+import { MetricCard } from "@/components/ui/metric-card";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { PageHeader } from "@/components/ui/page-header";
+import { RiskBadge, StatusBadge } from "@/components/ui/status-badge";
+import { MonoPath, Workspace } from "@/components/ui/workspace";
 import { getSessionUser } from "@/lib/auth";
 import { gitRemoteLinks } from "@/lib/git-remote";
 import {
@@ -16,7 +22,7 @@ import {
   visibleUsersCondition,
 } from "@/lib/project-access";
 import { findActiveTaskOverlaps, taskOverlapKey, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
-import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
+import { cn, formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { OverlapActionControls, type OverlapResolutionRow } from "./overlap-action-controls";
 import { ProjectMessagesPanel, type ProjectMessageRow } from "./project-messages-panel";
 import { ProjectMembersPanel, type ProjectMemberRow } from "./project-members-panel";
@@ -183,8 +189,6 @@ export default async function ProjectPage({
       : [];
   const activeResolutionByKey = new Map(activeOverlapResolutions.map((resolution) => [resolution.key, resolution]));
   const canResolveOverlaps = canWriteMessages;
-  const mergeRiskOverlaps = activeOverlaps.filter((overlap) => overlap.reasons.includes("merge_risk"));
-  const coordinationOverlaps = activeOverlaps.filter((overlap) => !overlap.reasons.includes("merge_risk"));
   const branchFilter = normalizeBranchFilter(query.branch);
   const filteredActive = filterActiveByBranch(active, branchFilter);
   const allActiveBranchGroups = groupActiveByBranch(active);
@@ -192,214 +196,211 @@ export default async function ProjectPage({
   const activeBranchOptions = getActiveBranchOptions(active, branchFilter);
   const isFiltered = branchFilter !== null;
   const remoteLinks = gitRemoteLinks(project.gitRemoteUrl);
+  const fileHotspots = groupFileHotspots(active);
+  const highRiskCount = activeOverlaps.filter((overlap) => overlap.severity === "high").length;
+  const riskLevel = highRiskCount > 0 ? "high" : activeOverlaps.length > 0 ? "medium" : "none";
+  const touchedFileCount = active.reduce((sum, task) => sum + task.files_touched.length, 0);
+  const sortedActiveOverlaps = activeOverlaps
+    .map((overlap) => ({
+      overlap,
+      resolution: activeResolutionByKey.get(overlap.key),
+    }))
+    .sort((a, b) => {
+      const rankDelta = overlapSortRank(b.overlap, b.resolution) - overlapSortRank(a.overlap, a.resolution);
+      if (rankDelta !== 0) return rankDelta;
+      return a.overlap.key.localeCompare(b.overlap.key);
+    });
 
   return (
     <AppShell user={user} activeNav="projects">
-      <div className="space-y-6">
-        <div className="rounded-lg border bg-card p-5">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">项目详情</div>
-          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold">{project.displayName ?? "未命名项目"}</h1>
-              <div className="mt-1 font-mono text-xs text-muted-foreground">
-                远端哈希：{project.gitRemoteHash.slice(0, 16)}…
-              </div>
-              {remoteLinks && (
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <ExternalLinkButton href={remoteLinks.repository_url}>仓库</ExternalLinkButton>
-                  <ExternalLinkButton href={remoteLinks.pulls_url}>PR</ExternalLinkButton>
-                </div>
-              )}
+      <Workspace>
+        <PageHeader
+          eyebrow="Project War Room"
+          title={project.displayName ?? "未命名项目"}
+          description={`远端哈希 ${project.gitRemoteHash.slice(0, 16)}... · 风险、分支和文件触达都在这里汇总。`}
+          actions={
+            <>
+              {remoteLinks && <ExternalLinkButton href={remoteLinks.repository_url}>仓库</ExternalLinkButton>}
+              {remoteLinks && <ExternalLinkButton href={remoteLinks.pulls_url}>PR</ExternalLinkButton>}
+              <ActionLink href="/projects">返回项目</ActionLink>
+            </>
+          }
+          meta={
+            <div className="flex flex-wrap gap-2">
+              <RiskBadge severity={riskLevel}>
+                {riskLevel === "high" ? "高风险" : riskLevel === "medium" ? "待协调" : "正常"}
+              </RiskBadge>
+              <StatusBadge tone="online">{active.length} 个进行中</StatusBadge>
+              <StatusBadge tone="agent">{allActiveBranchGroups.length} 个活跃分支</StatusBadge>
+              <StatusBadge>{members.length} 位成员</StatusBadge>
+              <StatusBadge>{touchedFileCount} 条文件触达</StatusBadge>
             </div>
-            <div className="flex gap-2 text-xs">
-              <span className="rounded-md border bg-background px-3 py-2">
-                当前进行中 <strong className="ml-1 text-foreground">{active.length}</strong>
-              </span>
-              <span className="rounded-md border bg-background px-3 py-2">
-                活跃分支 <strong className="ml-1 text-foreground">{allActiveBranchGroups.length}</strong>
-              </span>
-              <span className="rounded-md border bg-background px-3 py-2">
-                7 天记录 <strong className="ml-1 text-foreground">{recent.length}</strong>
-              </span>
-              <span className="rounded-md border bg-background px-3 py-2">
-                项目成员 <strong className="ml-1 text-foreground">{members.length}</strong>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <ProjectMembersPanel
-          projectId={project.id}
-          members={members as ProjectMemberRow[]}
-          canManage={canManageMembers}
-          currentUserId={user.id}
+          }
         />
 
-        <ProjectMessagesPanel
-          projectId={project.id}
-          messages={recentMessages.reverse() as ProjectMessageRow[]}
-          members={members as ProjectMemberRow[]}
-          canSend={canWriteMessages}
-        />
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="当前进行中" value={active.length} detail={isFiltered ? `筛选后 ${filteredActive.length} 个` : "实时心跳任务"} tone="online" />
+          <MetricCard label="冲突预警" value={activeOverlaps.length} detail={`${highRiskCount} 个高风险`} tone={activeOverlaps.length > 0 ? "risk" : "online"} />
+          <MetricCard label="活跃分支" value={allActiveBranchGroups.length} detail={branchFilter ? branchFilterLabel(branchFilter) : "全部分支"} tone="agent" />
+          <MetricCard label="7 天记录" value={recent.length} detail={`${members.length} 位项目成员`} tone="warning" />
+        </section>
 
-        <section>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                当前进行中 ({isFiltered ? `${filteredActive.length}/${active.length}` : active.length})
-              </h2>
-              {isFiltered && (
-                <div className="mt-1 text-xs text-muted-foreground">
-                  当前筛选：{branchFilterLabel(branchFilter)}
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="space-y-6">
+            <Panel
+              title={`冲突与协调 (${activeOverlaps.length})`}
+              description="同文件、同分支或跨分支同路径会进入风险队列。"
+            >
+              {activeOverlaps.length === 0 ? (
+                <EmptyPanel>当前没有检测到冲突。继续保持任务心跳和文件触达上报。</EmptyPanel>
+              ) : (
+                <div className="space-y-3">
+                  {sortedActiveOverlaps.map(({ overlap, resolution }) => (
+                    <OverlapAlert
+                      key={overlap.key}
+                      projectId={project.id}
+                      overlap={overlap}
+                      resolution={resolution}
+                      canResolve={canResolveOverlaps}
+                    />
+                  ))}
                 </div>
               )}
-            </div>
-            <BranchFilter
-              projectId={project.id}
-              currentBranch={branchFilter}
-              branchOptions={activeBranchOptions}
-            />
-          </div>
-          <div className="mt-3 space-y-3">
-            {active.length === 0 && (
-              <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-                当前没有成员在这个项目上工作。
-              </div>
-            )}
-            {active.length > 0 && filteredActive.length === 0 && (
-              <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-                当前筛选的分支没有进行中的任务。
-              </div>
-            )}
-            {displayedActiveBranchGroups.map((group) => (
-              <div key={group.key} className="overflow-hidden rounded-md border bg-card">
-                <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-3 py-2">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-medium">{group.label}</h3>
-                    {group.isUnknown && (
-                      <div className="text-xs text-muted-foreground">未从客户端上报到 git branch</div>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {!group.isUnknown && remoteLinks && (
-                      <>
-                        <ExternalTextLink href={remoteLinks.branch_url(group.key)}>分支</ExternalTextLink>
-                        {isCompareableBranch(group.key) && (
-                          <ExternalTextLink href={remoteLinks.compare_url(group.key)}>比较</ExternalTextLink>
-                        )}
-                      </>
-                    )}
-                    <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
-                      {group.tasks.length} 个任务
-                    </span>
-                  </div>
-                </div>
-                <div className="divide-y">
-                  {group.tasks.map((t) => (
-                    <div key={t.id} className="p-3">
-                      <div className="text-sm font-medium">{t.intent}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {t.user_display_name ?? t.user_name}
-                        {" · "}
-                        {formatRelativeTime(t.started_at)}
+            </Panel>
+
+            <Panel
+              title={`活跃任务矩阵 (${isFiltered ? `${filteredActive.length}/${active.length}` : active.length})`}
+              description="按分支组织当前仍在运行的 Agent 工作。"
+              actions={
+                <BranchFilter
+                  projectId={project.id}
+                  currentBranch={branchFilter}
+                  branchOptions={activeBranchOptions}
+                />
+              }
+            >
+              {active.length === 0 && <EmptyPanel>当前没有成员在这个项目上工作。</EmptyPanel>}
+              {active.length > 0 && filteredActive.length === 0 && <EmptyPanel>当前筛选的分支没有进行中的任务。</EmptyPanel>}
+              <div className="space-y-3">
+                {displayedActiveBranchGroups.map((group) => (
+                  <div key={group.key} className="overflow-hidden rounded-md border bg-white">
+                    <div className="flex items-center justify-between gap-3 border-b bg-surface px-3 py-2">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-medium">{group.label}</h3>
+                        {group.isUnknown && <div className="text-xs text-muted-foreground">未从客户端上报到 git branch</div>}
                       </div>
-                      {t.files_touched.length > 0 && (
-                        <div className="mt-1 font-mono text-xs text-muted-foreground">
-                          {t.files_touched.slice(0, 5).join(", ")}
-                          {t.files_touched.length > 5 && `（另有 ${t.files_touched.length - 5} 个文件）`}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!group.isUnknown && remoteLinks && (
+                          <>
+                            <ExternalTextLink href={remoteLinks.branch_url(group.key)}>分支</ExternalTextLink>
+                            {isCompareableBranch(group.key) && <ExternalTextLink href={remoteLinks.compare_url(group.key)}>比较</ExternalTextLink>}
+                          </>
+                        )}
+                        <StatusBadge>{group.tasks.length} 任务</StatusBadge>
+                      </div>
+                    </div>
+                    <div className="divide-y">
+                      {group.tasks.map((task) => (
+                        <div key={task.id} className="grid gap-3 p-3 text-sm lg:grid-cols-[minmax(0,1fr)_160px_160px] lg:items-start">
+                          <div className="min-w-0">
+                            <div className="line-clamp-2 font-medium">{task.intent}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {task.user_display_name ?? task.user_name} · 心跳 {formatRelativeTime(task.heartbeat_at)}
+                            </div>
+                            {task.files_touched.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {task.files_touched.slice(0, 5).map((file) => (
+                                  <MonoPath key={file} className="rounded bg-slate-100 px-2 py-1">
+                                    {file}
+                                  </MonoPath>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <StatusBadge tone="online" dot>进行中</StatusBadge>
+                          <div className="text-xs text-muted-foreground">
+                            开始 {formatRelativeTime(task.started_at)}
+                            <br />
+                            {task.files_touched.length} 条路径
+                          </div>
                         </div>
-                      )}
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </div>
+
+          <aside className="space-y-6">
+            <Panel title="文件风险热区" description="活跃任务触达最多的路径。">
+              {fileHotspots.length === 0 ? (
+                <EmptyPanel>暂无文件触达数据。</EmptyPanel>
+              ) : (
+                <div className="space-y-2">
+                  {fileHotspots.slice(0, 8).map((hotspot) => (
+                    <div key={hotspot.path} className="rounded-md border bg-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <MonoPath className="flex-1 text-foreground">{hotspot.path}</MonoPath>
+                        <StatusBadge tone={hotspot.count > 1 ? "warning" : "slate"}>{hotspot.count} 次</StatusBadge>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-agent" style={{ width: `${Math.min(hotspot.count * 18, 100)}%` }} />
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
-          </div>
+              )}
+            </Panel>
+
+            <ProjectLiveUpdates projectId={project.id} />
+          </aside>
         </section>
 
-        {coordinationOverlaps.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">
-              高风险与同分支重叠 ({coordinationOverlaps.length})
-            </h2>
-            <div className="mt-3 space-y-2">
-              {coordinationOverlaps.map((overlap) => (
-                <OverlapAlert
-                  key={overlap.key}
-                  projectId={project.id}
-                  overlap={overlap}
-                  resolution={activeResolutionByKey.get(overlap.key)}
-                  canResolve={canResolveOverlaps}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        <section className="grid gap-6 xl:grid-cols-2">
+          <ProjectMembersPanel
+            projectId={project.id}
+            members={members as ProjectMemberRow[]}
+            canManage={canManageMembers}
+            currentUserId={user.id}
+          />
 
-        {mergeRiskOverlaps.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700">
-              合并风险队列 ({mergeRiskOverlaps.length})
-            </h2>
-            <div className="mt-3 space-y-2">
-              {mergeRiskOverlaps.map((overlap) => (
-                <OverlapAlert
-                  key={overlap.key}
-                  projectId={project.id}
-                  overlap={overlap}
-                  resolution={activeResolutionByKey.get(overlap.key)}
-                  canResolve={canResolveOverlaps}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+          <ProjectMessagesPanel
+            projectId={project.id}
+            messages={recentMessages.reverse() as ProjectMessageRow[]}
+            members={members as ProjectMemberRow[]}
+            canSend={canWriteMessages}
+          />
+        </section>
 
-        <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            最近动态 · 7 天
-          </h2>
-          <div className="mt-3 overflow-hidden rounded-md border bg-card">
-            {recent.length === 0 && (
-              <div className="p-4 text-sm text-muted-foreground">最近 7 天没有历史记录。</div>
-            )}
-            <ul className="divide-y">
-              {recent.map((t) => (
-                <li key={t.id} className="grid grid-cols-[auto_1fr_auto] gap-3 px-4 py-3 text-sm">
-                  <div className="w-24 flex-shrink-0 text-xs text-muted-foreground">
-                    {formatRelativeTime(t.started_at)}
-                  </div>
+        <Panel title="最近动态 · 7 天" description="作为项目审计线索保留。">
+          {recent.length === 0 ? (
+            <EmptyPanel>最近 7 天没有历史记录。</EmptyPanel>
+          ) : (
+            <ul className="divide-y rounded-md border bg-white">
+              {recent.map((task) => (
+                <li key={task.id} className="grid gap-3 px-4 py-3 text-sm transition hover:bg-surface md:grid-cols-[96px_minmax(0,1fr)_120px] md:items-start">
+                  <div className="text-xs text-muted-foreground">{formatRelativeTime(task.started_at)}</div>
                   <div className="min-w-0">
                     <div className="truncate">
-                      <span className="font-medium">{t.user_display_name ?? t.user_name}</span>
-                      <span className="text-muted-foreground"> — {t.intent}</span>
+                      <span className="font-medium">{task.user_display_name ?? task.user_name}</span>
+                      <span className="text-muted-foreground"> · {task.intent}</span>
                     </div>
-                    {t.summary && (
-                      <div className="mt-1 line-clamp-3 rounded border bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">
-                        {t.summary}
+                    {task.summary && (
+                      <div className="mt-1 line-clamp-3 rounded border bg-surface p-2 text-xs leading-5 text-muted-foreground">
+                        {task.summary}
                       </div>
                     )}
                   </div>
-                  <div
-                    className={
-                      "h-fit flex-shrink-0 self-start rounded-full px-2 py-0.5 text-xs " +
-                      (t.status === "active"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : t.status === "done"
-                        ? "bg-muted text-muted-foreground"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400")
-                    }
-                  >
-                    {taskStatusLabel(t.status)}
-                  </div>
+                  <StatusBadge tone={task.status === "active" ? "online" : task.status === "done" ? "slate" : "warning"}>
+                    {taskStatusLabel(task.status)}
+                  </StatusBadge>
                 </li>
               ))}
             </ul>
-          </div>
-        </section>
-
-        <ProjectLiveUpdates projectId={project.id} />
-      </div>
+          )}
+        </Panel>
+      </Workspace>
     </AppShell>
   );
 }
@@ -410,7 +411,7 @@ function ExternalLinkButton({ href, children }: { href: string; children: ReactN
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="rounded-md border bg-background px-3 py-1.5 font-medium text-muted-foreground hover:text-foreground"
+      className="inline-flex items-center justify-center rounded-md border bg-white px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-surface"
     >
       {children}
     </a>
@@ -440,39 +441,41 @@ function BranchFilter({
   branchOptions: string[];
 }) {
   return (
-    <form action={`/projects/${projectId}`} method="get" className="flex flex-wrap items-center gap-2 text-sm">
-      <label className="text-xs font-medium text-muted-foreground" htmlFor="project-branch-filter">
-        分支
-      </label>
-      <select
-        id="project-branch-filter"
-        name="branch"
-        defaultValue={currentBranch ?? ""}
-        className="rounded-md border border-input bg-background px-3 py-2"
+    <div className="flex max-w-full items-center gap-1 overflow-x-auto pb-1 text-xs">
+      <Link href={`/projects/${projectId}`} className={branchChipClass(currentBranch === null)}>
+        全部
+      </Link>
+      <Link
+        href={`/projects/${projectId}?branch=${encodeURIComponent(UNKNOWN_BRANCH_FILTER)}`}
+        className={branchChipClass(currentBranch === UNKNOWN_BRANCH_FILTER)}
       >
-        <option value="">全部分支</option>
-        <option value={UNKNOWN_BRANCH_FILTER}>未检测到分支</option>
-        {branchOptions.map((branch) => (
-          <option key={branch} value={branch}>
-            {branch}
-          </option>
-        ))}
-      </select>
-      <button
-        type="submit"
-        className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
-      >
-        应用
-      </button>
-      {currentBranch && (
+        未检测
+      </Link>
+      {branchOptions.map((branch) => (
         <Link
-          href={`/projects/${projectId}`}
-          className="px-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+          key={branch}
+          href={`/projects/${projectId}?branch=${encodeURIComponent(branch)}`}
+          className={branchChipClass(currentBranch === branch)}
+          title={branch}
         >
+          <span className="block max-w-40 truncate">{branch}</span>
+        </Link>
+      ))}
+      {currentBranch && (
+        <Link href={`/projects/${projectId}`} className="shrink-0 px-2 py-1 text-muted-foreground hover:text-foreground">
           清空
         </Link>
       )}
-    </form>
+    </div>
+  );
+}
+
+function branchChipClass(active: boolean): string {
+  return cn(
+    "inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 font-medium transition",
+    active
+      ? "border-primary bg-primary text-primary-foreground"
+      : "border-border bg-white text-muted-foreground hover:border-slate-300 hover:text-foreground"
   );
 }
 
@@ -491,36 +494,42 @@ function OverlapAlert({
   const secondName = overlap.second.user_display_name ?? overlap.second.user_name;
   const isMergeRisk = overlap.reasons.includes("merge_risk");
   const badgeLabel = overlapBadgeLabel(overlap, resolution, isMergeRisk);
-  const badgeClass = overlapBadgeClass(overlap, resolution);
+  const badgeTone = overlapBadgeTone(overlap, resolution);
+  const isRisk = badgeTone === "risk";
+  const borderClass = isRisk
+    ? "border-red-200 bg-red-50 text-red-950"
+    : "border-amber-200 bg-amber-50 text-amber-950";
+  const mutedClass = isRisk ? "text-red-800" : "text-amber-800";
+  const innerBorderClass = isRisk ? "border-red-200" : "border-amber-200";
 
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+    <div className={cn("rounded-md border p-3 text-sm shadow-sm", borderClass)}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="font-medium">
             {firstName} 和 {secondName}
             {isMergeRisk ? " 在不同分支修改了相同路径" : " 可能在处理同一块内容"}
           </div>
-          <div className="mt-1 text-xs text-amber-800">
+          <div className={cn("mt-1 text-xs", mutedClass)}>
             {overlapContextLabel(overlap)}
           </div>
         </div>
-        <span
-          className={
-            "w-fit rounded-full px-2 py-0.5 text-xs font-medium " + badgeClass
-          }
-        >
-          {badgeLabel}
-        </span>
+        <StatusBadge tone={badgeTone}>{badgeLabel}</StatusBadge>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         <TaskSummary name={firstName} intent={overlap.first.intent} />
         <TaskSummary name={secondName} intent={overlap.second.intent} />
       </div>
       {overlap.overlapping_files.length > 0 && (
-        <div className="mt-3 rounded border border-amber-200 bg-white/70 p-2 font-mono text-xs text-amber-900">
-          {overlap.overlapping_files.slice(0, 6).join(", ")}
-          {overlap.overlapping_files.length > 6 && `（另有 ${overlap.overlapping_files.length - 6} 个路径）`}
+        <div className={cn("mt-3 flex flex-wrap gap-1 rounded border bg-white/70 p-2", innerBorderClass)}>
+          {overlap.overlapping_files.slice(0, 6).map((file) => (
+            <MonoPath key={file} className={cn("rounded bg-white px-2 py-1", isRisk ? "text-red-900" : "text-amber-900")}>
+              {file}
+            </MonoPath>
+          ))}
+          {overlap.overlapping_files.length > 6 && (
+            <span className={cn("text-xs", mutedClass)}>另有 {overlap.overlapping_files.length - 6} 个路径</span>
+          )}
         </div>
       )}
       <OverlapActionControls
@@ -541,6 +550,17 @@ function TaskSummary({ name, intent }: { name: string; intent: string }) {
       <div className="mt-1 truncate text-xs text-amber-800">{intent}</div>
     </div>
   );
+}
+
+function overlapSortRank(
+  overlap: ActiveTaskOverlap,
+  resolution: OverlapResolutionRow | undefined
+): number {
+  if (resolution) return 0;
+  if (overlap.severity === "high") return 4;
+  if (overlap.reasons.includes("merge_risk")) return 3;
+  if (overlap.severity === "medium") return 2;
+  return 1;
 }
 
 function overlapReasonLabel(reasons: OverlapReason[]): string {
@@ -569,14 +589,14 @@ function overlapBadgeLabel(
   return "需确认";
 }
 
-function overlapBadgeClass(
+function overlapBadgeTone(
   overlap: ActiveTaskOverlap,
   resolution: OverlapResolutionRow | undefined
-): string {
-  if (resolution?.action === "paused") return "bg-amber-100 text-amber-800";
-  if (resolution) return "bg-green-100 text-green-800";
-  if (overlap.severity === "high") return "bg-red-100 text-red-800";
-  return "bg-amber-100 text-amber-800";
+): "online" | "warning" | "risk" {
+  if (resolution?.action === "paused") return "warning";
+  if (resolution) return "online";
+  if (overlap.severity === "high") return "risk";
+  return "warning";
 }
 
 function overlapContextLabel(overlap: ActiveTaskOverlap): string {
@@ -646,4 +666,19 @@ function groupActiveByBranch<T extends { branch: string | null }>(tasks: T[]) {
   }
 
   return Array.from(groups.values());
+}
+
+function groupFileHotspots<T extends { files_touched: string[] }>(tasks: T[]) {
+  const counts = new Map<string, number>();
+  for (const task of tasks) {
+    for (const file of task.files_touched) {
+      const path = file.trim();
+      if (!path) continue;
+      counts.set(path, (counts.get(path) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([path, count]) => ({ path, count }))
+    .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
 }

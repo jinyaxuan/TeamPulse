@@ -1,8 +1,14 @@
 import { and, count, desc, eq, gt, gte, inArray, isNull, max, sql } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { db, devices, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
+import { ActionLink } from "@/components/ui/action-link";
+import { MetricCard } from "@/components/ui/metric-card";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { MonoPath, Workspace } from "@/components/ui/workspace";
+import { db, devices, projects, tasks, users } from "@/db";
 import { getSessionUser } from "@/lib/auth";
 import { listVisibleProjectMemberUserIds, visibleTasksCondition } from "@/lib/project-access";
 import {
@@ -53,12 +59,8 @@ export default async function TeamPage({
       display_name: users.displayName,
       role: users.role,
       task_count: count(tasks.id),
-      done_count: sql<number>`
-        COUNT(*) FILTER (WHERE ${tasks.status} = 'done')::int
-      `.as("done_count"),
-      abandoned_count: sql<number>`
-        COUNT(*) FILTER (WHERE ${tasks.status} = 'abandoned')::int
-      `.as("abandoned_count"),
+      done_count: sql<number>`COUNT(*) FILTER (WHERE ${tasks.status} = 'done')::int`.as("done_count"),
+      abandoned_count: sql<number>`COUNT(*) FILTER (WHERE ${tasks.status} = 'abandoned')::int`.as("abandoned_count"),
       last_active: max(tasks.heartbeatAt),
     })
     .from(users)
@@ -104,7 +106,7 @@ export default async function TeamPage({
       )
     )
     .orderBy(desc(tasks.heartbeatAt))
-    .limit(20);
+    .limit(30);
 
   const recentTasks = await db
     .select({
@@ -132,176 +134,182 @@ export default async function TeamPage({
     .limit(100);
 
   const activeCountByUser = new Map<string, number>();
+  const fileCountByUser = new Map<string, number>();
   for (const task of activeTasks) {
     activeCountByUser.set(task.user_id, (activeCountByUser.get(task.user_id) ?? 0) + 1);
+    fileCountByUser.set(task.user_id, (fileCountByUser.get(task.user_id) ?? 0) + task.files_touched.length);
   }
 
-  const memberStats = rawMemberStats.filter((member) => {
-    if (visibleMemberIds && !visibleMemberIds.has(member.id) && member.id !== sessionUser.id) return false;
-    const hasRecentTasks = Number(member.task_count) > 0;
-    const hasActiveDevice = (activeDeviceCountByUser.get(member.id) ?? 0) > 0;
-    return member.id === sessionUser.id || hasRecentTasks || hasActiveDevice;
-  }).sort((a, b) => {
-    if (a.id === sessionUser.id) return -1;
-    if (b.id === sessionUser.id) return 1;
-    const activeDelta = (activeCountByUser.get(b.id) ?? 0) - (activeCountByUser.get(a.id) ?? 0);
-    if (activeDelta !== 0) return activeDelta;
-    return timestamp(b.last_active) - timestamp(a.last_active);
-  });
+  const memberStats = rawMemberStats
+    .filter((member) => {
+      if (visibleMemberIds && !visibleMemberIds.has(member.id) && member.id !== sessionUser.id) return false;
+      const hasRecentTasks = Number(member.task_count) > 0;
+      const hasActiveDevice = (activeDeviceCountByUser.get(member.id) ?? 0) > 0;
+      return member.id === sessionUser.id || hasRecentTasks || hasActiveDevice;
+    })
+    .sort((a, b) => {
+      if (a.id === sessionUser.id) return -1;
+      if (b.id === sessionUser.id) return 1;
+      const activeDelta = (activeCountByUser.get(b.id) ?? 0) - (activeCountByUser.get(a.id) ?? 0);
+      if (activeDelta !== 0) return activeDelta;
+      return timestamp(b.last_active) - timestamp(a.last_active);
+    });
 
   const latestByUser = new Map<string, (typeof recentTasks)[number]>();
   for (const task of recentTasks) {
     if (!latestByUser.has(task.user_id)) latestByUser.set(task.user_id, task);
   }
 
-  const maxCount = Math.max(1, ...memberStats.map((m) => m.task_count));
-  const totalTasks = memberStats.reduce((sum, m) => sum + Number(m.task_count), 0);
-  const completedTasks = memberStats.reduce((sum, m) => sum + Number(m.done_count), 0);
-  const activeMembers = memberStats.filter((m) => (activeCountByUser.get(m.id) ?? 0) > 0).length;
+  const totalTasks = memberStats.reduce((sum, member) => sum + Number(member.task_count), 0);
+  const completedTasks = memberStats.reduce((sum, member) => sum + Number(member.done_count), 0);
+  const activeMembers = memberStats.filter((member) => (activeCountByUser.get(member.id) ?? 0) > 0).length;
+  const activeAgents = Array.from(activeDeviceCountByUser.values()).reduce((sum, value) => sum + value, 0);
 
   return (
     <AppShell user={sessionUser} activeNav="team">
-      <div className="space-y-8">
-        <header className="rounded-lg border bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">团队</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              查看谁正在工作、正在处理什么，以及最近 7 天的团队产出。
-            </p>
-          </div>
-          <Link
-            href="/activity"
-            className="w-fit rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700"
-          >
-            查看完整动态
-          </Link>
-          </div>
-        </header>
+      <Workspace>
+        <PageHeader
+          eyebrow="Team Roster"
+          title="团队与 Agent"
+          description="按成员查看 Agent、任务心跳和文件触达，先识别谁在工作，再决定是否进入项目协调。"
+          actions={
+            <>
+              <ActionLink href="/activity">完整动态</ActionLink>
+              <ActionLink href="/settings/connect" variant="primary">接入 Agent</ActionLink>
+            </>
+          }
+          meta={
+            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+              <CommandMeta label="成员" value={`${memberStats.length} 人`} />
+              <CommandMeta label="活跃成员" value={`${activeMembers} 人`} />
+              <CommandMeta label="活跃 Agent" value={`${activeAgents} 个`} />
+              <CommandMeta label="7 天完成" value={`${completedTasks}/${totalTasks}`} />
+            </div>
+          }
+        />
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="团队成员" value={memberStats.length} detail={`${activeMembers} 人正在活跃`} tone="blue" />
-          <MetricCard label="实时任务" value={activeTasks.length} detail="15 分钟内有心跳" tone="green" />
-          <MetricCard label="7 天任务" value={totalTasks} detail={`${completedTasks} 个已完成`} tone="slate" />
-          <MetricCard label="近期事件" value={recentTasks.length} detail="统计最近 100 条记录" tone="amber" />
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="团队成员" value={memberStats.length} detail={`${activeMembers} 人正在活跃`} tone="agent" />
+          <MetricCard label="实时任务" value={activeTasks.length} detail="15 分钟内有心跳" tone="online" />
+          <MetricCard label="活跃 Agent" value={activeAgents} detail="已绑定并可上报任务" tone="agent" />
+          <MetricCard label="近期事件" value={recentTasks.length} detail="最近 7 天任务记录" tone="warning" />
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-3">
-            <SectionHeader title="成员" description="按实时活跃优先排序，其次按最近心跳排序。" />
-            {memberStats.length === 0 && (
-              <EmptyState>还没有团队成员。</EmptyState>
-            )}
-            {memberStats.map((m) => {
-              const pct = Math.round((Number(m.task_count) / maxCount) * 100);
-              const latest = latestByUser.get(m.id);
-              const activeNow = activeCountByUser.get(m.id) ?? 0;
-              return (
-                <article key={m.id} className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
-                        {(m.display_name ?? m.name).slice(0, 1).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/team/${m.id}`}
-                          className="font-medium hover:text-slate-700 hover:underline"
-                        >
-                          {m.display_name ?? m.name}
-                        </Link>
-                        {m.id === sessionUser.id && <SelfPill>我</SelfPill>}
-                        <span className="text-xs text-muted-foreground">@{m.name}</span>
-                        {m.role === "admin" && <RolePill>{roleLabel(m.role)}</RolePill>}
-                        {activeNow > 0 && <LivePill>{activeNow} 个实时任务</LivePill>}
-                      </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        7 天内 {Number(m.task_count)} 个任务
-                        {m.last_active && ` · 最近活跃 ${formatRelativeTime(m.last_active)}`}
-                      </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-shrink-0 gap-2 text-xs text-muted-foreground">
-                      <span>{Number(m.done_count)} 已完成</span>
-                      <span>{Number(m.abandoned_count)} 已中断</span>
-                    </div>
-                  </div>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <Panel title="成员作战序列" description="实时活跃优先，其次按最近心跳排序。" bodyClassName="p-0">
+            {memberStats.length === 0 ? (
+              <div className="p-4">
+                <EmptyPanel>还没有团队成员。</EmptyPanel>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {memberStats.map((member) => {
+                  const latest = latestByUser.get(member.id);
+                  const activeNow = activeCountByUser.get(member.id) ?? 0;
+                  const activeDeviceCount = activeDeviceCountByUser.get(member.id) ?? 0;
+                  const touchedFiles = fileCountByUser.get(member.id) ?? 0;
+                  const name = member.display_name ?? member.name;
+                  return (
+                    <Link key={member.id} href={`/team/${member.id}`} className="block px-4 py-4 transition hover:bg-surface">
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_160px_160px_minmax(0,1fr)] lg:items-center">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-foreground text-sm font-semibold text-background">
+                            {name.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium">{name}</span>
+                              {member.id === sessionUser.id && <StatusBadge tone="dark">我</StatusBadge>}
+                              {member.role === "admin" && <StatusBadge tone="info">{roleLabel(member.role)}</StatusBadge>}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span>@{member.name}</span>
+                              <span>{Number(member.task_count)} 个 7 天任务</span>
+                              {member.last_active && <span>最近 {formatRelativeTime(member.last_active)}</span>}
+                            </div>
+                          </div>
+                        </div>
 
-                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className="h-full bg-slate-900" style={{ width: `${pct}%` }} />
-                  </div>
+                        <div className="flex flex-wrap gap-2">
+                          <StatusBadge tone={activeNow > 0 ? "online" : "slate"} dot={activeNow > 0}>
+                            {activeNow > 0 ? `${activeNow} 实时任务` : "空闲"}
+                          </StatusBadge>
+                          <StatusBadge tone="agent">{activeDeviceCount} Agent</StatusBadge>
+                        </div>
 
-                  {latest ? (
-                    <div className="mt-3 flex flex-col gap-1 border-t pt-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0 truncate">
-                        <StatusPill status={latest.status} />
-                        <span className="ml-2 text-muted-foreground">{latest.intent}</span>
+                        <div className="text-xs text-muted-foreground">
+                          <div>{Number(member.done_count)} 已完成 / {Number(member.abandoned_count)} 中断</div>
+                          <div className="mt-1">{touchedFiles} 条活跃文件触达</div>
+                        </div>
+
+                        <div className="min-w-0 text-sm">
+                          {latest ? (
+                            <>
+                              <div className="truncate">
+                                <StatusBadge tone={latest.status === "active" ? "online" : latest.status === "done" ? "slate" : "warning"}>
+                                  {taskStatusLabel(latest.status)}
+                                </StatusBadge>
+                                <span className="ml-2 text-muted-foreground">{latest.intent}</span>
+                              </div>
+                              <div className="mt-1 truncate text-xs text-muted-foreground">
+                                {latest.project_name ?? "项目"} · {formatRelativeTime(latest.started_at)}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">最近 7 天没有任务。</span>
+                          )}
+                        </div>
                       </div>
-                      <Link
-                        href={`/projects/${latest.project_id}`}
-                        className="flex-shrink-0 text-xs text-muted-foreground hover:text-foreground hover:underline"
-                      >
-                        {latest.project_name ?? "项目"} · {formatRelativeTime(latest.started_at)}
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="mt-3 border-t pt-3 text-sm text-muted-foreground">
-                      最近 7 天没有任务。
-                    </div>
-                  )}
-                  <div className="mt-3 border-t pt-3">
-                    <Link
-                      href={`/team/${m.id}`}
-                      className="text-xs font-medium text-slate-700 hover:text-slate-950 hover:underline"
-                    >
-                      查看成员详情
                     </Link>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          <aside className="space-y-3">
-            <SectionHeader title="实时进行中" description="当前仍在持续上报心跳的任务。" />
-            {activeTasks.length === 0 && (
-              <EmptyState>当前没有实时任务。</EmptyState>
+                  );
+                })}
+              </div>
             )}
-            {activeTasks.map((task) => (
-              <article key={task.id} className="rounded-lg border border-l-4 border-l-emerald-500 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{task.user_display_name ?? task.user_name}</span>
-                      <ClientPill client={task.client} />
-                    </div>
-                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{task.intent}</p>
-                  </div>
-                  <LiveDot />
-                </div>
-                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                  <div>
-                    <Link href={`/projects/${task.project_id}`} className="hover:text-foreground hover:underline">
-                      {task.project_name ?? "项目"}
+          </Panel>
+
+          <aside className="space-y-6">
+            <Panel title="实时进行中" description="当前仍在持续上报心跳的任务。">
+              {activeTasks.length === 0 ? (
+                <EmptyPanel>当前没有实时任务。</EmptyPanel>
+              ) : (
+                <div className="space-y-2">
+                  {activeTasks.slice(0, 8).map((task) => (
+                    <Link key={task.id} href={`/projects/${task.project_id}`} className="block rounded-md border bg-white p-3 transition hover:bg-surface">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{task.user_display_name ?? task.user_name}</span>
+                            <StatusBadge tone="agent">{clientLabel(task.client)}</StatusBadge>
+                          </div>
+                          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{task.intent}</p>
+                        </div>
+                        <StatusBadge tone="online" dot>Live</StatusBadge>
+                      </div>
+                      <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                        <div>{task.project_name ?? "项目"} · 心跳 {formatRelativeTime(task.heartbeat_at)}</div>
+                        <div>
+                          <MonoPath>{task.branch || "未检测分支"}</MonoPath>
+                          {task.files_touched.length > 0 && ` · ${task.files_touched.length} 个文件`}
+                        </div>
+                      </div>
                     </Link>
-                    {" · 开始于 "}
-                    {formatRelativeTime(task.started_at)}
-                  </div>
-                  <div>
-                    心跳 {formatRelativeTime(task.heartbeat_at)}
-                    {task.branch && ` · 分支：${task.branch}`}
-                  </div>
-                  {task.files_touched.length > 0 && (
-                    <div>已触碰 {task.files_touched.length} 个文件</div>
-                  )}
+                  ))}
                 </div>
-              </article>
-            ))}
+              )}
+            </Panel>
           </aside>
         </section>
-      </div>
+      </Workspace>
     </AppShell>
+  );
+}
+
+function CommandMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border bg-white/70 px-3 py-2">
+      <span>{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
+    </div>
   );
 }
 
@@ -312,103 +320,4 @@ function firstSearchParam(value: string | string[] | undefined): string | undefi
 function timestamp(value: Date | string | null): number {
   if (!value) return 0;
   return typeof value === "string" ? new Date(value).getTime() : value.getTime();
-}
-
-function MetricCard({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  tone: "blue" | "green" | "slate" | "amber";
-}) {
-  const toneClass =
-    tone === "blue"
-      ? "border-t-blue-500"
-      : tone === "green"
-        ? "border-t-emerald-500"
-        : tone === "amber"
-          ? "border-t-amber-500"
-          : "border-t-slate-400";
-
-  return (
-    <div className={`rounded-lg border border-t-4 bg-white p-4 shadow-sm ${toneClass}`}>
-      <div className="text-xs font-medium uppercase text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
-    </div>
-  );
-}
-
-function SectionHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <div>
-      <h2 className="text-sm font-semibold uppercase text-muted-foreground">{title}</h2>
-      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function EmptyState({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
-function RolePill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-      {children}
-    </span>
-  );
-}
-
-function SelfPill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs text-white">
-      {children}
-    </span>
-  );
-}
-
-function LivePill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-900/30 dark:text-green-400">
-      {children}
-    </span>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const classes =
-    status === "active"
-      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      : status === "done"
-        ? "bg-muted text-muted-foreground"
-        : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
-
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs ${classes}`}>
-      {taskStatusLabel(status)}
-    </span>
-  );
-}
-
-function ClientPill({ client }: { client: string }) {
-  return (
-    <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
-      {clientLabel(client)}
-    </span>
-  );
-}
-
-function LiveDot() {
-  return (
-    <span className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-green-500" aria-label="进行中" />
-  );
 }
