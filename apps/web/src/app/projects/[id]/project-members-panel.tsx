@@ -118,9 +118,9 @@ export function ProjectMembersPanel({
             <button
               type="submit"
               disabled={pending || !user.trim()}
-              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+              className={"rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
             >
-              添加成员
+              {pending ? "添加中" : "添加成员"}
             </button>
           </form>
         )}
@@ -175,9 +175,9 @@ export function ProjectMembersPanel({
                     type="button"
                     onClick={() => removeMember(member)}
                     disabled={pending || member.user_id === currentUserId}
-                    className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    className={"rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
                   >
-                    移除
+                    {pending ? "处理中" : "移除"}
                   </button>
                 </div>
               ) : (

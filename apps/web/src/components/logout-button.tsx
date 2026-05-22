@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { withBasePath } from "@/lib/base-path";
+import { cn } from "@/lib/utils";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function LogoutButton() {
     <button
       onClick={logout}
       disabled={pending}
-      className="whitespace-nowrap text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+      className={cn("whitespace-nowrap rounded-full px-2 py-1 text-xs text-muted-foreground transition hover:bg-surface hover:text-foreground disabled:opacity-50", pending && "tp-pending")}
     >
       {pending ? "退出中…" : "退出"}
     </button>

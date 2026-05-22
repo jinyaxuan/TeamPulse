@@ -29,6 +29,8 @@ export function AgentMetadataForm({
   const [capabilitiesText, setCapabilitiesText] = useState(device.capabilities.join(", "));
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const busy = pending || saving;
 
   const placeholderName = useMemo(() => {
     if (device.agent_type === "codex") return "例如 Codex 主力实现";
@@ -40,25 +42,30 @@ export function AgentMetadataForm({
     event.preventDefault();
     setMessage(null);
     setError(null);
+    setSaving(true);
 
-    const res = await fetch(withBasePath(`/api/v1/devices/${device.id}`), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        agent_name: agentName.trim() || null,
-        agent_type: agentType || null,
-        agent_role: agentRole.trim() || null,
-        capabilities: parseCapabilities(capabilitiesText),
-      }),
-    });
+    try {
+      const res = await fetch(withBasePath(`/api/v1/devices/${device.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent_name: agentName.trim() || null,
+          agent_type: agentType || null,
+          agent_role: agentRole.trim() || null,
+          capabilities: parseCapabilities(capabilitiesText),
+        }),
+      });
 
-    if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error ?? "保存 Agent 信息失败");
-      return;
+      if (!res.ok) {
+        setError((await res.json().catch(() => ({}))).error ?? "保存 Agent 信息失败");
+        return;
+      }
+
+      setMessage("Agent 信息已保存");
+      startTransition(() => router.refresh());
+    } finally {
+      setSaving(false);
     }
-
-    setMessage("Agent 信息已保存");
-    startTransition(() => router.refresh());
   }
 
   return (
@@ -127,11 +134,12 @@ export function AgentMetadataForm({
         </div>
         <ActionButton
           type="submit"
-          disabled={pending}
+          disabled={busy}
+          pending={busy}
           variant="primary"
           className="px-3 py-2"
         >
-          保存 Agent
+          {busy ? "保存中" : "保存 Agent"}
         </ActionButton>
       </div>
     </form>

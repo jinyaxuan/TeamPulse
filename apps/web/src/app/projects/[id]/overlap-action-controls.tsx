@@ -82,12 +82,13 @@ export function OverlapActionControls({
                 disabled={pending || resolution?.action === action.value}
                 className={
                   "rounded-md border border-amber-200 px-2 py-1 text-xs font-medium disabled:opacity-50 " +
+                  (pending ? "tp-pending " : "") +
                   (resolution?.action === action.value
                     ? "bg-amber-200 text-amber-950"
                     : "bg-white/70 text-amber-900 hover:bg-white")
                 }
               >
-                {action.label}
+                {pending ? "记录中" : action.label}
               </button>
             ))}
           </div>

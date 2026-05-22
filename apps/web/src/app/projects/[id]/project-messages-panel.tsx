@@ -144,9 +144,9 @@ export function ProjectMessagesPanel({
                 type="button"
                 onClick={sendMessage}
                 disabled={pending || body.trim().length === 0}
-                className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+                className={"rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
               >
-                发送
+                {pending ? "发送中" : "发送"}
               </button>
             </div>
           </div>

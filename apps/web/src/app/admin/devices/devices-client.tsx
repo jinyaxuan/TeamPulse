@@ -285,16 +285,16 @@ function PendingCard({
             onApprove(device.id, name.trim());
           }}
           disabled={disabled || !name.trim()}
-          className="rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:bg-black/80 disabled:opacity-50"
+          className={"rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:bg-black/80 disabled:opacity-50 " + (disabled ? "tp-pending" : "")}
         >
-          绑定到用户
+          {disabled ? "绑定中" : "绑定到用户"}
         </button>
         <button
           onClick={() => onReject(device.id)}
           disabled={disabled}
-          className="rounded-full border border-red-200 bg-white/80 px-4 py-2.5 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+          className={"rounded-full border border-red-200 bg-white/80 px-4 py-2.5 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-50 " + (disabled ? "tp-pending" : "")}
         >
-          拒绝
+          {disabled ? "处理中" : "拒绝"}
         </button>
       </div>
     </div>

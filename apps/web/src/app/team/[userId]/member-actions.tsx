@@ -61,27 +61,27 @@ export function MemberRoleActions({
             type="button"
             onClick={() => setRole("member")}
             disabled={pending || isSelf}
-            className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+            className={"rounded-md border px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
           >
-            设为成员
+            {pending ? "处理中" : "设为成员"}
           </button>
         ) : (
           <button
             type="button"
             onClick={() => setRole("admin")}
             disabled={pending}
-            className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+            className={"rounded-md border px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
           >
-            设为管理员
+            {pending ? "处理中" : "设为管理员"}
           </button>
         )}
         <button
           type="button"
           onClick={revokeMember}
           disabled={pending || isSelf}
-          className="rounded-md border px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+          className={"rounded-md border px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
         >
-          撤销成员
+          {pending ? "撤销中" : "撤销成员"}
         </button>
       </div>
       {error && (
@@ -122,9 +122,9 @@ export function RevokeDeviceButton({ deviceId, disabled }: { deviceId: string; d
         type="button"
         onClick={revokeDevice}
         disabled={disabled || pending}
-        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+        className={"rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 " + (pending ? "tp-pending" : "")}
       >
-        撤销
+        {pending ? "处理中" : "撤销"}
       </button>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </div>

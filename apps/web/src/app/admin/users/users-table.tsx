@@ -25,6 +25,8 @@ export function UsersTable({ users }: { users: UserRow[] }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const busy = pending || busyUserId !== null;
   const normalizedQuery = query.trim().toLowerCase();
   const filteredUsers =
     normalizedQuery.length === 0
@@ -44,28 +46,38 @@ export function UsersTable({ users }: { users: UserRow[] }) {
 
   async function setRole(id: string, role: "admin" | "member") {
     setError(null);
-    const res = await fetch(withBasePath(`/api/v1/admin/users/${id}`), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
-    if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error ?? "操作失败");
-      return;
+    setBusyUserId(id);
+    try {
+      const res = await fetch(withBasePath(`/api/v1/admin/users/${id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        setError((await res.json().catch(() => ({}))).error ?? "操作失败");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } finally {
+      setBusyUserId(null);
     }
-    startTransition(() => router.refresh());
   }
 
   async function revoke(id: string, name: string) {
     if (!confirm(`确定撤销用户「${name}」吗？该用户会被强制退出，所有设备也会被禁用。`))
       return;
     setError(null);
-    const res = await fetch(withBasePath(`/api/v1/admin/users/${id}/revoke`), { method: "POST" });
-    if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error ?? "操作失败");
-      return;
+    setBusyUserId(id);
+    try {
+      const res = await fetch(withBasePath(`/api/v1/admin/users/${id}/revoke`), { method: "POST" });
+      if (!res.ok) {
+        setError((await res.json().catch(() => ({}))).error ?? "操作失败");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } finally {
+      setBusyUserId(null);
     }
-    startTransition(() => router.refresh());
   }
 
   return (
@@ -142,29 +154,32 @@ export function UsersTable({ users }: { users: UserRow[] }) {
                         <ActionButton
                           type="button"
                           onClick={() => setRole(u.id, "member")}
-                          disabled={pending}
+                          disabled={busy}
+                          pending={busyUserId === u.id}
                           className="px-3 py-1.5 text-xs"
                         >
-                          设为成员
+                          {busyUserId === u.id ? "处理中" : "设为成员"}
                         </ActionButton>
                       ) : (
                         <ActionButton
                           type="button"
                           onClick={() => setRole(u.id, "admin")}
-                          disabled={pending}
+                          disabled={busy}
+                          pending={busyUserId === u.id}
                           className="px-3 py-1.5 text-xs"
                         >
-                          设为管理员
+                          {busyUserId === u.id ? "处理中" : "设为管理员"}
                         </ActionButton>
                       )}
                       <ActionButton
                         type="button"
                         onClick={() => revoke(u.id, u.name)}
-                        disabled={pending}
+                        disabled={busy}
+                        pending={busyUserId === u.id}
                         variant="danger"
                         className="px-3 py-1.5 text-xs"
                       >
-                        撤销
+                        {busyUserId === u.id ? "处理中" : "撤销"}
                       </ActionButton>
                     </>
                   )}

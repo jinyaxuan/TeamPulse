@@ -28,6 +28,9 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const createBusy = pending || submitting;
   const normalizedQuery = query.trim().toLowerCase();
   const filteredInvites =
     normalizedQuery.length === 0
@@ -48,42 +51,52 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
     event.preventDefault();
     setError(null);
     setCreatedCode(null);
+    setSubmitting(true);
 
-    const res = await fetch(withBasePath("/api/v1/admin/invite-codes"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        label: label || undefined,
-        max_uses: maxUses,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
-      }),
-    });
+    try {
+      const res = await fetch(withBasePath("/api/v1/admin/invite-codes"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: label || undefined,
+          max_uses: maxUses,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+        }),
+      });
 
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(body.error ?? "创建邀请码失败");
-      return;
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "创建邀请码失败");
+        return;
+      }
+
+      setCreatedCode(body.invite_code?.code ?? null);
+      setLabel("");
+      setMaxUses(1);
+      setExpiresAt("");
+      startTransition(() => router.refresh());
+    } finally {
+      setSubmitting(false);
     }
-
-    setCreatedCode(body.invite_code?.code ?? null);
-    setLabel("");
-    setMaxUses(1);
-    setExpiresAt("");
-    startTransition(() => router.refresh());
   }
 
   async function revokeInvite(id: string) {
     if (!confirm("确定撤销这个邀请码吗？撤销后无法再用于注册。")) return;
 
     setError(null);
-    const res = await fetch(withBasePath(`/api/v1/admin/invite-codes/${id}/revoke`), { method: "POST" });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "撤销邀请码失败");
-      return;
-    }
+    setRevokingId(id);
+    try {
+      const res = await fetch(withBasePath(`/api/v1/admin/invite-codes/${id}/revoke`), { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? "撤销邀请码失败");
+        return;
+      }
 
-    startTransition(() => router.refresh());
+      startTransition(() => router.refresh());
+    } finally {
+      setRevokingId(null);
+    }
   }
 
   return (
@@ -146,8 +159,8 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
             />
           </label>
         </div>
-        <ActionButton type="submit" disabled={pending} variant="primary" className="w-full">
-          创建邀请码
+        <ActionButton type="submit" disabled={createBusy} pending={createBusy} variant="primary" className="w-full">
+          {createBusy ? "创建中" : "创建邀请码"}
         </ActionButton>
       </form>
 
@@ -190,10 +203,10 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
                   <button
                     type="button"
                     onClick={() => revokeInvite(invite.id)}
-                    disabled={pending}
-                    className="rounded-full border border-red-200 bg-white/80 px-2.5 py-1 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                    disabled={pending || revokingId !== null}
+                    className={"rounded-full border border-red-200 bg-white/80 px-2.5 py-1 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50 " + (revokingId === invite.id ? "tp-pending" : "")}
                   >
-                    撤销
+                    {revokingId === invite.id ? "撤销中" : "撤销"}
                   </button>
                 )}
               </div>

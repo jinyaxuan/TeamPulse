@@ -90,6 +90,52 @@
     @apply tp-focus-ring rounded-full border border-input bg-white/90 px-4 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] transition placeholder:text-muted-foreground/70 hover:border-black/20;
   }
 
+  .tp-navigation-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    height: 2px;
+    width: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left;
+    background: linear-gradient(90deg, hsl(var(--foreground)) 0%, hsl(var(--agent)) 52%, hsl(var(--online)) 100%);
+    box-shadow: 0 0 18px rgba(15, 23, 42, 0.18);
+    transition:
+      opacity var(--tp-motion-fast) var(--tp-motion-ease),
+      transform 640ms var(--tp-motion-ease);
+  }
+
+  .tp-navigation-progress[data-active="true"] {
+    opacity: 1;
+    transform: scaleX(0.82);
+    animation: tp-progress-wait 1400ms var(--tp-motion-ease) infinite;
+  }
+
+  .tp-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(15, 23, 42, 0.06), rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.06));
+    background-size: 220% 100%;
+    animation: tp-shimmer 1500ms var(--tp-motion-ease) infinite;
+  }
+
+  .tp-pending {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tp-pending::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+    animation: tp-pending-sweep 1200ms var(--tp-motion-ease) infinite;
+  }
+
   .tp-route-transition {
     animation: tp-route-enter var(--tp-motion-base) var(--tp-motion-ease) both;
     transform-origin: 50% 0;
@@ -195,6 +241,36 @@
   }
 }
 
+@keyframes tp-progress-wait {
+  0% {
+    transform: scaleX(0.18);
+  }
+
+  45% {
+    transform: scaleX(0.74);
+  }
+
+  100% {
+    transform: scaleX(0.9);
+  }
+}
+
+@keyframes tp-shimmer {
+  from {
+    background-position: 180% 0;
+  }
+
+  to {
+    background-position: -40% 0;
+  }
+}
+
+@keyframes tp-pending-sweep {
+  to {
+    transform: translateX(120%);
+  }
+}
+
 @keyframes tp-section-enter {
   from {
     opacity: 0;
@@ -258,7 +334,9 @@
 
   .tp-route-transition,
   .tp-reveal-stack > *,
-  .tp-reveal-list > * {
+  .tp-reveal-list > *,
+  .tp-skeleton,
+  .tp-pending::after {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
