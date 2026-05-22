@@ -125,6 +125,9 @@ async function register() {
     hostname: hostname(),
     os: platform(),
     git_email: gitEmail(),
+    agent_type: "generic",
+    agent_name: `Agent on ${hostname()}`,
+    capabilities: ["terminal", "git", "task-reporting"],
   });
 
   if (!body.claim_code || !body.device_secret || !body.device_id) {

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { AgentMetadataForm } from "@/components/agent-metadata-form";
 import { getSessionUser } from "@/lib/auth";
+import { agentDisplayName, agentTypeLabel } from "@/lib/agent-display";
 import { shouldShowTestData, SHOW_TEST_DATA_PARAM } from "@/lib/test-data";
 import {
   clientLabel,
@@ -85,7 +87,7 @@ export default async function TeamMemberPage({
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="实时任务" value={detail.member.active_task_count} detail="15 分钟内有心跳" />
           <MetricCard label="7 天任务" value={detail.member.task_count} detail={`${detail.member.done_count} 个已完成`} />
-          <MetricCard label="Agent 设备" value={detail.member.active_device_count} detail={`共 ${detail.member.total_device_count} 个记录`} />
+          <MetricCard label="Agent" value={detail.member.active_device_count} detail={`共 ${detail.member.total_device_count} 个记录`} />
           <MetricCard label="参与项目" value={detail.projects.length} detail="按最近确认排序" />
         </section>
 
@@ -140,18 +142,19 @@ export default async function TeamMemberPage({
               />
             )}
 
-            <Panel title={`Agent 设备 (${detail.devices.length})`}>
+            <Panel title={`Agent (${detail.devices.length})`}>
               <div className="space-y-2">
-                {detail.devices.length === 0 && <EmptyState>还没有绑定 Agent 设备。</EmptyState>}
+                {detail.devices.length === 0 && <EmptyState>还没有绑定 Agent。</EmptyState>}
                 {detail.devices.map((device) => (
                   <div key={device.id} className="rounded-md border bg-white p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate font-mono text-sm font-medium">
-                          {device.hostname ?? "未知设备"}
+                        <div className="truncate text-sm font-medium">
+                          {agentDisplayName(device)}
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {device.os ?? "未知系统"}
+                          {agentTypeLabel(device.agent_type)} · {device.hostname ?? "未知主机"}
+                          {device.os && ` · ${device.os}`}
                           {device.git_email && ` · ${device.git_email}`}
                         </div>
                       </div>
@@ -170,6 +173,25 @@ export default async function TeamMemberPage({
                         <RevokeDeviceButton deviceId={device.id} />
                       )}
                     </div>
+                    {device.agent_role && (
+                      <div className="mt-3 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-muted-foreground">
+                        {device.agent_role}
+                      </div>
+                    )}
+                    {device.capabilities.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {device.capabilities.map((capability) => (
+                          <Pill key={capability} tone="slate">
+                            {capability}
+                          </Pill>
+                        ))}
+                      </div>
+                    )}
+                    {(canAdmin || isSelf) && (
+                      <div className="mt-3 border-t pt-3">
+                        <AgentMetadataForm device={device} compact />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

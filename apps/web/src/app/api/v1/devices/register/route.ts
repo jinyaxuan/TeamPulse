@@ -16,6 +16,10 @@ const registerSchema = z.object({
   hostname: z.string().max(128).optional(),
   os: z.string().max(32).optional(),
   git_email: z.string().email().max(256).optional(),
+  agent_name: z.string().trim().min(1).max(128).optional(),
+  agent_type: z.enum(["codex", "claude-code", "openclaw", "generic"]).optional(),
+  agent_role: z.string().trim().max(500).optional(),
+  capabilities: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
 });
 
 /**
@@ -45,6 +49,10 @@ export const POST = handler(async (request) => {
           hostname: body.hostname,
           os: body.os,
           gitEmail: body.git_email,
+          agentName: body.agent_name,
+          agentType: body.agent_type,
+          agentRole: body.agent_role,
+          capabilities: uniqueCapabilities(body.capabilities ?? []),
           status: "pending",
         })
         .returning({ id: devices.id, claimCode: devices.claimCode });
@@ -63,3 +71,16 @@ export const POST = handler(async (request) => {
   // Unreachable.
   return json({ error: "设备注册失败" }, { status: 500 });
 });
+
+function uniqueCapabilities(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}

@@ -29,13 +29,15 @@ chmod 700 "$HOME/.teampulse/bin/teampulse-connect.mjs"
 
 ## First-Time Connection
 
-Register the local device:
+Register the local Agent device:
 
 \`\`\`bash
 node "$HOME/.teampulse/bin/teampulse-connect.mjs" register --server-url ${appUrl}
 \`\`\`
 
 Return only the printed claim_code to the user. Do not paste device_secret.
+After the device is bound, the user can edit the Agent name, type,
+responsibility, and capability tags in TeamPulse.
 
 After the user confirms that they bound the claim_code in TeamPulse, poll for the token:
 

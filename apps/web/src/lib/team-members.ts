@@ -27,6 +27,10 @@ export type TeamMemberDevice = {
   hostname: string | null;
   os: string | null;
   git_email: string | null;
+  agent_name: string | null;
+  agent_type: string | null;
+  agent_role: string | null;
+  capabilities: string[];
   status: string;
   registered_at: Date;
   approved_at: Date | null;
@@ -187,6 +191,10 @@ export async function getTeamMemberDetail(
         hostname: devices.hostname,
         os: devices.os,
         git_email: devices.gitEmail,
+        agent_name: devices.agentName,
+        agent_type: devices.agentType,
+        agent_role: devices.agentRole,
+        capabilities: devices.capabilities,
         status: devices.status,
         registered_at: devices.registeredAt,
         approved_at: devices.approvedAt,

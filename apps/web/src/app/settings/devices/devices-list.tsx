@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { AgentMetadataForm } from "@/components/agent-metadata-form";
+import { agentDisplayName, agentTypeLabel } from "@/lib/agent-display";
 import { withBasePath } from "@/lib/base-path";
 import { deviceStatusLabel, formatRelativeTime } from "@/lib/utils";
 
@@ -9,6 +11,10 @@ type MyDevice = {
   id: string;
   hostname: string | null;
   os: string | null;
+  agent_name: string | null;
+  agent_type: string | null;
+  agent_role: string | null;
+  capabilities: string[];
   status: string;
   registered_at: Date | null;
   approved_at: Date | null;
@@ -54,8 +60,8 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-4 py-2 text-left">主机</th>
-              <th className="px-4 py-2 text-left">系统</th>
+              <th className="px-4 py-2 text-left">Agent</th>
+              <th className="px-4 py-2 text-left">职责</th>
               <th className="px-4 py-2 text-left">状态</th>
               <th className="px-4 py-2 text-left">最近使用</th>
               <th className="px-4 py-2 text-left">审批时间</th>
@@ -65,8 +71,25 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
           <tbody>
             {devices.map((d) => (
               <tr key={d.id} className="border-b last:border-b-0">
-                <td className="px-4 py-2 font-mono text-xs">{d.hostname ?? "未知主机"}</td>
-                <td className="px-4 py-2 text-muted-foreground">{d.os ?? "—"}</td>
+                <td className="px-4 py-2">
+                  <div className="text-sm font-medium">{agentDisplayName(d)}</div>
+                  <div className="mt-1 font-mono text-xs text-muted-foreground">
+                    {agentTypeLabel(d.agent_type)} · {d.hostname ?? "未知主机"}
+                    {d.os && ` · ${d.os}`}
+                  </div>
+                  {d.capabilities.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {d.capabilities.map((capability) => (
+                        <span key={capability} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                          {capability}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="max-w-xs px-4 py-2 text-muted-foreground">
+                  {d.agent_role ? <span className="line-clamp-2">{d.agent_role}</span> : "—"}
+                </td>
                 <td className="px-4 py-2">
                   <span
                     className={
@@ -89,13 +112,23 @@ export function DevicesList({ devices }: { devices: MyDevice[] }) {
                 </td>
                 <td className="px-4 py-2 text-right">
                   {d.status === "active" && (
-                    <button
-                      onClick={() => revoke(d.id)}
-                      disabled={pending}
-                      className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                    >
-                      撤销
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <details className="text-left">
+                        <summary className="cursor-pointer rounded-md border px-2 py-1 text-xs hover:bg-slate-50">
+                          编辑
+                        </summary>
+                        <div className="absolute right-6 z-10 mt-2 w-[min(28rem,calc(100vw-3rem))] rounded-lg border bg-white p-4 text-left shadow-lg">
+                          <AgentMetadataForm device={d} compact />
+                        </div>
+                      </details>
+                      <button
+                        onClick={() => revoke(d.id)}
+                        disabled={pending}
+                        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      >
+                        撤销
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

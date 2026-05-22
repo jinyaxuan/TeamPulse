@@ -12,6 +12,10 @@ export default async function DevicesPage() {
       hostname: devices.hostname,
       os: devices.os,
       git_email: devices.gitEmail,
+      agent_name: devices.agentName,
+      agent_type: devices.agentType,
+      agent_role: devices.agentRole,
+      capabilities: devices.capabilities,
       registered_at: devices.registeredAt,
     })
     .from(devices)
@@ -23,6 +27,10 @@ export default async function DevicesPage() {
       id: devices.id,
       hostname: devices.hostname,
       os: devices.os,
+      agent_name: devices.agentName,
+      agent_type: devices.agentType,
+      agent_role: devices.agentRole,
+      capabilities: devices.capabilities,
       last_used_at: devices.lastUsedAt,
       approved_at: devices.approvedAt,
       user_id: users.id,

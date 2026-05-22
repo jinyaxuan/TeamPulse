@@ -31,20 +31,24 @@ const bytea = customType<{ data: Buffer; default: false }>({
  * users — human identities. admin has password; normal devs may have null password
  * and log in via magic link.
  */
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(), // "bob" — admin enters when claiming device
-  displayName: text("display_name"),
-  email: citext("email"),
-  passwordHash: text("password_hash"), // Argon2id; only admins need this
-  role: text("role").notNull().default("member"), // 'admin' | 'member'
-  teamOwnerId: uuid("team_owner_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
-  avatarUrl: text("avatar_url"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  revokedAt: timestamp("revoked_at", { withTimezone: true }),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull().unique(), // "bob" — admin enters when claiming device
+    displayName: text("display_name"),
+    email: citext("email"),
+    passwordHash: text("password_hash"), // Argon2id; only admins need this
+    role: text("role").notNull().default("member"), // 'admin' | 'member'
+    teamOwnerId: uuid("team_owner_id").references((): AnyPgColumn => users.id, {
+      onDelete: "set null",
+    }),
+    avatarUrl: text("avatar_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("users_team_owner_idx").on(t.teamOwnerId)]
+);
 
 /**
  * devices — Claude Code plugin instances. Self-register, admin approves,
@@ -59,6 +63,10 @@ export const devices = pgTable(
     hostname: text("hostname"),
     os: text("os"),
     gitEmail: text("git_email"),
+    agentName: text("agent_name"),
+    agentType: text("agent_type"), // codex|claude-code|openclaw|generic
+    agentRole: text("agent_role"),
+    capabilities: text("capabilities").array().notNull().default(sql`ARRAY[]::text[]`),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     tokenHash: bytea("token_hash"), // sha256 of bearer token; NULL until approved
     pendingToken: text("pending_token"), // raw token, one-time handoff to plugin; cleared on fetch

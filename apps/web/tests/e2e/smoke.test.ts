@@ -271,6 +271,10 @@ test("e2e: full happy path", async (t) => {
       body: {
         hostname: `e2e-${adminName}`,
         os: "linux",
+        agent_name: "E2E implementation agent",
+        agent_type: "codex",
+        agent_role: "Owns TeamPulse member-management E2E implementation fixtures.",
+        capabilities: ["TypeScript", "E2E", "TypeScript"],
       },
     });
     assert.equal(res.status, 200);
@@ -305,6 +309,32 @@ test("e2e: full happy path", async (t) => {
     assert.equal(res.body.status, "active");
     assert.ok(res.body.token?.startsWith("tp_tok_"));
     devToken = res.body.token;
+  });
+
+  await t.test("device: agent metadata can be updated by owner", async () => {
+    const forbidden = await http(`/api/v1/devices/${deviceId}`, {
+      method: "PATCH",
+      cookies: [invitedCookie],
+      body: {
+        agent_name: "Wrong owner update",
+      },
+    });
+    assert.equal(forbidden.status, 403);
+
+    const updated = await http(`/api/v1/devices/${deviceId}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        agent_name: "E2E Codex Builder",
+        agent_type: "codex",
+        agent_role: "Owns implementation and verification for the member-centered TeamPulse flow.",
+        capabilities: ["TypeScript", "E2E", "Review", "TypeScript"],
+      },
+    });
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.updated, true);
+    assert.equal(updated.body.device.agent_name, "E2E Codex Builder");
+    assert.deepEqual(updated.body.device.capabilities, ["TypeScript", "E2E", "Review"]);
   });
 
   const remoteUrl = `https://github.com/test/${adminName}-repo`;
@@ -758,10 +788,13 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(detail.status, 200);
     assert.match(detail.body, /成员详情/);
-    assert.match(detail.body, /Agent 设备/);
+    assert.match(detail.body, /Agent/);
     assert.match(detail.body, /参与项目/);
     assert.match(detail.body, /进行中任务/);
     assert.match(detail.body, new RegExp(devUserName));
+    assert.match(detail.body, /E2E Codex Builder/);
+    assert.match(detail.body, /Owns implementation and verification/);
+    assert.match(detail.body, /Review/);
     assert.match(detail.body, new RegExp(`${adminName}-repo`));
     assert.match(detail.body, /E2E: write a failing test/);
   });
