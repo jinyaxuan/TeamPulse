@@ -27,6 +27,7 @@ export default async function DevicesPage() {
       id: devices.id,
       hostname: devices.hostname,
       os: devices.os,
+      git_email: devices.gitEmail,
       agent_name: devices.agentName,
       agent_type: devices.agentType,
       agent_role: devices.agentRole,

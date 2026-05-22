@@ -19,6 +19,10 @@ export const GET = handler(async (request) => {
       hostname: devices.hostname,
       os: devices.os,
       git_email: devices.gitEmail,
+      agent_name: devices.agentName,
+      agent_type: devices.agentType,
+      agent_role: devices.agentRole,
+      capabilities: devices.capabilities,
       registered_at: devices.registeredAt,
     })
     .from(devices)
@@ -30,6 +34,12 @@ export const GET = handler(async (request) => {
       id: devices.id,
       hostname: devices.hostname,
       os: devices.os,
+      git_email: devices.gitEmail,
+      agent_name: devices.agentName,
+      agent_type: devices.agentType,
+      agent_role: devices.agentRole,
+      capabilities: devices.capabilities,
+      status: devices.status,
       last_used_at: devices.lastUsedAt,
       approved_at: devices.approvedAt,
       user_id: users.id,

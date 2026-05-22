@@ -12,7 +12,7 @@ import {
   shouldShowTestData,
   SHOW_TEST_DATA_PARAM,
 } from "@/lib/test-data";
-import { formatDateTime, taskStatusLabel } from "@/lib/utils";
+import { clientLabel, formatDateTime, formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -56,10 +56,13 @@ export default async function ActivityPage({
       id: tasks.id,
       project_id: tasks.projectId,
       project_name: projects.displayName,
+      client: tasks.client,
       intent: tasks.intent,
       summary: tasks.summary,
       status: tasks.status,
       branch: tasks.branch,
+      files_touched: tasks.filesTouched,
+      heartbeat_at: tasks.heartbeatAt,
       started_at: tasks.startedAt,
       ended_at: tasks.endedAt,
       user_name: users.name,
@@ -140,18 +143,46 @@ export default async function ActivityPage({
             {rows.map((t) => (
               <li
                 key={t.id}
-                className="grid gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 lg:grid-cols-[120px_minmax(0,1fr)_180px_88px] lg:items-center"
+                className="grid gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 lg:grid-cols-[120px_minmax(0,1fr)_180px_88px] lg:items-start"
               >
                 <div className="text-xs text-muted-foreground">
                   {formatDateTime(t.started_at)}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-medium">{t.user_display_name ?? t.user_name}</span>
-                    <span className="text-muted-foreground"> — {t.intent}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                      {clientLabel(t.client)}
+                    </span>
+                  </div>
+                  <div className="mt-1 truncate text-muted-foreground">
+                    {t.intent}
                   </div>
                   {t.branch && (
                     <div className="font-mono text-xs text-muted-foreground">分支：{t.branch}</div>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    {t.status === "active" && <span>心跳 {formatRelativeTime(t.heartbeat_at)}</span>}
+                    {t.ended_at && <span>结束 {formatDateTime(t.ended_at)}</span>}
+                    <span>{t.files_touched.length} 条路径</span>
+                  </div>
+                  {t.files_touched.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {t.files_touched.slice(0, 3).map((file) => (
+                        <span
+                          key={file}
+                          className="max-w-[18rem] truncate rounded-full bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600"
+                          title={file}
+                        >
+                          {file}
+                        </span>
+                      ))}
+                      {t.files_touched.length > 3 && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                          +{t.files_touched.length - 3}
+                        </span>
+                      )}
+                    </div>
                   )}
                   {t.summary && (
                     <div className="mt-1 line-clamp-2 rounded border bg-muted/40 p-2 text-xs leading-5 text-muted-foreground">

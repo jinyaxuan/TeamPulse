@@ -24,6 +24,7 @@ export type ActiveDevice = {
   id: string;
   hostname: string | null;
   os: string | null;
+  git_email: string | null;
   agent_name: string | null;
   agent_type: string | null;
   agent_role: string | null;
@@ -141,6 +142,9 @@ export function DevicesClient({
                       {agentTypeLabel(d.agent_type)} · {d.hostname ?? "未知主机"}
                       {d.os && ` · ${d.os}`}
                     </div>
+                    {d.git_email && (
+                      <div className="mt-1 text-xs text-muted-foreground">Git 邮箱：{d.git_email}</div>
+                    )}
                     {d.capabilities.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {d.capabilities.map((capability) => (

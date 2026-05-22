@@ -337,6 +337,22 @@ test("e2e: full happy path", async (t) => {
     assert.deepEqual(updated.body.device.capabilities, ["TypeScript", "E2E", "Review"]);
   });
 
+  await t.test("admin devices API exposes full agent metadata", async () => {
+    const res = await http("/api/v1/admin/devices", {
+      cookies: [adminCookie],
+    });
+    assert.equal(res.status, 200);
+
+    const activeDevice = res.body.active.find((device: any) => device.id === deviceId);
+    assert.ok(activeDevice, "expected active admin device payload to include the approved device");
+    assert.equal(activeDevice.agent_name, "E2E Codex Builder");
+    assert.equal(activeDevice.agent_type, "codex");
+    assert.match(activeDevice.agent_role, /verification/);
+    assert.deepEqual(activeDevice.capabilities, ["TypeScript", "E2E", "Review"]);
+    assert.equal(activeDevice.status, "active");
+    assert.ok("git_email" in activeDevice, "expected active device payload to expose git_email");
+  });
+
   const remoteUrl = `https://github.com/test/${adminName}-repo`;
   const remoteHash = sha256Hex(remoteUrl.toLowerCase());
   let projectId!: string;
@@ -548,6 +564,7 @@ test("e2e: full happy path", async (t) => {
         session_id: `e2e-sess-${adminName}`,
         intent: "E2E: write a failing test",
         branch: "e2e-branch",
+        client: "codex",
         files_hint: ["src/lib/conflict-target.ts"],
       },
     });
@@ -561,6 +578,8 @@ test("e2e: full happy path", async (t) => {
     const ours = list.body.tasks.find((t: any) => t.id === taskId);
     assert.ok(ours, "task not found in active list");
     assert.equal(ours.intent, "E2E: write a failing test");
+    assert.equal(ours.client, "codex");
+    assert.deepEqual(ours.files_touched, ["src/lib/conflict-target.ts"]);
   });
 
   await t.test("task: different branch same file produces merge risk", async () => {
@@ -572,6 +591,7 @@ test("e2e: full happy path", async (t) => {
         session_id: `e2e-sess-overlap-${adminName}`,
         intent: "E2E: touch the same file from another task",
         branch: "e2e-overlap-branch",
+        client: "codex",
         files_hint: ["./src/lib/conflict-target.ts"],
       },
     });
@@ -592,6 +612,10 @@ test("e2e: full happy path", async (t) => {
     });
     assert.equal(project.status, 200);
     assert.equal(project.body.active.length, 2);
+    const activeOriginal = project.body.active.find((task: any) => task.id === taskId);
+    assert.equal(activeOriginal?.client, "codex");
+    assert.deepEqual(activeOriginal?.files_touched, ["src/lib/conflict-target.ts"]);
+    assert.ok(activeOriginal?.heartbeat_at, "expected active task to expose heartbeat_at");
     assert.equal(
       project.body.active.find((task: any) => task.id === taskId)?.branch,
       "e2e-branch"
@@ -620,6 +644,7 @@ test("e2e: full happy path", async (t) => {
         session_id: `e2e-sess-same-branch-${adminName}`,
         intent: "E2E: touch the same file on the same branch",
         branch: "e2e-branch",
+        client: "codex",
         files_hint: ["src/lib/conflict-target.ts"],
       },
     });
@@ -836,6 +861,9 @@ test("e2e: full happy path", async (t) => {
     assert.equal(project.status, 200);
     const recent = project.body.recent.find((t: any) => t.id === taskId);
     assert.ok(recent, "ended task not found in recent project history");
+    assert.equal(recent.client, "codex");
+    assert.deepEqual(recent.files_touched, ["src/lib/conflict-target.ts"]);
+    assert.ok(recent.heartbeat_at, "expected recent task payload to expose heartbeat_at");
     assert.match(recent.summary, new RegExp(handoffToken));
 
     const exported = await http(

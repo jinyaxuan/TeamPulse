@@ -107,6 +107,7 @@ export const POST = handler(async (request) => {
       files_touched: tasks.filesTouched,
       started_at: tasks.startedAt,
       heartbeat_at: tasks.heartbeatAt,
+      client: tasks.client,
     })
     .from(tasks)
     .innerJoin(users, eq(tasks.userId, users.id))

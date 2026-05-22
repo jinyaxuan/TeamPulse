@@ -22,7 +22,7 @@ import {
   visibleUsersCondition,
 } from "@/lib/project-access";
 import { findActiveTaskOverlaps, taskOverlapKey, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
-import { cn, formatRelativeTime, taskStatusLabel } from "@/lib/utils";
+import { clientLabel, cn, formatDateTime, formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { OverlapActionControls, type OverlapResolutionRow } from "./overlap-action-controls";
 import { ProjectMessagesPanel, type ProjectMessageRow } from "./project-messages-panel";
 import { ProjectMembersPanel, type ProjectMemberRow } from "./project-members-panel";
@@ -60,6 +60,7 @@ export default async function ProjectPage({
   const active = await db
     .select({
       id: tasks.id,
+      client: tasks.client,
       intent: tasks.intent,
       branch: tasks.branch,
       files_touched: tasks.filesTouched,
@@ -84,12 +85,16 @@ export default async function ProjectPage({
   const recent = await db
     .select({
       id: tasks.id,
+      client: tasks.client,
       intent: tasks.intent,
       branch: tasks.branch,
+      files_touched: tasks.filesTouched,
       summary: tasks.summary,
       status: tasks.status,
+      heartbeat_at: tasks.heartbeatAt,
       started_at: tasks.startedAt,
       ended_at: tasks.endedAt,
+      user_id: users.id,
       user_name: users.name,
       user_display_name: users.displayName,
     })
@@ -317,7 +322,10 @@ export default async function ProjectPage({
                               </div>
                             )}
                           </div>
-                          <StatusBadge tone="online" dot>进行中</StatusBadge>
+                          <div className="flex flex-wrap gap-2">
+                            <StatusBadge tone="online" dot>进行中</StatusBadge>
+                            <StatusBadge tone="agent">{clientLabel(task.client)}</StatusBadge>
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             开始 {formatRelativeTime(task.started_at)}
                             <br />
@@ -379,22 +387,50 @@ export default async function ProjectPage({
           ) : (
             <ul className="divide-y divide-black/5 overflow-hidden rounded-[22px] bg-white">
               {recent.map((task) => (
-                <li key={task.id} className="grid gap-3 px-4 py-3 text-sm transition hover:bg-surface md:grid-cols-[96px_minmax(0,1fr)_120px] md:items-start">
+                <li key={task.id} className="grid gap-3 px-4 py-3 text-sm transition hover:bg-surface md:grid-cols-[96px_minmax(0,1fr)_150px] md:items-start">
                   <div className="text-xs text-muted-foreground">{formatRelativeTime(task.started_at)}</div>
                   <div className="min-w-0">
-                    <div className="truncate">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-medium">{task.user_display_name ?? task.user_name}</span>
-                      <span className="text-muted-foreground"> · {task.intent}</span>
+                      <StatusBadge tone="agent">{clientLabel(task.client)}</StatusBadge>
+                      {task.branch ? (
+                        <span className="max-w-52 truncate font-mono text-xs text-muted-foreground">分支 {task.branch}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">未检测到分支</span>
+                      )}
                     </div>
+                    <div className="mt-1 truncate text-muted-foreground">
+                      {task.intent}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {task.ended_at ? <span>结束 {formatDateTime(task.ended_at)}</span> : <span>心跳 {formatRelativeTime(task.heartbeat_at)}</span>}
+                      <span>{task.files_touched.length} 条路径</span>
+                    </div>
+                    {task.files_touched.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {task.files_touched.slice(0, 4).map((file) => (
+                          <MonoPath key={file} className="rounded-full bg-surface px-2.5 py-1">
+                            {file}
+                          </MonoPath>
+                        ))}
+                        {task.files_touched.length > 4 && (
+                          <span className="rounded-full bg-surface px-2.5 py-1 text-xs text-muted-foreground">
+                            +{task.files_touched.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {task.summary && (
                       <div className="mt-1 line-clamp-3 rounded-[16px] bg-surface p-3 text-xs leading-5 text-muted-foreground">
                         {task.summary}
                       </div>
                     )}
                   </div>
-                  <StatusBadge tone={task.status === "active" ? "online" : task.status === "done" ? "slate" : "warning"}>
-                    {taskStatusLabel(task.status)}
-                  </StatusBadge>
+                  <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+                    <StatusBadge tone={task.status === "active" ? "online" : task.status === "done" ? "slate" : "warning"}>
+                      {taskStatusLabel(task.status)}
+                    </StatusBadge>
+                  </div>
                 </li>
               ))}
             </ul>

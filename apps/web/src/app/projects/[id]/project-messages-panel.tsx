@@ -115,6 +115,12 @@ export function ProjectMessagesPanel({
                 )}
                 <span>·</span>
                 <span className="font-mono">{message.thread_key}</span>
+                {message.task_id && (
+                  <>
+                    <span>·</span>
+                    <span className="font-mono">任务 {message.task_id.slice(0, 8)}</span>
+                  </>
+                )}
                 <span>·</span>
                 <span>{formatRelativeTime(message.created_at)}</span>
               </div>

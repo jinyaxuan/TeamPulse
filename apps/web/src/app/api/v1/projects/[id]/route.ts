@@ -33,6 +33,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
   const active = await db
     .select({
       id: tasks.id,
+      client: tasks.client,
       intent: tasks.intent,
       branch: tasks.branch,
       files_touched: tasks.filesTouched,
@@ -57,10 +58,13 @@ export const GET = handler<{ id: string }>(async (request, params) => {
   const recent = await db
     .select({
       id: tasks.id,
+      client: tasks.client,
       intent: tasks.intent,
       branch: tasks.branch,
+      files_touched: tasks.filesTouched,
       summary: tasks.summary,
       status: tasks.status,
+      heartbeat_at: tasks.heartbeatAt,
       started_at: tasks.startedAt,
       ended_at: tasks.endedAt,
       user_id: users.id,

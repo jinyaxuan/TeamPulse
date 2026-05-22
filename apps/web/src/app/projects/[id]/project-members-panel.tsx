@@ -153,7 +153,8 @@ export function ProjectMembersPanel({
             </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="text-xs text-muted-foreground">
-                最近确认 {formatRelativeTime(member.last_seen_at)}
+                <div>最近确认 {formatRelativeTime(member.last_seen_at)}</div>
+                <div>加入 {formatRelativeTime(member.joined_at)}</div>
               </div>
               {canManage ? (
                 <div className="flex items-center gap-2">
