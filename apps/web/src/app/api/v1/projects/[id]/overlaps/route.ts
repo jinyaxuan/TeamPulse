@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, taskOverlapResolutions, tasks, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
-import { canWriteProject, getVisibleProject } from "@/lib/project-access";
+import { canWriteProject, getVisibleProject, isProjectMember, visibleTasksCondition } from "@/lib/project-access";
 import { orderedTaskPair, taskOverlapKey } from "@/lib/task-overlap";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +71,8 @@ export const GET = handler<{ id: string }>(async (request, params) => {
   const ctx = await requireAuth(request);
   const project = await getVisibleProject(params.id, ctx.user);
   if (!project) throw new ApiError("项目不存在", 404);
+  const fullProjectView = await isProjectMember(project.id, ctx.user);
+  const taskVisibility = fullProjectView ? undefined : visibleTasksCondition(ctx.user);
 
   const rows = await db
     .select({
@@ -88,7 +90,27 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     })
     .from(taskOverlapResolutions)
     .leftJoin(users, eq(taskOverlapResolutions.resolvedBy, users.id))
-    .where(eq(taskOverlapResolutions.projectId, project.id))
+    .where(
+      and(
+        eq(taskOverlapResolutions.projectId, project.id),
+        ...(taskVisibility
+          ? [
+              sql`exists (
+                select 1
+                from ${tasks}
+                where ${tasks.id} = ${taskOverlapResolutions.firstTaskId}
+                  and ${taskVisibility}
+              )`,
+              sql`exists (
+                select 1
+                from ${tasks}
+                where ${tasks.id} = ${taskOverlapResolutions.secondTaskId}
+                  and ${taskVisibility}
+              )`,
+            ]
+          : [])
+      )
+    )
     .orderBy(desc(taskOverlapResolutions.updatedAt))
     .limit(100);
 

@@ -26,13 +26,14 @@ export async function runSweepOnce(): Promise<number> {
       endedAt: new Date(),
     })
     .where(and(eq(tasks.status, "active"), lt(tasks.heartbeatAt, cutoff)))
-    .returning({ id: tasks.id, projectId: tasks.projectId });
+    .returning({ id: tasks.id, projectId: tasks.projectId, userId: tasks.userId });
 
   for (const t of affected) {
     publishPresence({
       type: "task.ended",
       project_id: t.projectId,
       task_id: t.id,
+      user_id: t.userId,
       outcome: "abandoned",
     });
   }

@@ -92,6 +92,8 @@ export const POST = handler(async (request) => {
       throw new ApiError("用户名或邮箱已被占用", 409);
     }
 
+    let inviterTeamOwnerId: string | null = null;
+
     // Validate invite code if provided
     if (hasInviteCode) {
       const codeHash = hashInviteCode(body.invite_code!);
@@ -109,14 +111,26 @@ export const POST = handler(async (request) => {
             sql`${inviteCodes.uses} < ${inviteCodes.maxUses}`
           )
         )
-        .returning({ id: inviteCodes.id });
+        .returning({
+          id: inviteCodes.id,
+          createdBy: inviteCodes.createdBy,
+        });
 
       if (!usedInvite) {
         throw new ApiError("邀请码无效、已过期或已用完", 400);
       }
+
+      if (usedInvite.createdBy) {
+        const [inviter] = await tx
+          .select({ id: users.id, teamOwnerId: users.teamOwnerId })
+          .from(users)
+          .where(and(eq(users.id, usedInvite.createdBy), isNull(users.revokedAt)))
+          .limit(1);
+        inviterTeamOwnerId = inviter ? inviter.teamOwnerId ?? inviter.id : null;
+      }
     }
 
-    return tx
+    const [newUser] = await tx
       .insert(users)
       .values({
         name: userName,
@@ -124,8 +138,20 @@ export const POST = handler(async (request) => {
         email: body.email,
         passwordHash,
         role: "member",
+        teamOwnerId: inviterTeamOwnerId,
       })
       .returning();
+
+    if (!newUser.teamOwnerId) {
+      const [updated] = await tx
+        .update(users)
+        .set({ teamOwnerId: newUser.id })
+        .where(eq(users.id, newUser.id))
+        .returning();
+      return [updated];
+    }
+
+    return [newUser];
   });
 
   // Sync to Casdoor (fire-and-forget, non-blocking)

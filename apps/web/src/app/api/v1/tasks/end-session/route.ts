@@ -38,13 +38,14 @@ export const POST = handler(async (request) => {
         eq(tasks.status, "active")
       )
     )
-    .returning({ id: tasks.id, projectId: tasks.projectId });
+    .returning({ id: tasks.id, projectId: tasks.projectId, userId: tasks.userId });
 
   for (const t of affected) {
     publishPresence({
       type: "task.ended",
       project_id: t.projectId,
       task_id: t.id,
+      user_id: t.userId,
       outcome: body.outcome,
     });
   }

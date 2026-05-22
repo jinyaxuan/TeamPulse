@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  type AnyPgColumn,
   customType,
   index,
   integer,
@@ -37,6 +38,9 @@ export const users = pgTable("users", {
   email: citext("email"),
   passwordHash: text("password_hash"), // Argon2id; only admins need this
   role: text("role").notNull().default("member"), // 'admin' | 'member'
+  teamOwnerId: uuid("team_owner_id").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),

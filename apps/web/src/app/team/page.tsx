@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, isNull, max, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNull, max, sql } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db, devices, projects, tasks, users } from "@/db";
@@ -18,6 +18,8 @@ export default async function TeamPage() {
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const taskVisibility = visibleTasksCondition(sessionUser);
   const visibleMemberIds = await listVisibleProjectMemberUserIds(sessionUser);
+  const memberVisibility =
+    visibleMemberIds === null ? undefined : inArray(users.id, Array.from(visibleMemberIds));
 
   const activeDeviceRows = await db
     .select({
@@ -54,7 +56,14 @@ export default async function TeamPage() {
       and(eq(tasks.userId, users.id), gte(tasks.startedAt, since), ...(taskVisibility ? [taskVisibility] : []))
     )
     .leftJoin(projects, eq(tasks.projectId, projects.id))
-    .where(and(isNull(users.revokedAt), nonTestUserCondition(), nonTestProjectCondition()))
+    .where(
+      and(
+        isNull(users.revokedAt),
+        nonTestUserCondition(),
+        nonTestProjectCondition(),
+        ...(memberVisibility ? [memberVisibility] : [])
+      )
+    )
     .groupBy(users.id);
 
   const activeTasks = await db

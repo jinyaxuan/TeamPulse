@@ -5,8 +5,10 @@ import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
 import {
   canManageProjectMembers,
   getVisibleProject,
+  isProjectMember,
   PROJECT_MEMBER_ROLES,
   type ProjectMemberRole,
+  visibleUsersCondition,
 } from "@/lib/project-access";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +72,8 @@ export const GET = handler<{ id: string }>(async (request, params) => {
   const ctx = await requireAuth(request);
   const project = await getVisibleProject(params.id, ctx.user);
   if (!project) throw new ApiError("项目不存在", 404);
+  const fullProjectView = await isProjectMember(project.id, ctx.user);
+  const memberVisibility = fullProjectView ? undefined : visibleUsersCondition(ctx.user);
 
   const members = await db
     .select({
@@ -83,7 +87,12 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     })
     .from(projectMembers)
     .innerJoin(users, eq(projectMembers.userId, users.id))
-    .where(eq(projectMembers.projectId, project.id))
+    .where(
+      and(
+        eq(projectMembers.projectId, project.id),
+        ...(memberVisibility ? [memberVisibility] : [])
+      )
+    )
     .orderBy(desc(projectMembers.lastSeenAt));
 
   return json({ members });

@@ -3,7 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db, projectMembers, projectMessages, tasks, users } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
-import { canWriteProject, getVisibleProject } from "@/lib/project-access";
+import { canWriteProject, getVisibleProject, isProjectMember } from "@/lib/project-access";
 import { publishPresence } from "@/lib/presence";
 
 export const dynamic = "force-dynamic";
@@ -83,10 +83,11 @@ export const GET = handler<{ id: string }>(async (request, params) => {
   const limit = clampLimit(url.searchParams.get("limit"));
   const threadKey = url.searchParams.get("thread_key")?.trim();
   const inboxOnly = url.searchParams.get("inbox") === "1";
+  const fullProjectView = await isProjectMember(project.id, ctx.user);
 
   const conditions: SQL[] = [eq(projectMessages.projectId, project.id)];
   if (threadKey) conditions.push(eq(projectMessages.threadKey, threadKey));
-  if (inboxOnly) {
+  if (inboxOnly || !fullProjectView) {
     const inboxCondition = or(
       eq(projectMessages.targetUserId, ctx.user.id),
       eq(projectMessages.authorId, ctx.user.id)

@@ -86,6 +86,7 @@ export async function GET(request: Request) {
         role: "member",
       })
       .returning({ id: users.id });
+    await db.update(users).set({ teamOwnerId: newUser.id }).where(eq(users.id, newUser.id));
     userId = newUser.id;
   }
 

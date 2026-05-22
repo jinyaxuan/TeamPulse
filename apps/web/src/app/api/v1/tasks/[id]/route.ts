@@ -56,6 +56,7 @@ export const PATCH = handler<{ id: string }>(async (request, params) => {
       type: "task.ended",
       project_id: existing.projectId,
       task_id: existing.id,
+      user_id: existing.userId,
       outcome: body.status as "done" | "abandoned",
     });
   }

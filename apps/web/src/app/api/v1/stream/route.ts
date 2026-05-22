@@ -1,5 +1,5 @@
 import { getAuthFromRequest } from "@/lib/auth";
-import { canAccessProject } from "@/lib/project-access";
+import { canAccessProject, isProjectMember, listVisibleProjectMemberUserIds } from "@/lib/project-access";
 import { presenceBus, type PresenceEvent } from "@/lib/presence";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,8 @@ export async function GET(request: Request) {
   if (!(await canAccessProject(projectId, ctx.user))) {
     return new Response("项目不存在", { status: 404 });
   }
+  const fullProjectView = await isProjectMember(projectId, ctx.user);
+  const visibleUserIds = fullProjectView ? null : await listVisibleProjectMemberUserIds(ctx.user);
 
   const encoder = new TextEncoder();
   const channel = `project:${projectId}`;
@@ -39,6 +41,7 @@ export async function GET(request: Request) {
       controller.enqueue(encoder.encode(`: connected\n\n`));
 
       handler = (event: PresenceEvent) => {
+        if (!canReceiveEvent(event, ctx.user.id, visibleUserIds)) return;
         try {
           const data = JSON.stringify(event);
           controller.enqueue(encoder.encode(`event: ${event.type}\ndata: ${data}\n\n`));
@@ -82,4 +85,21 @@ export async function GET(request: Request) {
       "X-Accel-Buffering": "no",
     },
   });
+}
+
+function canReceiveEvent(
+  event: PresenceEvent,
+  currentUserId: string,
+  visibleUserIds: Set<string> | null
+): boolean {
+  if (visibleUserIds === null) return true;
+  switch (event.type) {
+    case "task.started":
+    case "task.updated":
+      return visibleUserIds.has(event.task.user_id);
+    case "task.ended":
+      return visibleUserIds.has(event.user_id);
+    case "message.created":
+      return event.message.author_id === currentUserId || event.message.target_user_id === currentUserId;
+  }
 }

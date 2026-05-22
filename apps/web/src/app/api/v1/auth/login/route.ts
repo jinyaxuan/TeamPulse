@@ -109,7 +109,8 @@ export const POST = handler(async (request) => {
         displayName: casdoorProfile.displayName,
         role: "member",
       })
-      .returning({ id: users.id });
+      .returning();
+    await db.update(users).set({ teamOwnerId: newUser.id }).where(eq(users.id, newUser.id));
     userId = newUser.id;
   }
 

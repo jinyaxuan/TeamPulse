@@ -1,8 +1,14 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, projectMembers, projectMessages, taskOverlapResolutions, tasks, users } from "@/db";
 import { ApiError, handler, json, requireAuth } from "@/lib/api";
-import { canManageProjectMembers, getVisibleProject } from "@/lib/project-access";
+import {
+  canManageProjectMembers,
+  getVisibleProject,
+  isProjectMember,
+  visibleTasksCondition,
+  visibleUsersCondition,
+} from "@/lib/project-access";
 import { findActiveTaskOverlaps, taskOverlapKey } from "@/lib/task-overlap";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,6 +26,9 @@ export const GET = handler<{ id: string }>(async (request, params) => {
 
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const taskVisibility = visibleTasksCondition(ctx.user);
+  const fullProjectView = await isProjectMember(project.id, ctx.user);
+  const memberVisibility = fullProjectView ? undefined : visibleUsersCondition(ctx.user);
 
   const active = await db
     .select({
@@ -39,7 +48,8 @@ export const GET = handler<{ id: string }>(async (request, params) => {
       and(
         eq(tasks.projectId, project.id),
         eq(tasks.status, "active"),
-        gt(tasks.heartbeatAt, activeCutoff)
+        gt(tasks.heartbeatAt, activeCutoff),
+        ...(taskVisibility ? [taskVisibility] : [])
       )
     )
     .orderBy(desc(tasks.heartbeatAt));
@@ -59,7 +69,13 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     })
     .from(tasks)
     .innerJoin(users, eq(tasks.userId, users.id))
-    .where(and(eq(tasks.projectId, project.id), gt(tasks.startedAt, recentCutoff)))
+    .where(
+      and(
+        eq(tasks.projectId, project.id),
+        gt(tasks.startedAt, recentCutoff),
+        ...(taskVisibility ? [taskVisibility] : [])
+      )
+    )
     .orderBy(desc(tasks.startedAt))
     .limit(50);
 
@@ -75,7 +91,12 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     })
     .from(projectMembers)
     .innerJoin(users, eq(projectMembers.userId, users.id))
-    .where(eq(projectMembers.projectId, project.id))
+    .where(
+      and(
+        eq(projectMembers.projectId, project.id),
+        ...(memberVisibility ? [memberVisibility] : [])
+      )
+    )
     .orderBy(desc(projectMembers.lastSeenAt));
 
   const messageAuthor = alias(users, "message_author");
@@ -97,7 +118,19 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     .from(projectMessages)
     .leftJoin(messageAuthor, eq(projectMessages.authorId, messageAuthor.id))
     .leftJoin(messageTarget, eq(projectMessages.targetUserId, messageTarget.id))
-    .where(eq(projectMessages.projectId, project.id))
+    .where(
+      and(
+        eq(projectMessages.projectId, project.id),
+        ...(fullProjectView
+          ? []
+          : [
+              or(
+                eq(projectMessages.authorId, ctx.user.id),
+                eq(projectMessages.targetUserId, ctx.user.id)
+              )!,
+            ])
+      )
+    )
     .orderBy(desc(projectMessages.createdAt))
     .limit(20);
 

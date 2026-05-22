@@ -24,7 +24,7 @@ export async function listProjectsWithStats({
   user,
 }: {
   includeTestData?: boolean;
-  user?: Pick<User, "id" | "role">;
+  user?: Pick<User, "id" | "role" | "teamOwnerId">;
 } = {}): Promise<ProjectStat[]> {
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const conditions: SQL[] = [];

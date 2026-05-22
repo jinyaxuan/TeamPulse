@@ -30,7 +30,7 @@ const approveSchema = z.object({
  *     clear it.
  */
 export const POST = handler<{ id: string }>(async (request, params) => {
-  await requireAdminAuth(request);
+  const ctx = await requireAdminAuth(request);
 
   const body = await parseBody(request, approveSchema);
   const userName = body.user_name.toLowerCase();
@@ -55,6 +55,7 @@ export const POST = handler<{ id: string }>(async (request, params) => {
         displayName: body.display_name ?? userName,
         email: device.gitEmail ?? null,
         role: "member",
+        teamOwnerId: ctx.user.teamOwnerId ?? ctx.user.id,
       })
       .returning();
     user = created;

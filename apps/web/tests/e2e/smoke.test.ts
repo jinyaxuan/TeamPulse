@@ -26,6 +26,7 @@ import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { randomBytes, createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import postgres from "postgres";
 
 const BASE = process.env.TEAMPULSE_TEST_URL ?? "http://localhost:3000";
 
@@ -108,6 +109,41 @@ async function runCreateAdmin(env: Record<string, string>) {
   });
 }
 
+async function grantEnterprisePlan(userName: string) {
+  if (!process.env.DATABASE_URL) return;
+
+  const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+  try {
+    const [row] = await sql<{ user_id: string; plan_id: string }[]>`
+      SELECT u."id" AS user_id, p."id" AS plan_id
+      FROM "users" u
+      CROSS JOIN "plans" p
+      WHERE u."name" = ${userName}
+        AND p."slug" = 'enterprise'
+      LIMIT 1
+    `;
+    assert.ok(row, "expected test admin and enterprise plan to exist");
+
+    await sql`
+      INSERT INTO "subscriptions" (
+        "user_id",
+        "plan_id",
+        "status",
+        "current_period_start",
+        "current_period_end"
+      ) VALUES (
+        ${row.user_id},
+        ${row.plan_id},
+        'active',
+        NOW(),
+        NOW() + INTERVAL '30 days'
+      )
+    `;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
 // ---------- tests ----------
 
 test("e2e: full happy path", async (t) => {
@@ -122,6 +158,7 @@ test("e2e: full happy path", async (t) => {
       TEAMPULSE_ADMIN_EMAIL: adminEmail,
       TEAMPULSE_ADMIN_PASSWORD: adminPassword,
     });
+    await grantEnterprisePlan(adminName);
   });
 
   let adminCookie!: string;
@@ -309,11 +346,35 @@ test("e2e: full happy path", async (t) => {
     assert.equal(detail.body.can_manage_members, true);
   });
 
-  await t.test("project: manual membership roles gate visibility and writes", async () => {
-    const beforeJoin = await http(`/api/v1/projects/${projectId}`, {
+  await t.test("project: invited accounts inherit team visibility while writes stay membership-gated", async () => {
+    const teamVisibleDetail = await http(`/api/v1/projects/${projectId}`, {
       cookies: [invitedCookie],
     });
-    assert.equal(beforeJoin.status, 404);
+    assert.equal(teamVisibleDetail.status, 200);
+    assert.ok(
+      teamVisibleDetail.body.members.some((member: any) => member.user_name === devUserName),
+      "invited team member should see inviter team's project membership"
+    );
+
+    const teamProjectList = await http("/api/v1/projects?showTestData=1", {
+      cookies: [invitedCookie],
+    });
+    assert.equal(teamProjectList.status, 200);
+    assert.ok(
+      teamProjectList.body.projects.some((project: any) => project.id === projectId),
+      "invited team member should see inviter team's projects"
+    );
+
+    const readonlyStart = await http("/api/v1/tasks", {
+      method: "POST",
+      cookies: [invitedCookie],
+      body: {
+        git_remote_hash: remoteHash,
+        session_id: `e2e-sess-invited-readonly-${adminName}`,
+        intent: "E2E: team-visible non-member cannot start a task",
+      },
+    });
+    assert.equal(readonlyStart.status, 403);
 
     const added = await http(`/api/v1/projects/${projectId}/members`, {
       method: "POST",
@@ -324,17 +385,17 @@ test("e2e: full happy path", async (t) => {
     assert.equal(added.body.member.user_name, invitedName);
     assert.equal(added.body.member.role, "viewer");
 
-    const afterInvite = await http(`/api/v1/projects/${projectId}`, {
+    const afterManualAdd = await http(`/api/v1/projects/${projectId}`, {
       cookies: [invitedCookie],
     });
-    assert.equal(afterInvite.status, 200);
+    assert.equal(afterManualAdd.status, 200);
     assert.equal(
-      afterInvite.body.members.find((member: any) => member.user_name === invitedName)?.role,
+      afterManualAdd.body.members.find((member: any) => member.user_name === invitedName)?.role,
       "viewer"
     );
 
     const sessionId = `e2e-sess-invited-${adminName}`;
-    const readonlyStart = await http("/api/v1/tasks", {
+    const viewerStart = await http("/api/v1/tasks", {
       method: "POST",
       cookies: [invitedCookie],
       body: {
@@ -343,7 +404,7 @@ test("e2e: full happy path", async (t) => {
         intent: "E2E: viewer cannot start a task",
       },
     });
-    assert.equal(readonlyStart.status, 403);
+    assert.equal(viewerStart.status, 403);
 
     const readonlyMessage = await http(`/api/v1/projects/${projectId}/messages`, {
       method: "POST",
@@ -405,7 +466,42 @@ test("e2e: full happy path", async (t) => {
     const afterRemove = await http(`/api/v1/projects/${projectId}`, {
       cookies: [invitedCookie],
     });
-    assert.equal(afterRemove.status, 404);
+    assert.equal(afterRemove.status, 200);
+
+    const teammateSessionId = `e2e-sess-teammate-${adminName}`;
+    const teammateStarted = await http("/api/v1/tasks", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        project_id: projectId,
+        session_id: teammateSessionId,
+        intent: "E2E: teammate history remains visible after direct membership is removed",
+      },
+    });
+    assert.equal(teammateStarted.status, 200);
+
+    const teammateEnded = await http("/api/v1/tasks/end-session", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${devToken}` },
+      body: {
+        session_id: teammateSessionId,
+        outcome: "done",
+        summary: "E2E: closing teammate visibility fixture.",
+      },
+    });
+    assert.equal(teammateEnded.status, 200);
+    assert.equal(teammateEnded.body.ended_count, 1);
+
+    const teamHistory = await http(`/api/v1/tasks/history?project=${projectId}&user=${devUserName}`, {
+      cookies: [invitedCookie],
+    });
+    assert.equal(teamHistory.status, 200);
+    assert.ok(
+      teamHistory.body.tasks.some(
+        (task: any) => task.id === teammateStarted.body.task_id && task.user_name === devUserName
+      ),
+      "invited team member should keep read access to teammate task history after direct membership is removed"
+    );
   });
 
   let taskId!: string;

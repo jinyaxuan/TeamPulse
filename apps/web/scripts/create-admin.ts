@@ -69,17 +69,18 @@ async function main() {
       }
       await db
         .update(users)
-        .set({ passwordHash, role: "admin", email, displayName })
+        .set({ passwordHash, role: "admin", email, displayName, teamOwnerId: existing.teamOwnerId ?? existing.id })
         .where(eq(users.id, existing.id));
       console.log(`✓ Updated existing user '${name}' as admin.`);
     } else {
-      await db.insert(users).values({
+      const [created] = await db.insert(users).values({
         name,
         email,
         displayName,
         passwordHash,
         role: "admin",
-      });
+      }).returning({ id: users.id });
+      await db.update(users).set({ teamOwnerId: created.id }).where(eq(users.id, created.id));
       console.log(`✓ Created admin user '${name}'.`);
     }
   } finally {

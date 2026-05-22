@@ -1,4 +1,4 @@
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -7,7 +7,14 @@ import { db, projectMembers, projectMessages, taskOverlapResolutions, tasks, use
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
 import { gitRemoteLinks } from "@/lib/git-remote";
-import { canManageProjectMembers, canWriteProject, getVisibleProject } from "@/lib/project-access";
+import {
+  canManageProjectMembers,
+  canWriteProject,
+  getVisibleProject,
+  isProjectMember,
+  visibleTasksCondition,
+  visibleUsersCondition,
+} from "@/lib/project-access";
 import { findActiveTaskOverlaps, taskOverlapKey, type ActiveTaskOverlap, type OverlapReason } from "@/lib/task-overlap";
 import { formatRelativeTime, taskStatusLabel } from "@/lib/utils";
 import { OverlapActionControls, type OverlapResolutionRow } from "./overlap-action-controls";
@@ -40,6 +47,9 @@ export default async function ProjectPage({
 
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const recentCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const taskVisibility = visibleTasksCondition(user);
+  const fullProjectView = await isProjectMember(project.id, user);
+  const memberVisibility = fullProjectView ? undefined : visibleUsersCondition(user);
 
   const active = await db
     .select({
@@ -59,7 +69,8 @@ export default async function ProjectPage({
       and(
         eq(tasks.projectId, project.id),
         eq(tasks.status, "active"),
-        gt(tasks.heartbeatAt, activeCutoff)
+        gt(tasks.heartbeatAt, activeCutoff),
+        ...(taskVisibility ? [taskVisibility] : [])
       )
     )
     .orderBy(desc(tasks.heartbeatAt));
@@ -78,7 +89,13 @@ export default async function ProjectPage({
     })
     .from(tasks)
     .innerJoin(users, eq(tasks.userId, users.id))
-    .where(and(eq(tasks.projectId, project.id), gt(tasks.startedAt, recentCutoff)))
+    .where(
+      and(
+        eq(tasks.projectId, project.id),
+        gt(tasks.startedAt, recentCutoff),
+        ...(taskVisibility ? [taskVisibility] : [])
+      )
+    )
     .orderBy(desc(tasks.startedAt))
     .limit(50);
 
@@ -94,7 +111,12 @@ export default async function ProjectPage({
     })
     .from(projectMembers)
     .innerJoin(users, eq(projectMembers.userId, users.id))
-    .where(eq(projectMembers.projectId, project.id))
+    .where(
+      and(
+        eq(projectMembers.projectId, project.id),
+        ...(memberVisibility ? [memberVisibility] : [])
+      )
+    )
     .orderBy(desc(projectMembers.lastSeenAt));
   const canManageMembers = await canManageProjectMembers(project.id, user);
   const canWriteMessages = await canWriteProject(project.id, user);
@@ -118,7 +140,19 @@ export default async function ProjectPage({
     .from(projectMessages)
     .leftJoin(messageAuthor, eq(projectMessages.authorId, messageAuthor.id))
     .leftJoin(messageTarget, eq(projectMessages.targetUserId, messageTarget.id))
-    .where(eq(projectMessages.projectId, project.id))
+    .where(
+      and(
+        eq(projectMessages.projectId, project.id),
+        ...(fullProjectView
+          ? []
+          : [
+              or(
+                eq(projectMessages.authorId, user.id),
+                eq(projectMessages.targetUserId, user.id)
+              )!,
+            ])
+      )
+    )
     .orderBy(desc(projectMessages.createdAt))
     .limit(20);
 
