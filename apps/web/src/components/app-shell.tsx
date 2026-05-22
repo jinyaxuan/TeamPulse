@@ -10,7 +10,7 @@ export function AppShell({
 }: {
   user: User;
   children: React.ReactNode;
-  activeNav?: "home" | "projects" | "activity" | "team";
+  activeNav?: "home" | "projects" | "activity" | "team" | "admin-users" | "admin-devices";
 }) {
   const navItem = (href: string, label: string, key: string) => (
     <Link
@@ -65,13 +65,23 @@ export function AppShell({
                 <>
                   <Link
                     href="/admin/users"
-                    className="ml-1 rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-white hover:text-foreground hover:shadow-sm"
+                    className={cn(
+                      "ml-1 rounded-full px-3 py-2 text-xs font-medium transition",
+                      activeNav === "admin-users"
+                        ? "bg-white text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-white hover:text-foreground hover:shadow-sm"
+                    )}
                   >
                     用户管理
                   </Link>
                   <Link
                     href="/admin/devices"
-                    className="rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-white hover:text-foreground hover:shadow-sm"
+                    className={cn(
+                      "rounded-full px-3 py-2 text-xs font-medium transition",
+                      activeNav === "admin-devices"
+                        ? "bg-white text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-white hover:text-foreground hover:shadow-sm"
+                    )}
                   >
                     Agent 管理
                   </Link>

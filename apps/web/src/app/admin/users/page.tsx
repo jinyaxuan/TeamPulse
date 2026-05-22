@@ -1,4 +1,9 @@
 import { desc, eq, count } from "drizzle-orm";
+import { ActionLink } from "@/components/ui/action-link";
+import { MetricCard } from "@/components/ui/metric-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Workspace } from "@/components/ui/workspace";
 import { db, devices, inviteCodes, tasks, users } from "@/db";
 import { InviteCodesPanel, type InviteCodeRow } from "./invite-codes-panel";
 import { UsersTable, type UserRow } from "./users-table";
@@ -48,16 +53,48 @@ export default async function AdminUsersPage() {
     .from(inviteCodes)
     .orderBy(desc(inviteCodes.createdAt));
 
+  const activeUsers = enriched.filter((user) => !user.revoked_at).length;
+  const adminUsers = enriched.filter((user) => !user.revoked_at && user.role === "admin").length;
+  const totalDevices = enriched.reduce((sum, user) => sum + Number(user.device_count), 0);
+  const totalTasks = enriched.reduce((sum, user) => sum + Number(user.task_count), 0);
+  const usableInvites = inviteRows.filter((invite) => {
+    const expired = invite.expires_at ? invite.expires_at.getTime() <= Date.now() : false;
+    return !invite.revoked_at && !expired && invite.uses < invite.max_uses;
+  }).length;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">用户管理</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          管理成员角色和访问权限。团队成员用自己的账号到“我的接入”绑定各自的 Agent 设备。
-        </p>
-      </div>
-      <InviteCodesPanel inviteCodes={inviteRows} />
-      <UsersTable users={enriched} />
-    </div>
+    <Workspace>
+      <PageHeader
+        eyebrow="后台权限中心"
+        title="用户管理"
+        description="邀请码、成员角色和账号状态集中在这里；成员加入后会自动继承邀请人的团队可见范围。"
+        actions={
+          <>
+            <ActionLink href="/team">团队视图</ActionLink>
+            <ActionLink href="/admin/devices" variant="primary">Agent 管理</ActionLink>
+          </>
+        }
+        meta={
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge tone="online">{activeUsers} 个可用账号</StatusBadge>
+            <StatusBadge tone="agent">{adminUsers} 个管理员</StatusBadge>
+            <StatusBadge>{usableInvites} 个可用邀请码</StatusBadge>
+            <StatusBadge>{totalDevices} 台设备</StatusBadge>
+          </div>
+        }
+      />
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="可用账号" value={activeUsers} detail={`共 ${enriched.length} 个账号`} tone="online" />
+        <MetricCard label="管理员" value={adminUsers} detail="拥有后台权限" tone="agent" />
+        <MetricCard label="邀请码" value={usableInvites} detail={`${inviteRows.length} 条历史记录`} tone="warning" />
+        <MetricCard label="任务记录" value={totalTasks} detail={`${totalDevices} 台绑定设备`} tone="default" />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <InviteCodesPanel inviteCodes={inviteRows} />
+        <UsersTable users={enriched} />
+      </section>
+    </Workspace>
   );
 }

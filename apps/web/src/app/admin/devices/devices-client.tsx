@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AgentMetadataForm } from "@/components/agent-metadata-form";
+import { ActionButton } from "@/components/ui/action-link";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { agentDisplayName, agentTypeLabel } from "@/lib/agent-display";
 import { withBasePath } from "@/lib/base-path";
 import { formatRelativeTime } from "@/lib/utils";
@@ -80,22 +83,17 @@ export function DevicesClient({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
       {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="xl:col-span-2 rounded-[20px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          待认领 ({pending.length})
-        </h2>
-        <div className="mt-3 space-y-3">
+      <Panel title={`待认领 (${pending.length})`} description="新安装的 Agent 会先停在这里，确认身份后绑定成员。">
+        <div className="space-y-3">
           {pending.length === 0 && (
-            <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-              暂无待认领设备。成员安装或运行 Agent 接入命令后，会自动出现在这里。
-            </p>
+            <EmptyPanel>暂无待认领设备。成员安装或运行 Agent 接入命令后，会自动出现在这里。</EmptyPanel>
           )}
           {pending.map((d) => (
             <PendingCard
@@ -108,42 +106,29 @@ export function DevicesClient({
             />
           ))}
         </div>
-      </section>
+      </Panel>
 
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          已启用设备 ({active.length})
-        </h2>
-        <div className="mt-3 overflow-x-auto rounded-md border bg-card">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 text-left">Agent</th>
-                <th className="px-4 py-2 text-left">用户</th>
-                <th className="px-4 py-2 text-left">职责</th>
-                <th className="px-4 py-2 text-left">最近使用</th>
-                <th className="px-4 py-2 text-left">绑定时间</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {active.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                    暂无已启用设备。
-                  </td>
-                </tr>
-              )}
-              {active.map((d) => (
-                <tr key={d.id} className="border-b last:border-b-0">
-                  <td className="px-4 py-2">
-                    <div className="font-medium">{agentDisplayName(d)}</div>
-                    <div className="mt-1 font-mono text-xs text-muted-foreground">
-                      {agentTypeLabel(d.agent_type)} · {d.hostname ?? "未知主机"}
-                      {d.os && ` · ${d.os}`}
+      <Panel title={`已启用设备 (${active.length})`} description="按最近使用排序，展示成员、职责和能力。">
+        <div className="space-y-3">
+          {active.length === 0 ? (
+            <EmptyPanel>暂无已启用设备。</EmptyPanel>
+          ) : (
+            active.map((d) => (
+              <div key={d.id} className="rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_auto] lg:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{agentDisplayName(d)}</span>
+                      <StatusBadge tone="agent">{agentTypeLabel(d.agent_type)}</StatusBadge>
+                    </div>
+                    <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                      {d.hostname ?? "未知主机"}{d.os ? ` · ${d.os}` : ""}
                     </div>
                     {d.git_email && (
                       <div className="mt-1 text-xs text-muted-foreground">Git 邮箱：{d.git_email}</div>
+                    )}
+                    {d.agent_role && (
+                      <div className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{d.agent_role}</div>
                     )}
                     {d.capabilities.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -154,45 +139,38 @@ export function DevicesClient({
                         ))}
                       </div>
                     )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {d.user_display_name ?? d.user_name}{" "}
-                    <span className="text-xs text-muted-foreground">@{d.user_name}</span>
-                  </td>
-                  <td className="max-w-xs px-4 py-2 text-muted-foreground">
-                    {d.agent_role ? <span className="line-clamp-2">{d.agent_role}</span> : "—"}
-                  </td>
-                  <td className="px-4 py-2 text-muted-foreground">
-                    {d.last_used_at ? formatRelativeTime(d.last_used_at) : "暂无"}
-                  </td>
-                  <td className="px-4 py-2 text-muted-foreground">
-                    {d.approved_at ? formatRelativeTime(d.approved_at) : "—"}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <details className="text-left">
-                        <summary className="cursor-pointer rounded-md border px-2 py-1 text-xs hover:bg-slate-50">
-                          编辑
-                        </summary>
-                        <div className="absolute right-6 z-10 mt-2 w-[min(28rem,calc(100vw-3rem))] rounded-lg border bg-white p-4 text-left shadow-lg">
-                          <AgentMetadataForm device={d} compact />
-                        </div>
-                      </details>
-                      <button
-                        onClick={() => revoke(d.id)}
-                        disabled={isPending}
-                        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                      >
-                        撤销
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <div className="font-medium text-foreground">{d.user_display_name ?? d.user_name}</div>
+                    <div>@{d.user_name}</div>
+                    <div className="mt-2">最近使用 {d.last_used_at ? formatRelativeTime(d.last_used_at) : "暂无"}</div>
+                    <div>绑定 {d.approved_at ? formatRelativeTime(d.approved_at) : "—"}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <details className="text-left">
+                      <summary className="cursor-pointer rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-surface">
+                        编辑
+                      </summary>
+                      <div className="absolute right-6 z-10 mt-2 w-[min(28rem,calc(100vw-3rem))] rounded-[22px] border border-black/10 bg-white p-4 text-left shadow-[0_24px_70px_-38px_rgba(0,0,0,0.42)]">
+                        <AgentMetadataForm device={d} compact />
+                      </div>
+                    </details>
+                    <ActionButton
+                      type="button"
+                      onClick={() => revoke(d.id)}
+                      disabled={isPending}
+                      variant="danger"
+                      className="px-3 py-1.5 text-xs"
+                    >
+                      撤销
+                    </ActionButton>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
-      </section>
+      </Panel>
     </div>
   );
 }
@@ -216,11 +194,14 @@ function PendingCard({
   const listId = `users-${device.id}`;
 
   return (
-    <div className="rounded-md border bg-card p-4">
+    <div className="rounded-[22px] bg-white p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 space-y-1">
-          <div className="font-mono text-sm font-semibold">{device.claim_code ?? "—"}</div>
-          <div className="text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-mono text-sm font-semibold">{device.claim_code ?? "—"}</div>
+            <StatusBadge tone="warning">待认领</StatusBadge>
+          </div>
+          <div className="text-sm font-medium">
             <span className="font-medium">{agentDisplayName(device)}</span>
             {device.os && <span className="text-muted-foreground"> · {device.os}</span>}
           </div>
@@ -247,7 +228,7 @@ function PendingCard({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例如 alice"
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="tp-focus-ring mt-1 w-full rounded-full border border-input bg-white px-4 py-2.5 text-sm"
           />
           <datalist id={listId}>
             {existingUsers.map((u) => (
@@ -263,14 +244,14 @@ function PendingCard({
             onApprove(device.id, name.trim());
           }}
           disabled={disabled || !name.trim()}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-black/80 disabled:opacity-50"
         >
           绑定到用户
         </button>
         <button
           onClick={() => onReject(device.id)}
           disabled={disabled}
-          className="rounded-md border px-4 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+          className="rounded-full border border-red-200 px-4 py-2 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-50"
         >
           拒绝
         </button>

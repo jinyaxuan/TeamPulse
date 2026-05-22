@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ActionButton } from "@/components/ui/action-link";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { withBasePath } from "@/lib/base-path";
 import { formatRelativeTime, roleLabel } from "@/lib/utils";
 
@@ -49,86 +52,99 @@ export function UsersTable({ users }: { users: UserRow[] }) {
   }
 
   return (
-    <div className="space-y-3">
+    <Panel title={`成员账号 (${users.length})`} description="角色、设备和任务贡献按账号汇总。" bodyClassName="p-3 sm:p-4">
       {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="mb-3 rounded-[20px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
-      <div className="overflow-hidden rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 text-left">用户</th>
-              <th className="px-4 py-2 text-left">邮箱</th>
-              <th className="px-4 py-2 text-left">角色</th>
-              <th className="px-4 py-2 text-left">设备</th>
-              <th className="px-4 py-2 text-left">任务</th>
-              <th className="px-4 py-2 text-left">加入时间</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b last:border-b-0">
-                <td className="px-4 py-2">
-                  <div className="font-medium">{u.display_name ?? u.name}</div>
-                  <div className="text-xs text-muted-foreground">@{u.name}</div>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{u.email ?? "—"}</td>
-                <td className="px-4 py-2">
-                  {u.revoked_at ? (
-                    <span className="rounded-full bg-destructive/20 px-2 py-0.5 text-xs text-destructive">
-                      已撤销
-                    </span>
-                  ) : u.role === "admin" ? (
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                      {roleLabel(u.role)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">{roleLabel(u.role)}</span>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{u.device_count}</td>
-                <td className="px-4 py-2 text-muted-foreground">{u.task_count}</td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {formatRelativeTime(u.created_at)}
-                </td>
-                <td className="px-4 py-2 text-right">
+      <div className="space-y-3">
+        {users.length === 0 ? (
+          <EmptyPanel>还没有成员账号。</EmptyPanel>
+        ) : (
+          users.map((u) => (
+            <div key={u.id} className="rounded-[22px] bg-white p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-surface">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto] lg:items-center">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">
+                    {(u.display_name ?? u.name).slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-medium">{u.display_name ?? u.name}</span>
+                      {u.revoked_at ? (
+                        <StatusBadge tone="risk">已撤销</StatusBadge>
+                      ) : u.role === "admin" ? (
+                        <StatusBadge tone="info">{roleLabel(u.role)}</StatusBadge>
+                      ) : (
+                        <StatusBadge>{roleLabel(u.role)}</StatusBadge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>@{u.name}</span>
+                      <span>{u.email ?? "未设置邮箱"}</span>
+                      <span>加入 {formatRelativeTime(u.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <StatPill label="设备" value={u.device_count} />
+                  <StatPill label="任务" value={u.task_count} />
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  {u.revoked_at ? `撤销 ${formatRelativeTime(u.revoked_at)}` : "账号可正常登录"}
+                </div>
+
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   {!u.revoked_at && (
-                    <div className="flex items-center justify-end gap-2">
+                    <>
                       {u.role === "admin" ? (
-                        <button
+                        <ActionButton
+                          type="button"
                           onClick={() => setRole(u.id, "member")}
                           disabled={pending}
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
+                          className="px-3 py-1.5 text-xs"
                         >
                           设为成员
-                        </button>
+                        </ActionButton>
                       ) : (
-                        <button
+                        <ActionButton
+                          type="button"
                           onClick={() => setRole(u.id, "admin")}
                           disabled={pending}
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
+                          className="px-3 py-1.5 text-xs"
                         >
                           设为管理员
-                        </button>
+                        </ActionButton>
                       )}
-                      <button
+                      <ActionButton
+                        type="button"
                         onClick={() => revoke(u.id, u.name)}
                         disabled={pending}
-                        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        variant="danger"
+                        className="px-3 py-1.5 text-xs"
                       >
                         撤销
-                      </button>
-                    </div>
+                      </ActionButton>
+                    </>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
+    </Panel>
+  );
+}
+
+function StatPill({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-full bg-surface px-3 py-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="ml-2 font-mono font-semibold text-foreground">{value}</span>
     </div>
   );
 }

@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ActionButton } from "@/components/ui/action-link";
+import { EmptyPanel, Panel } from "@/components/ui/panel";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { withBasePath } from "@/lib/base-path";
-import { formatDateTime, formatRelativeTime } from "@/lib/utils";
+import { cn, formatDateTime, formatRelativeTime } from "@/lib/utils";
 
 export type InviteCodeRow = {
   id: string;
@@ -68,110 +71,103 @@ export function InviteCodesPanel({ inviteCodes }: { inviteCodes: InviteCodeRow[]
   }
 
   return (
-    <section className="space-y-4 rounded-lg border bg-card p-4 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold">邀请注册</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          只允许通过邀请码创建成员账号。邀请码明文只在创建后显示一次，数据库只保存哈希。
-        </p>
-      </div>
-
+    <Panel
+      title="邀请注册"
+      description="邀请码明文只在创建后显示一次，数据库只保存哈希。"
+      className="h-fit"
+    >
       {createdCode && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          新邀请码：<span className="font-mono font-semibold">{createdCode}</span>
-          <span className="ml-2 text-emerald-700">请现在发给成员，刷新后不会再次显示。</span>
+        <div className="mb-4 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <div className="text-xs font-medium text-emerald-700">新邀请码</div>
+          <div className="mt-1 break-all font-mono text-lg font-semibold">{createdCode}</div>
+          <div className="mt-1 text-xs text-emerald-700">请现在发给成员，刷新后不会再次显示。</div>
         </div>
       )}
 
       {error && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="mb-4 rounded-[20px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
-      <form onSubmit={createInvite} className="grid gap-3 md:grid-cols-[1fr_120px_190px_auto]">
-        <input
-          value={label}
-          onChange={(event) => setLabel(event.target.value)}
-          placeholder="备注，例如 前端同学"
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-        />
-        <input
-          type="number"
-          min={1}
-          max={1000}
-          value={maxUses}
-          onChange={(event) => setMaxUses(Number(event.target.value))}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-          aria-label="可使用次数"
-        />
-        <input
-          type="datetime-local"
-          value={expiresAt}
-          onChange={(event) => setExpiresAt(event.target.value)}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-          aria-label="过期时间"
-        />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-        >
+      <form onSubmit={createInvite} className="grid gap-3">
+        <label className="grid gap-1.5 text-sm">
+          <span className="text-xs font-medium text-muted-foreground">备注</span>
+          <input
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+            placeholder="例如 前端同学"
+            className="tp-focus-ring rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+          />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">可使用</span>
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              value={maxUses}
+              onChange={(event) => setMaxUses(Number(event.target.value))}
+              className="tp-focus-ring rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+              aria-label="可使用次数"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">过期时间</span>
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(event) => setExpiresAt(event.target.value)}
+              className="tp-focus-ring rounded-full border border-input bg-white px-4 py-2.5 text-sm"
+              aria-label="过期时间"
+            />
+          </label>
+        </div>
+        <ActionButton type="submit" disabled={pending} variant="primary" className="w-full">
           创建邀请码
-        </button>
+        </ActionButton>
       </form>
 
-      <div className="overflow-hidden rounded-md border">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 text-left">备注</th>
-              <th className="px-4 py-2 text-left">使用</th>
-              <th className="px-4 py-2 text-left">状态</th>
-              <th className="px-4 py-2 text-left">创建</th>
-              <th className="px-4 py-2 text-left">过期</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {inviteCodes.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
-                  还没有邀请码
-                </td>
-              </tr>
-            ) : (
-              inviteCodes.map((invite) => (
-                <tr key={invite.id} className="border-b last:border-b-0">
-                  <td className="px-4 py-2">{invite.label ?? "—"}</td>
-                  <td className="px-4 py-2 text-muted-foreground">
-                    {invite.uses} / {invite.max_uses}
-                  </td>
-                  <td className="px-4 py-2">{inviteStatus(invite)}</td>
-                  <td className="px-4 py-2 text-muted-foreground">
-                    {formatRelativeTime(invite.created_at)}
-                  </td>
-                  <td className="px-4 py-2 text-muted-foreground">
-                    {invite.expires_at ? formatDateTime(invite.expires_at) : "不过期"}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    {!invite.revoked_at && invite.uses < invite.max_uses && (
-                      <button
-                        onClick={() => revokeInvite(invite.id)}
-                        disabled={pending}
-                        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                      >
-                        撤销
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="mt-5 space-y-2">
+        {inviteCodes.length === 0 ? (
+          <EmptyPanel>还没有邀请码。</EmptyPanel>
+        ) : (
+          inviteCodes.map((invite) => (
+            <div key={invite.id} className="rounded-[20px] bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{invite.label ?? "未备注邀请码"}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    创建 {formatRelativeTime(invite.created_at)} · {invite.expires_at ? `过期 ${formatDateTime(invite.expires_at)}` : "不过期"}
+                  </div>
+                </div>
+                {inviteStatus(invite)}
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface">
+                  <div
+                    className={cn("h-full rounded-full", invite.uses >= invite.max_uses ? "bg-muted-foreground" : "bg-agent")}
+                    style={{ width: `${Math.min((invite.uses / invite.max_uses) * 100, 100)}%` }}
+                  />
+                </div>
+                <span className="font-mono text-xs text-muted-foreground">{invite.uses}/{invite.max_uses}</span>
+                {!invite.revoked_at && invite.uses < invite.max_uses && (
+                  <button
+                    type="button"
+                    onClick={() => revokeInvite(invite.id)}
+                    disabled={pending}
+                    className="rounded-full border border-red-200 px-2.5 py-1 text-xs text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    撤销
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
-    </section>
+    </Panel>
   );
 }
 
@@ -180,29 +176,13 @@ function inviteStatus(invite: InviteCodeRow) {
   const usedUp = invite.uses >= invite.max_uses;
 
   if (invite.revoked_at) {
-    return (
-      <span className="rounded-full bg-destructive/20 px-2 py-0.5 text-xs text-destructive">
-        已撤销
-      </span>
-    );
+    return <StatusBadge tone="risk">已撤销</StatusBadge>;
   }
   if (expired) {
-    return (
-      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-        已过期
-      </span>
-    );
+    return <StatusBadge>已过期</StatusBadge>;
   }
   if (usedUp) {
-    return (
-      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-        已用完
-      </span>
-    );
+    return <StatusBadge>已用完</StatusBadge>;
   }
-  return (
-    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
-      可使用
-    </span>
-  );
+  return <StatusBadge tone="online">可使用</StatusBadge>;
 }
