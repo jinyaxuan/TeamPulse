@@ -5,15 +5,26 @@ import { db, devices, projects, tasks, users } from "@/db";
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/auth";
 import { listVisibleProjectMemberUserIds, visibleTasksCondition } from "@/lib/project-access";
-import { nonTestProjectCondition, nonTestUserCondition } from "@/lib/test-data";
+import {
+  nonTestProjectCondition,
+  nonTestUserCondition,
+  shouldShowTestData,
+  SHOW_TEST_DATA_PARAM,
+} from "@/lib/test-data";
 import { clientLabel, formatRelativeTime, roleLabel, taskStatusLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/login");
 
+  const query = await searchParams;
+  const includeTestData = shouldShowTestData(firstSearchParam(query[SHOW_TEST_DATA_PARAM]));
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const activeCutoff = new Date(Date.now() - 15 * 60 * 1000);
   const taskVisibility = visibleTasksCondition(sessionUser);
@@ -59,8 +70,7 @@ export default async function TeamPage() {
     .where(
       and(
         isNull(users.revokedAt),
-        nonTestUserCondition(),
-        nonTestProjectCondition(),
+        ...(includeTestData ? [] : [nonTestUserCondition(), nonTestProjectCondition()]),
         ...(memberVisibility ? [memberVisibility] : [])
       )
     )
@@ -89,8 +99,7 @@ export default async function TeamPage() {
         eq(tasks.status, "active"),
         gt(tasks.heartbeatAt, activeCutoff),
         isNull(users.revokedAt),
-        nonTestProjectCondition(),
-        nonTestUserCondition(),
+        ...(includeTestData ? [] : [nonTestProjectCondition(), nonTestUserCondition()]),
         ...(taskVisibility ? [taskVisibility] : [])
       )
     )
@@ -115,8 +124,7 @@ export default async function TeamPage() {
       and(
         gte(tasks.startedAt, since),
         isNull(users.revokedAt),
-        nonTestProjectCondition(),
-        nonTestUserCondition(),
+        ...(includeTestData ? [] : [nonTestProjectCondition(), nonTestUserCondition()]),
         ...(taskVisibility ? [taskVisibility] : [])
       )
     )
@@ -197,7 +205,12 @@ export default async function TeamPage() {
                       </div>
                       <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{m.display_name ?? m.name}</span>
+                        <Link
+                          href={`/team/${m.id}`}
+                          className="font-medium hover:text-slate-700 hover:underline"
+                        >
+                          {m.display_name ?? m.name}
+                        </Link>
                         {m.id === sessionUser.id && <SelfPill>我</SelfPill>}
                         <span className="text-xs text-muted-foreground">@{m.name}</span>
                         {m.role === "admin" && <RolePill>{roleLabel(m.role)}</RolePill>}
@@ -237,6 +250,14 @@ export default async function TeamPage() {
                       最近 7 天没有任务。
                     </div>
                   )}
+                  <div className="mt-3 border-t pt-3">
+                    <Link
+                      href={`/team/${m.id}`}
+                      className="text-xs font-medium text-slate-700 hover:text-slate-950 hover:underline"
+                    >
+                      查看成员详情
+                    </Link>
+                  </div>
                 </article>
               );
             })}
@@ -282,6 +303,10 @@ export default async function TeamPage() {
       </div>
     </AppShell>
   );
+}
+
+function firstSearchParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function timestamp(value: Date | string | null): number {

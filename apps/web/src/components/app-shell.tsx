@@ -43,12 +43,20 @@ export function AppShell({
               {navItem("/activity", "动态", "activity")}
               {navItem("/team", "团队", "team")}
               {user.role === "admin" && (
-                <Link
-                  href="/admin/devices"
-                  className="ml-3 rounded-md border bg-white px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:text-foreground"
-                >
-                  管理
-                </Link>
+                <>
+                  <Link
+                    href="/admin/users"
+                    className="ml-3 rounded-md border bg-white px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:text-foreground"
+                  >
+                    用户管理
+                  </Link>
+                  <Link
+                    href="/admin/devices"
+                    className="rounded-md border bg-white px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:text-foreground"
+                  >
+                    设备管理
+                  </Link>
+                </>
               )}
             </nav>
           </div>
