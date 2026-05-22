@@ -57,6 +57,13 @@
       "when": 1779370261806,
       "tag": "0007_chilly_marvex",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779425017406,
+      "tag": "0008_seed_pricing_plans",
+      "breakpoints": true
     }
   ]
 }
