@@ -1,10 +1,21 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { env } from "@/lib/env";
 import { LoginForm } from "./login-form";
+import { OidcButton } from "./oidc-button";
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams?: {
+    local?: string;
+  };
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const user = await getSessionUser();
   if (user) redirect("/");
+
+  const localLogin = searchParams?.local === "1";
+  if (env.OIDC_ENABLED && !localLogin) redirect("/api/v1/auth/oidc");
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
@@ -15,6 +26,11 @@ export default async function LoginPage() {
         </div>
         <p className="mt-5 text-sm text-muted-foreground">使用统一身份账号登录，查看团队实时任务、项目动态和设备接入状态。</p>
         <div className="mt-6">
+          {env.OIDC_ENABLED && (
+            <div className="mb-4">
+              <OidcButton />
+            </div>
+          )}
           <LoginForm />
         </div>
         <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
