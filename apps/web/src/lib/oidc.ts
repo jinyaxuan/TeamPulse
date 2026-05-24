@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
 import { env } from "@/lib/env";
 
+export const OIDC_AUTO_LOGIN_PAUSE_COOKIE = "teampulse_oidc_pause";
+
 type OidcMetadata = {
   authorization_endpoint: string;
   token_endpoint: string;

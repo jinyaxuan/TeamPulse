@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { OIDC_AUTO_LOGIN_PAUSE_COOKIE } from "@/lib/oidc";
 import { LoginForm } from "./login-form";
 import { OidcButton } from "./oidc-button";
 
@@ -14,7 +16,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const user = await getSessionUser();
   if (user) redirect("/");
 
-  const localLogin = searchParams?.local === "1";
+  const localLogin = searchParams?.local === "1" || cookies().get(OIDC_AUTO_LOGIN_PAUSE_COOKIE)?.value === "1";
   if (env.OIDC_ENABLED && !localLogin) redirect("/api/v1/auth/oidc");
 
   return (
