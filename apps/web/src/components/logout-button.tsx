@@ -12,7 +12,7 @@ export function LogoutButton() {
   async function logout() {
     await fetch(withBasePath("/api/v1/auth/logout"), { method: "POST" });
     startTransition(() => {
-      router.replace("/login");
+      router.replace(withBasePath("/login?local=1"));
       router.refresh();
     });
   }
