@@ -22,49 +22,6 @@ const registerSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
-/**
- * Sync user to Casdoor so credentials work across all services.
- */
-async function syncToCasdoor(name: string, email: string, password: string, displayName: string) {
-  if (!env.OIDC_ISSUER || !env.OIDC_CLIENT_ID) return;
-  try {
-    // Login as admin to get session
-    const loginRes = await fetch(`${env.OIDC_ISSUER}/api/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        application: "app-tangchaolizi",
-        organization: "tangchaolizi",
-        username: "admin",
-        password: "Wjd123..",
-        type: "login",
-      }),
-    });
-    const cookies = loginRes.headers.get("set-cookie") ?? "";
-    const sessionCookie = cookies.split(";")[0];
-
-    // Create user in Casdoor
-    await fetch(`${env.OIDC_ISSUER}/api/add-user`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Cookie: sessionCookie,
-      },
-      body: JSON.stringify({
-        owner: "tangchaolizi",
-        name,
-        displayName,
-        email,
-        password,
-        type: "normal-user",
-        signupApplication: "teampulse",
-      }),
-    });
-  } catch (err) {
-    console.warn("Casdoor sync failed (non-fatal):", err);
-  }
-}
-
 export const POST = handler(async (request) => {
   const rateLimited = checkRateLimit(request, "register", 5, 60 * 60 * 1000);
   if (rateLimited) return rateLimited;
@@ -153,9 +110,6 @@ export const POST = handler(async (request) => {
 
     return [newUser];
   });
-
-  // Sync to Casdoor (fire-and-forget, non-blocking)
-  syncToCasdoor(userName, body.email, body.password, body.display_name ?? userName).catch(() => {});
 
   const session = await createSession(created.id);
   await setSessionCookie(session.id, session.expiresAt);

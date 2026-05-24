@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db, users } from "@/db";
 import { createSession, setSessionCookie } from "@/lib/auth";
-import { env } from "@/lib/env";
+import { buildOidcTokenRequest, getOidcMetadata } from "@/lib/oidc";
 
 export const dynamic = "force-dynamic";
 
@@ -23,17 +23,14 @@ export async function GET(request: Request) {
     return new Response("Invalid OIDC callback", { status: 400 });
   }
 
+  const metadata = await getOidcMetadata();
+  const tokenRequest = buildOidcTokenRequest(metadata, code);
+
   // Exchange code for tokens
-  const tokenRes = await fetch(`${env.OIDC_ISSUER}/api/login/oauth/access_token`, {
+  const tokenRes = await fetch(metadata.token_endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: `${env.PUBLIC_APP_URL}/api/v1/auth/oidc/callback`,
-      client_id: env.OIDC_CLIENT_ID,
-      client_secret: env.OIDC_CLIENT_SECRET,
-    }),
+    headers: tokenRequest.headers,
+    body: tokenRequest.body,
   });
 
   if (!tokenRes.ok) {
@@ -44,9 +41,15 @@ export async function GET(request: Request) {
 
   const tokenData = await tokenRes.json();
   const accessToken = tokenData.access_token;
+  if (!accessToken) {
+    return new Response("OIDC token response missing access token", { status: 502 });
+  }
+  if (!metadata.userinfo_endpoint) {
+    return new Response("OIDC discovery response missing userinfo endpoint", { status: 502 });
+  }
 
   // Fetch user info
-  const userInfoRes = await fetch(`${env.OIDC_ISSUER}/api/userinfo`, {
+  const userInfoRes = await fetch(metadata.userinfo_endpoint, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
