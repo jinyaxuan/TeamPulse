@@ -11,7 +11,7 @@ export function AppShell({
 }: {
   user: User;
   children: React.ReactNode;
-  activeNav?: "home" | "projects" | "activity" | "team" | "admin-users" | "admin-devices";
+  activeNav?: "home" | "projects" | "activity" | "team" | "ops" | "admin-users" | "admin-devices";
 }) {
   const navItem = (href: string, label: string, key: string) => (
     <ProgressLink
@@ -63,6 +63,7 @@ export function AppShell({
                 {navItem("/projects", "项目", "projects")}
                 {navItem("/activity", "动态", "activity")}
                 {navItem("/team", "团队", "team")}
+                {user.role === "admin" && navItem("/ops", "发布台", "ops")}
                 {user.role === "admin" && (
                   <>
                     <ProgressLink

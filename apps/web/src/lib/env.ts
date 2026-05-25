@@ -42,4 +42,10 @@ export const env = {
   get REGISTRATION_MODE() {
     return (process.env.REGISTRATION_MODE ?? "open") as "open" | "invite_only";
   },
+  get OPS_GITEA_BASE_URL() {
+    return process.env.OPS_GITEA_BASE_URL ?? "https://gitea.tangchaolizi.com";
+  },
+  get OPS_GITEA_TOKEN() {
+    return process.env.OPS_GITEA_TOKEN ?? "";
+  },
 };
