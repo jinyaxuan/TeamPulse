@@ -89,7 +89,7 @@ export async function getWorkflowState(service: OpsService): Promise<OpsWorkflow
       `/api/v1/repos/${encodePath(service.owner)}/${encodePath(service.repo)}/actions/runs?${params.toString()}`
     );
     const runs = (Array.isArray(data.workflow_runs) ? data.workflow_runs : Array.isArray(data.runs) ? data.runs : [])
-      .filter((run) => run.path === workflow.path);
+      .filter((run) => isRunForWorkflow(run, workflow));
     const latest = runs[0];
     if (!latest) {
       return {
@@ -152,6 +152,14 @@ async function resolveWorkflow(service: OpsService): Promise<GiteaWorkflow | und
       path.endsWith(`/${service.workflow}`)
     );
   });
+}
+
+function isRunForWorkflow(run: GiteaWorkflowRun, workflow: GiteaWorkflow): boolean {
+  const runPath = (run.path ?? "").split("@", 1)[0];
+  const workflowPath = workflow.path ?? "";
+  const workflowFile = workflowPath.split("/").pop() ?? workflowPath;
+  const workflowId = workflow.id ? String(workflow.id) : "";
+  return runPath === workflowPath || runPath === workflowFile || runPath === workflowId;
 }
 
 async function giteaRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
