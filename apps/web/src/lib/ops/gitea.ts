@@ -10,10 +10,22 @@ type GiteaWorkflowRun = {
   event?: string;
   head_branch?: string;
   head_sha?: string;
+  path?: string;
   html_url?: string;
   created_at?: string;
   updated_at?: string;
   run_started_at?: string;
+};
+
+type GiteaWorkflow = {
+  id?: string | number;
+  name?: string;
+  path?: string;
+  state?: string;
+};
+
+type WorkflowsResponse = {
+  workflows?: GiteaWorkflow[];
 };
 
 type WorkflowRunsResponse = {
@@ -60,16 +72,24 @@ export async function getWorkflowState(service: OpsService): Promise<OpsWorkflow
   }
 
   try {
+    const workflow = await resolveWorkflow(service);
+    if (!workflow) {
+      return {
+        state: "not-integrated",
+        label: "未发现",
+        detail: `Gitea 未发现 ${service.workflow} workflow。`,
+        triggerable: false,
+      };
+    }
     const params = new URLSearchParams({
       branch: service.ref,
       limit: "1",
     });
     const data = await giteaRequest<WorkflowRunsResponse>(
-      `/api/v1/repos/${encodePath(service.owner)}/${encodePath(service.repo)}/actions/workflows/${encodePath(
-        service.workflow
-      )}/runs?${params.toString()}`
+      `/api/v1/repos/${encodePath(service.owner)}/${encodePath(service.repo)}/actions/runs?${params.toString()}`
     );
-    const runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : Array.isArray(data.runs) ? data.runs : [];
+    const runs = (Array.isArray(data.workflow_runs) ? data.workflow_runs : Array.isArray(data.runs) ? data.runs : [])
+      .filter((run) => run.path === workflow.path);
     const latest = runs[0];
     if (!latest) {
       return {
@@ -97,10 +117,14 @@ export async function dispatchWorkflow(service: OpsService, ref?: string): Promi
   if (!env.OPS_GITEA_TOKEN) {
     throw new OpsIntegrationError("缺少 OPS_GITEA_TOKEN，无法触发 Gitea workflow", 503);
   }
+  const workflow = await resolveWorkflow(service);
+  if (!workflow?.id) {
+    throw new OpsIntegrationError(`Gitea 未发现 ${service.workflow} workflow`, 404);
+  }
 
   await giteaRequest<void>(
     `/api/v1/repos/${encodePath(service.owner)}/${encodePath(service.repo)}/actions/workflows/${encodePath(
-      service.workflow
+      String(workflow.id)
     )}/dispatches`,
     {
       method: "POST",
@@ -110,6 +134,24 @@ export async function dispatchWorkflow(service: OpsService, ref?: string): Promi
       }),
     }
   );
+}
+
+async function resolveWorkflow(service: OpsService): Promise<GiteaWorkflow | undefined> {
+  if (!service.workflow) return undefined;
+  const data = await giteaRequest<WorkflowsResponse>(
+    `/api/v1/repos/${encodePath(service.owner)}/${encodePath(service.repo)}/actions/workflows`
+  );
+  const workflows = Array.isArray(data.workflows) ? data.workflows : [];
+  return workflows.find((workflow) => {
+    const path = workflow.path ?? "";
+    return (
+      workflow.id === service.workflow ||
+      String(workflow.id) === service.workflow ||
+      workflow.name === service.workflow ||
+      path === service.workflow ||
+      path.endsWith(`/${service.workflow}`)
+    );
+  });
 }
 
 async function giteaRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
