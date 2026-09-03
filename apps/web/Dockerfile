@@ -22,7 +22,7 @@ COPY packages/plugin/package.json ./packages/plugin/package.json
 COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.json
 
 RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --network-concurrency 4 --fetch-retries 5
 
 # ---- Stage 2: builder ----
 FROM ${BASE_IMAGE} AS builder
@@ -70,7 +70,7 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY packages/plugin/package.json ./packages/plugin/package.json
 COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.json
 RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
-    pnpm install --frozen-lockfile --prod
+    pnpm install --frozen-lockfile --prod --network-concurrency 4 --fetch-retries 5
 
 # Copy the built app + static assets + migrations + public.
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/.next-build ./apps/web/.next-build
