@@ -20,8 +20,14 @@ jobs:
         arch: [amd64, arm64]
     runs-on: linux-${{ matrix.arch }}
     steps:
-      - name: Install dependencies
-        run: apt-get update && apt-get install -y git docker.io
+      - name: Verify runner toolchain
+        run: |
+          set -euo pipefail
+          command -v git
+          git --version
+          command -v docker
+          docker --version
+          docker buildx version
 
       - name: Checkout code
         run: |
