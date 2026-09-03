@@ -19,10 +19,10 @@ jobs:
       matrix:
         arch: [amd64, arm64]
     runs-on: linux-${{ matrix.arch }}
-    # The runner injects an internal cache endpoint, but the nested DinD
-    # network currently returns 503. Use the verified public mirror for pnpm.
+    # Use the GitOps-managed cache so both architecture builds share tarballs
+    # and do not depend on direct CDN TLS from the nested DinD network.
     env:
-      TEAMPULSE_NPM_REGISTRY: https://registry.npmmirror.com
+      TEAMPULSE_NPM_REGISTRY: http://npm-cache.devops.svc.cluster.local:4873
     steps:
       - name: Verify runner toolchain
         run: |

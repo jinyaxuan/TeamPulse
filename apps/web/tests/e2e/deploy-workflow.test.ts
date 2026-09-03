@@ -39,8 +39,8 @@ test("base image installs pnpm without Corepack's unreachable default registry",
 test("deployment builds use the reachable public package registry", () => {
   assert.match(
     workflow,
-    /TEAMPULSE_NPM_REGISTRY:\s*https:\/\/registry\.npmmirror\.com/,
-    "the job must override the unavailable cluster cache for nested Docker builds"
+    /TEAMPULSE_NPM_REGISTRY:\s*http:\/\/npm-cache\.devops\.svc\.cluster\.local:4873/,
+    "the job must use the GitOps-managed cluster package cache"
   );
   const buildStep = (name: string) => {
     const start = workflow.indexOf(`- name: ${name}`);
