@@ -28,9 +28,12 @@ test("deployment workflow uses the prebuilt runner toolchain", () => {
 });
 
 test("base image installs pnpm without Corepack's unreachable default registry", () => {
-  assert.match(baseDockerfile, /npm install --global pnpm@\$\{PNPM_VERSION\}/);
+  assert.match(baseDockerfile, /npm install --global ["']?\$\{tarball\}/);
   assert.doesNotMatch(baseDockerfile, /corepack prepare pnpm/);
   assert.match(baseDockerfile, /NPM_CONFIG_REGISTRY=["']?\$\{NPM_CONFIG_REGISTRY\}/);
+  assert.match(baseDockerfile, /PNPM_TARBALL_SHA512=/);
+  assert.match(baseDockerfile, /openssl dgst -sha512/);
+  assert.match(baseDockerfile, /test ["']?\$\{actual\}["']? = ["']?\$\{PNPM_TARBALL_SHA512\}/);
 });
 
 test("deployment builds use the reachable public package registry", () => {

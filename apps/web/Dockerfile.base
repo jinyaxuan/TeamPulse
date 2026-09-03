@@ -6,13 +6,28 @@
 ARG NODE_VERSION=22
 ARG PNPM_VERSION=10.25.0
 ARG NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+ARG PNPM_TARBALL_SHA512=XoJjkCevN8+DIGG8xtY5whljRIjg8rrr54UCink957Ul/80/f/V09emGBlTgmP6FK6isXdXO/hdn0joCCpL1AQ==
 
 FROM node:${NODE_VERSION}-bookworm
 
 ARG PNPM_VERSION
 ARG NPM_CONFIG_REGISTRY
+ARG PNPM_TARBALL_SHA512
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
-    npm install --global pnpm@${PNPM_VERSION} --no-fund --no-audit
+RUN set -eux; \
+    tarball="/tmp/pnpm-${PNPM_VERSION}.tgz"; \
+    curl -fsSL \
+      --retry 5 \
+      --retry-all-errors \
+      --retry-delay 2 \
+      --connect-timeout 10 \
+      --max-time 120 \
+      "${NPM_CONFIG_REGISTRY%/}/pnpm/-/pnpm-${PNPM_VERSION}.tgz" \
+      -o "${tarball}"; \
+    actual="$(openssl dgst -sha512 -binary "${tarball}" | openssl base64 -A)"; \
+    test "${actual}" = "${PNPM_TARBALL_SHA512}"; \
+    NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
+      npm install --global "${tarball}" --no-fund --no-audit; \
+    rm -f "${tarball}"
