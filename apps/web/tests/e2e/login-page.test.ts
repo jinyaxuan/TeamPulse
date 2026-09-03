@@ -59,19 +59,29 @@ test(
   "runtime auth entry exposes choices without opening the dashboard",
   { skip: !runtimeBaseUrl ? "set TEAMPULSE_TEST_URL to run the HTTP smoke" : false },
   async () => {
-    const loginResponse = await fetch(`${runtimeBaseUrl}/login`, { redirect: "manual" });
+    const requestOptions = {
+      redirect: "manual" as const,
+      signal: AbortSignal.timeout(10_000),
+    };
+    const loginResponse = await fetch(`${runtimeBaseUrl}/login`, requestOptions);
     assert.equal(loginResponse.status, 200);
     const loginHtml = await loginResponse.text();
     assert.doesNotMatch(loginHtml, /NEXT_REDIRECT;replace;\/api\/v1\/auth\/oidc/);
     assert.match(loginHtml, /统一身份登录/);
     assert.match(loginHtml, /href="\/register"/);
 
-    const registerResponse = await fetch(`${runtimeBaseUrl}/register`, { redirect: "manual" });
+    const registerResponse = await fetch(`${runtimeBaseUrl}/register`, requestOptions);
     assert.equal(registerResponse.status, 200);
     assert.match(await registerResponse.text(), /注册并进入 TeamPulse/);
 
-    const homeResponse = await fetch(`${runtimeBaseUrl}/`, { redirect: "manual" });
-    assert.equal(homeResponse.status, 200);
-    assert.match(await homeResponse.text(), /NEXT_REDIRECT;replace;\/login/);
+    const homeResponse = await fetch(`${runtimeBaseUrl}/`, requestOptions);
+    assert.ok([200, 307, 308].includes(homeResponse.status));
+    const homeLocation = homeResponse.headers.get("location");
+    const homeHtml = await homeResponse.text();
+    if (homeResponse.status === 307 || homeResponse.status === 308) {
+      assert.equal(homeLocation, "/login");
+    } else {
+      assert.match(homeHtml, /(?:NEXT_REDIRECT;replace;|url=)\/login/);
+    }
   }
 );
