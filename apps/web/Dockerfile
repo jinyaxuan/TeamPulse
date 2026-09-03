@@ -9,9 +9,11 @@
 #     -t teampulse-web .
 
 ARG BASE_IMAGE=teampulse-node-base:22-bookworm
+ARG NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
 # ---- Stage 1: deps ----
 FROM ${BASE_IMAGE} AS deps
+ARG NPM_CONFIG_REGISTRY
 WORKDIR /repo
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* .npmrc* ./
@@ -19,12 +21,14 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY packages/plugin/package.json ./packages/plugin/package.json
 COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
+    pnpm install --frozen-lockfile
 
 # ---- Stage 2: builder ----
 FROM ${BASE_IMAGE} AS builder
 ARG NEXT_PUBLIC_BASE_PATH=
 ARG PUBLIC_APP_URL=http://localhost:3000
+ARG NPM_CONFIG_REGISTRY
 WORKDIR /repo
 
 COPY --from=deps /repo/node_modules ./node_modules
@@ -37,7 +41,8 @@ WORKDIR /repo/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 ENV PUBLIC_APP_URL=${PUBLIC_APP_URL}
-RUN pnpm run build
+RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
+    pnpm run build
 
 # ---- Stage 3: runtime ----
 # We install prod deps fresh (no dev deps) and copy in the built .next-build.
@@ -45,6 +50,7 @@ RUN pnpm run build
 FROM ${BASE_IMAGE} AS runtime
 ARG NEXT_PUBLIC_BASE_PATH=
 ARG PUBLIC_APP_URL=http://localhost:3000
+ARG NPM_CONFIG_REGISTRY
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -63,7 +69,8 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc* ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/plugin/package.json ./packages/plugin/package.json
 COPY packages/teampulse-codex/package.json ./packages/teampulse-codex/package.json
-RUN pnpm install --frozen-lockfile --prod
+RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
+    pnpm install --frozen-lockfile --prod
 
 # Copy the built app + static assets + migrations + public.
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/.next-build ./apps/web/.next-build

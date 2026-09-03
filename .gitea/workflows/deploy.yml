@@ -19,6 +19,10 @@ jobs:
       matrix:
         arch: [amd64, arm64]
     runs-on: linux-${{ matrix.arch }}
+    # The runner injects an internal cache endpoint, but the nested DinD
+    # network currently returns 503. Use the verified public mirror for pnpm.
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmmirror.com
     steps:
       - name: Verify runner toolchain
         run: |
@@ -35,7 +39,11 @@ jobs:
           git checkout ${{ github.sha }}
 
       - name: Build base image
-        run: DOCKER_BUILDKIT=0 docker build -f apps/web/Dockerfile.base -t teampulse-node-base:22-bookworm .
+        run: |
+          DOCKER_BUILDKIT=0 docker build \
+            --build-arg "NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}" \
+            -f apps/web/Dockerfile.base \
+            -t teampulse-node-base:22-bookworm .
 
       - name: Build and push arch-suffixed image
         run: |
@@ -44,6 +52,7 @@ jobs:
           DOCKER_BUILDKIT=0 docker build \
             -f apps/web/Dockerfile \
             --build-arg BASE_IMAGE=teampulse-node-base:22-bookworm \
+            --build-arg "NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}" \
             --build-arg PUBLIC_APP_URL=https://teampulse.tangchaolizi.com \
             -t ${IMAGE} .
           echo "${{ secrets.GITEATOKEN }}" | docker login gitea.tangchaolizi.com -u kindong --password-stdin

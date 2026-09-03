@@ -5,12 +5,14 @@
 
 ARG NODE_VERSION=22
 ARG PNPM_VERSION=10.25.0
+ARG NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
 FROM node:${NODE_VERSION}-bookworm
 
 ARG PNPM_VERSION
+ARG NPM_CONFIG_REGISTRY
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
-
+RUN NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY}" \
+    npm install --global pnpm@${PNPM_VERSION} --no-fund --no-audit
