@@ -71,6 +71,12 @@ test("registry arguments are propagated through every Dockerfile stage", () => {
     assert.match(stage, /^ARG NPM_CONFIG_REGISTRY(?:=.*)?$/m);
     assert.match(stage, /NPM_CONFIG_REGISTRY=["']?\$\{NPM_CONFIG_REGISTRY\}/);
   }
-  assert.match(appDockerfile, /pnpm install --frozen-lockfile --network-concurrency 4 --fetch-retries 5/);
-  assert.match(appDockerfile, /pnpm install --frozen-lockfile --prod --network-concurrency 4 --fetch-retries 5/);
+  assert.match(
+    appDockerfile,
+    /pnpm install --prefer-offline --frozen-lockfile --network-concurrency 1 --fetch-retries 5 --fetch-retry-factor 2/
+  );
+  assert.match(
+    appDockerfile,
+    /pnpm install --prefer-offline --frozen-lockfile --prod --network-concurrency 1 --fetch-retries 5 --fetch-retry-factor 2/
+  );
 });
