@@ -36,7 +36,7 @@ test("base image installs pnpm without Corepack's unreachable default registry",
 test("deployment builds use the reachable public package registry", () => {
   assert.match(
     workflow,
-    /NPM_CONFIG_REGISTRY:\s*https:\/\/registry\.npmmirror\.com/,
+    /TEAMPULSE_NPM_REGISTRY:\s*https:\/\/registry\.npmmirror\.com/,
     "the job must override the unavailable cluster cache for nested Docker builds"
   );
   const buildStep = (name: string) => {
@@ -48,7 +48,7 @@ test("deployment builds use the reachable public package registry", () => {
 
   for (const stepName of ["Build base image", "Build and push arch-suffixed image"]) {
     const step = buildStep(stepName);
-    assert.match(step, /--build-arg\s+['"]?NPM_CONFIG_REGISTRY=\$\{NPM_CONFIG_REGISTRY\}/);
+    assert.match(step, /--build-arg\s+['"]?NPM_CONFIG_REGISTRY=\$\{TEAMPULSE_NPM_REGISTRY\}/);
   }
 
   assert.doesNotMatch(
