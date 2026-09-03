@@ -17,7 +17,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (user) redirect("/");
 
   const localLogin = searchParams?.local === "1" || cookies().get(OIDC_AUTO_LOGIN_PAUSE_COOKIE)?.value === "1";
-  if (env.OIDC_ENABLED && !localLogin) redirect("/api/v1/auth/oidc");
+  const loginDescription = localLogin
+    ? "请使用 TeamPulse 账号密码登录，也可以选择统一身份登录。"
+    : "选择统一身份登录，或使用 TeamPulse 账号密码登录，查看团队实时任务、项目动态和设备接入状态。";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
@@ -26,7 +28,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <h1 className="text-2xl font-semibold">TeamPulse</h1>
           <p className="mt-1 text-sm opacity-80">团队 AI 协作面板</p>
         </div>
-        <p className="mt-5 text-sm text-muted-foreground">使用统一身份账号登录，查看团队实时任务、项目动态和设备接入状态。</p>
+        <p className="mt-5 text-sm text-muted-foreground">{loginDescription}</p>
         <div className="mt-6">
           {env.OIDC_ENABLED && (
             <div className="mb-4">
