@@ -101,5 +101,7 @@ function canReceiveEvent(
       return visibleUserIds.has(event.user_id);
     case "message.created":
       return event.message.author_id === currentUserId || event.message.target_user_id === currentUserId;
+    case "work_item.updated":
+      return false;
   }
 }

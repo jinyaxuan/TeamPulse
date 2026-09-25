@@ -226,6 +226,8 @@ export default async function ProjectPage({
           description={`远端哈希 ${project.gitRemoteHash.slice(0, 16)}... · 风险、分支和文件触达都在这里汇总。`}
           actions={
             <>
+              <ActionLink href={`/projects/${project.id}/work`} variant="primary">工作流</ActionLink>
+              <ActionLink href={`/projects/${project.id}/knowledge`}>知识库</ActionLink>
               {remoteLinks && <ExternalLinkButton href={remoteLinks.repository_url}>仓库</ExternalLinkButton>}
               {remoteLinks && <ExternalLinkButton href={remoteLinks.pulls_url}>PR</ExternalLinkButton>}
               <ActionLink href="/projects">返回项目</ActionLink>

@@ -24,6 +24,7 @@ import {
 import { withCoordinationAdvice } from "../../plugin/mcp-server/coordination.js";
 import { LiveEvents } from "../../plugin/mcp-server/live-events.js";
 import { resolveProject } from "../../plugin/mcp-server/project-resolve.js";
+import { callWorkItemTool, workItemTools } from "./work-item-tools.js";
 
 const server = new Server(
   {
@@ -271,6 +272,7 @@ const TOOLS = [
       },
     },
   },
+  ...workItemTools,
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
@@ -310,6 +312,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       return errorResult(
         `TeamPulse is not configured. Run teampulse_register_device first; credentials path: ${paths.CREDENTIALS_PATH}`
       );
+    }
+
+    const workItemResult = await callWorkItemTool(name, args, client, currentCwd);
+    if (workItemResult) {
+      return workItemResult.ok ? textResult(workItemResult.data) : errorResult(workItemResult.error);
     }
 
     switch (name) {

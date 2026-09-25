@@ -41,6 +41,15 @@ export type PresenceEvent =
       type: "message.created";
       project_id: string;
       message: PresenceMessagePayload;
+    }
+  | {
+      type: "work_item.updated";
+      project_id: string;
+      work_item_id: string;
+      actor_user_id: string | null;
+      status: string;
+      version: number;
+      event_type: string;
     };
 
 export type PresenceTaskPayload = {

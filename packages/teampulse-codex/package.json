@@ -9,7 +9,7 @@
     "teampulse-codex": "bin/teampulse-codex.js"
   },
   "scripts": {
-    "check": "node --check mcp-server/index.js && node --check bin/teampulse-codex.js",
+    "check": "node --check mcp-server/index.js && node --check mcp-server/work-item-tools.js && node --check bin/teampulse-codex.js && node --test tests/*.test.js",
     "status": "node bin/teampulse-codex.js status",
     "register": "node bin/teampulse-codex.js register",
     "poll": "node bin/teampulse-codex.js poll",

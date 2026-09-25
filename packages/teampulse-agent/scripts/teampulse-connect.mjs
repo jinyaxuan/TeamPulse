@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { homedir, hostname, platform } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 
-const CONNECTOR_VERSION = "0.4.2";
+const CONNECTOR_VERSION = "0.5.0";
 const CONNECTOR_MARKER = "TEAMPULSE_CONNECTOR_SCRIPT";
 const AUTO_UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const AUTO_UPDATE_COMMANDS = new Set([
@@ -19,6 +19,15 @@ const AUTO_UPDATE_COMMANDS = new Set([
   "reply",
   "resolve-overlap",
   "inbox",
+  "work-list",
+  "work-get",
+  "work-create",
+  "work-update",
+  "work-link",
+  "work-submit",
+  "work-review",
+  "work-knowledge",
+  "knowledge-list",
 ]);
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -78,6 +87,33 @@ async function main() {
     case "inbox":
       await inbox();
       return;
+    case "work-list":
+      await workList();
+      return;
+    case "work-get":
+      await workGet();
+      return;
+    case "work-create":
+      await workCreate();
+      return;
+    case "work-update":
+      await workUpdate();
+      return;
+    case "work-link":
+      await workLink();
+      return;
+    case "work-submit":
+      await workSubmit();
+      return;
+    case "work-review":
+      await workReview();
+      return;
+    case "work-knowledge":
+      await workKnowledge();
+      return;
+    case "knowledge-list":
+      await knowledgeList();
+      return;
     default:
       throw new Error(`Unknown command: ${command}`);
   }
@@ -101,6 +137,15 @@ Usage:
   node scripts/teampulse-connect.mjs message --text "FYI: ..." [--to alice] [--thread project]
   node scripts/teampulse-connect.mjs reply --thread "task:<id>" --text "..."
   node scripts/teampulse-connect.mjs resolve-overlap --first-task-id <id> --second-task-id <id> --action acknowledged|handoff|paused [--note "..."]
+  node scripts/teampulse-connect.mjs work-list [--project-id <id>] [--status <status>]
+  node scripts/teampulse-connect.mjs work-get --work-item-id <id>
+  node scripts/teampulse-connect.mjs work-create --body-file work-item.json [--project-id <id>]
+  node scripts/teampulse-connect.mjs work-update --work-item-id <id> --body-file update.json
+  node scripts/teampulse-connect.mjs work-link --work-item-id <id> --body-file link.json
+  node scripts/teampulse-connect.mjs work-submit --work-item-id <id> --body-file submit.json
+  node scripts/teampulse-connect.mjs work-review --work-item-id <id> --body-file review.json
+  node scripts/teampulse-connect.mjs work-knowledge --work-item-id <id> create|publish --body-file knowledge.json
+  node scripts/teampulse-connect.mjs knowledge-list [--project-id <id>] [--q <text>] [--tag <tag>] [--limit 20]
 
 Credentials are stored in ${credentialsPath}.
 `);
@@ -462,6 +507,103 @@ async function resolveOverlap() {
   );
 }
 
+async function knowledgeList() {
+  const { serverUrl, token } = await credentialsOrThrow();
+  const projectId = option("project-id") || await resolveProject({ serverUrl, token, cwd: currentCwd() });
+  if (!projectId) throw new Error("--project-id is required when the project cannot be resolved from cwd");
+  const params = new URLSearchParams();
+  if (option("q")) params.set("q", option("q"));
+  if (option("tag")) params.set("tag", option("tag"));
+  if (option("limit")) params.set("limit", option("limit"));
+  const suffix = params.toString() ? `?${params}` : "";
+  writeJson(await apiGet(serverUrl, token, `/api/v1/projects/${encodeURIComponent(projectId)}/knowledge${suffix}`));
+}
+
+async function workList() {
+  const { serverUrl, token } = await credentialsOrThrow();
+  const projectId = option("project-id") || await resolveProject({ serverUrl, token, cwd: currentCwd() });
+  if (!projectId) throw new Error("--project-id is required when the project cannot be resolved from cwd");
+  const params = new URLSearchParams();
+  if (option("status")) params.set("status", option("status"));
+  if (option("parent-id")) params.set("parent_id", option("parent-id"));
+  if (option("limit")) params.set("limit", option("limit"));
+  const suffix = params.toString() ? `?${params}` : "";
+  writeJson(await apiGet(serverUrl, token, `/api/v1/projects/${encodeURIComponent(projectId)}/work-items${suffix}`));
+}
+
+async function workGet() {
+  const id = requiredOption("work-item-id");
+  const { serverUrl, token } = await credentialsOrThrow();
+  writeJson(await apiGet(serverUrl, token, `/api/v1/work-items/${encodeURIComponent(id)}`));
+}
+
+async function workCreate() {
+  const { serverUrl, token } = await credentialsOrThrow();
+  const projectId = option("project-id") || await resolveProject({ serverUrl, token, cwd: currentCwd() });
+  if (!projectId) throw new Error("--project-id is required when the project cannot be resolved from cwd");
+  writeJson(await apiPost(serverUrl, token, `/api/v1/projects/${encodeURIComponent(projectId)}/work-items`, await bodyFile()));
+}
+
+async function workUpdate() {
+  await workMutation("work-item-id", "PATCH", (id) => `/api/v1/work-items/${encodeURIComponent(id)}`);
+}
+
+async function workLink() {
+  await workMutation("work-item-id", "POST", (id) => `/api/v1/work-items/${encodeURIComponent(id)}/sessions`);
+}
+
+async function workSubmit() {
+  await workMutation("work-item-id", "POST", (id) => `/api/v1/work-items/${encodeURIComponent(id)}/submit`);
+}
+
+async function workReview() {
+  await workMutation("work-item-id", "POST", (id) => `/api/v1/work-items/${encodeURIComponent(id)}/reviews`);
+}
+
+async function workKnowledge() {
+  const action = args[1];
+  if (!["create", "publish"].includes(action || "")) {
+    throw new Error("work-knowledge requires create or publish");
+  }
+  const id = requiredOption("work-item-id");
+  const body = await bodyFile();
+  const { serverUrl, token } = await credentialsOrThrow();
+  if (action === "create") {
+    writeJson(await apiPost(serverUrl, token, `/api/v1/work-items/${encodeURIComponent(id)}/knowledge`, body));
+    return;
+  }
+  const knowledgeId = body.knowledge_id || body.id;
+  if (!knowledgeId) throw new Error("publish requires knowledge_id or id in --body-file JSON");
+  const payload = { status: "published" };
+  writeJson(await apiRequest("PATCH", serverUrl, token, `/api/v1/work-items/${encodeURIComponent(id)}/knowledge/${encodeURIComponent(knowledgeId)}`, payload));
+}
+
+async function workMutation(idOption, method, pathBuilder) {
+  const id = requiredOption(idOption);
+  const { serverUrl, token } = await credentialsOrThrow();
+  writeJson(await apiRequest(method, serverUrl, token, pathBuilder(id), await bodyFile()));
+}
+
+async function bodyFile() {
+  const path = requiredOption("body-file");
+  let body;
+  try {
+    body = JSON.parse(await readFile(resolvePath(path), "utf8"));
+  } catch (error) {
+    throw new Error(`Cannot read JSON body file ${path}: ${error?.message || error}`);
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error(`JSON body file ${path} must contain an object`);
+  }
+  return body;
+}
+
+function requiredOption(name) {
+  const value = option(name);
+  if (!value) throw new Error(`--${name} is required`);
+  return value;
+}
+
 async function inbox() {
   const { serverUrl, token } = await credentialsOrThrow();
   const cwd = currentCwd();
@@ -563,7 +705,11 @@ async function apiGet(serverUrl, token, path) {
 }
 
 async function apiPost(serverUrl, token, path, body) {
-  return requestJson("POST", `${serverUrl}${path}`, body, token);
+  return apiRequest("POST", serverUrl, token, path, body);
+}
+
+async function apiRequest(method, serverUrl, token, path, body) {
+  return requestJson(method, `${serverUrl}${path}`, body, token);
 }
 
 function option(name) {

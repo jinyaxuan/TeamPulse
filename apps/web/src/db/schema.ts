@@ -5,6 +5,7 @@ import {
   customType,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -269,6 +270,154 @@ export const memoryBlobs = pgTable(
 );
 
 /**
+ * work_items — durable business work, separate from the append-only Agent
+ * session activity in `tasks`.
+ */
+export const workItems = pgTable(
+  "work_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id").references((): AnyPgColumn => workItems.id, {
+      onDelete: "cascade",
+    }),
+    kind: text("kind").notNull().default("task"), // requirement | task
+    title: text("title").notNull(),
+    description: text("description"),
+    acceptanceCriteria: jsonb("acceptance_criteria")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    status: text("status").notNull().default("intake"),
+    priority: text("priority").notNull().default("normal"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    assigneeUserId: uuid("assignee_user_id").references(() => users.id, { onDelete: "set null" }),
+    assigneeDeviceId: uuid("assignee_device_id").references(() => devices.id, { onDelete: "set null" }),
+    reviewerUserId: uuid("reviewer_user_id").references(() => users.id, { onDelete: "set null" }),
+    reviewerDeviceId: uuid("reviewer_device_id").references(() => devices.id, { onDelete: "set null" }),
+    reviewPolicy: text("review_policy").notNull().default("both"), // human | agent | both
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    version: integer("version").notNull().default(1),
+    submissionAttempt: integer("submission_attempt").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("work_items_project_status_idx").on(t.projectId, t.status, t.updatedAt),
+    index("work_items_parent_idx").on(t.parentId),
+    index("work_items_assignee_idx").on(t.assigneeUserId, t.status),
+  ]
+);
+
+/** Existing Agent execution sessions attached to durable work. */
+export const workItemSessions = pgTable(
+  "work_item_sessions",
+  {
+    workItemId: uuid("work_item_id")
+      .notNull()
+      .references(() => workItems.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    linkedBy: uuid("linked_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workItemId, t.taskId] }),
+    index("work_item_sessions_task_idx").on(t.taskId),
+  ]
+);
+
+/** Append-only lifecycle and evidence audit trail. */
+export const workItemEvents = pgTable(
+  "work_item_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workItemId: uuid("work_item_id")
+      .notNull()
+      .references(() => workItems.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorDeviceId: uuid("actor_device_id").references(() => devices.id, { onDelete: "set null" }),
+    eventType: text("event_type").notNull(),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("work_item_events_item_created_idx").on(t.workItemId, t.createdAt),
+    index("work_item_events_type_idx").on(t.eventType, t.createdAt),
+  ]
+);
+
+/** Immutable human/Agent acceptance decisions. */
+export const acceptanceReviews = pgTable(
+  "acceptance_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workItemId: uuid("work_item_id")
+      .notNull()
+      .references(() => workItems.id, { onDelete: "cascade" }),
+    reviewerUserId: uuid("reviewer_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    reviewerDeviceId: uuid("reviewer_device_id").references(() => devices.id, { onDelete: "set null" }),
+    reviewerKind: text("reviewer_kind").notNull(), // human | agent
+    submissionAttempt: integer("submission_attempt").notNull(),
+    decision: text("decision").notNull(), // approved | changes_requested
+    criterionResults: jsonb("criterion_results")
+      .$type<Record<string, boolean>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    comment: text("comment"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("acceptance_reviews_item_created_idx").on(t.workItemId, t.createdAt),
+    index("acceptance_reviews_reviewer_idx").on(t.reviewerUserId, t.createdAt),
+  ]
+);
+
+/** Curated project knowledge with provenance back to accepted work events. */
+export const knowledgeRecords = pgTable(
+  "knowledge_records",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    workItemId: uuid("work_item_id")
+      .notNull()
+      .references(() => workItems.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    summary: text("summary"),
+    tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+    sourceEventIds: uuid("source_event_ids").array().notNull().default(sql`ARRAY[]::uuid[]`),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    status: text("status").notNull().default("draft"), // draft | published | archived
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("knowledge_records_project_status_idx").on(t.projectId, t.status, t.updatedAt),
+    index("knowledge_records_work_item_idx").on(t.workItemId),
+  ]
+);
+
+/**
  * plans — pricing tiers (seeded, rarely changes).
  * Prices stored in fen (分): ¥49.00 = 4900.
  */
@@ -358,6 +507,12 @@ export type NewTask = typeof tasks.$inferInsert;
 export type TaskOverlapResolution = typeof taskOverlapResolutions.$inferSelect;
 export type ProjectMessage = typeof projectMessages.$inferSelect;
 export type MemoryBlob = typeof memoryBlobs.$inferSelect;
+export type WorkItem = typeof workItems.$inferSelect;
+export type NewWorkItem = typeof workItems.$inferInsert;
+export type WorkItemSession = typeof workItemSessions.$inferSelect;
+export type WorkItemEvent = typeof workItemEvents.$inferSelect;
+export type AcceptanceReview = typeof acceptanceReviews.$inferSelect;
+export type KnowledgeRecord = typeof knowledgeRecords.$inferSelect;
 export type WebSession = typeof webSessions.$inferSelect;
 export type MagicLink = typeof magicLinks.$inferSelect;
 export type InviteCode = typeof inviteCodes.$inferSelect;
