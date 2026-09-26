@@ -29,6 +29,7 @@ export function WorkItemDetail({
   canManage,
   canReview,
   currentUserId,
+  jevEnabled,
 }: {
   projectId: string;
   itemId: string;
@@ -38,6 +39,7 @@ export function WorkItemDetail({
   canManage: boolean;
   canReview: boolean;
   currentUserId: string;
+  jevEnabled: boolean;
 }) {
   const [item, setItem] = useState<WorkItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +89,7 @@ export function WorkItemDetail({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <WorkItemOverview item={item} canEdit={canEdit && !["accepted", "cancelled"].includes(item.stage)} canManage={canManage} currentUserId={currentUserId} members={members} agents={agents} onSaved={() => void loadItem()} />
-          <WorkItemTriage key={`${item.id}:${item.version}`} item={item} canEdit={canEdit} />
+          <WorkItemTriage key={item.id} item={item} projectId={projectId} initialJevEnabled={jevEnabled} canEdit={canEdit} canManage={canManage} onChanged={() => loadItem()} />
           {item.kind === "requirement" && <DecompositionPanel item={item} members={members} agents={agents} canCreate={canEdit && !["accepted", "cancelled"].includes(item.stage)} canManage={canManage} />}
           <ExecutionSessions item={item} canLink={canEdit && !["awaiting_acceptance", "accepted", "cancelled"].includes(item.stage)} onLinked={() => void loadItem()} />
           <EvidencePanel item={item} canSubmit={canEdit && !["accepted", "cancelled"].includes(item.stage)} onSubmitted={() => void loadItem()} />
@@ -305,7 +307,27 @@ function KnowledgePanel({ item, canEdit, canManage, onSaved }: { item: WorkItem;
 }
 
 function AuditPanel({ item }: { item: WorkItem }) {
-  return <Panel title="审计线索" description="保留谁在什么时候改变了阶段、标准、负责人或验收结果。"><div className="space-y-3">{item.audit.length === 0 ? <EmptyPanel>暂无审计记录。</EmptyPanel> : item.audit.map((entry) => <div key={entry.id} className="border-l-2 border-black/10 pl-3"><div className="text-sm font-medium">{entry.action}</div><div className="mt-1 text-xs text-muted-foreground">{entry.actorName ?? "系统"} · {formatWorkDate(entry.createdAt)}</div>{entry.detail && <div className="mt-1 text-xs leading-5 text-muted-foreground">{entry.detail}</div>}</div>)}</div></Panel>;
+  return <Panel title="审计线索" description="保留谁在什么时候改变了阶段、标准、负责人或验收结果。"><div className="space-y-3">{item.audit.length === 0 ? <EmptyPanel>暂无审计记录。</EmptyPanel> : item.audit.map((entry) => {
+    const { title, detail } = auditPresentation(entry);
+    return <div key={entry.id} className="border-l-2 border-black/10 pl-3"><div className="text-sm font-medium">{title}</div><div className="mt-1 text-xs text-muted-foreground">{entry.actorName ?? "系统"} · {formatWorkDate(entry.createdAt)}</div>{detail && <div className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</div>}</div>;
+  })}</div></Panel>;
+}
+
+function auditPresentation(entry: WorkItem["audit"][number]): { title: string; detail: string | null } {
+  const payload = entry.payload && typeof entry.payload === "object" ? entry.payload as Record<string, unknown> : {};
+  if (entry.action === "jev_requested") return { title: "已发起 JEV 分析", detail: "分析请求已记入项目审计记录。" };
+  if (entry.action === "jev_triaged") {
+    const triage = payload.triage && typeof payload.triage === "object" ? payload.triage as Record<string, unknown> : {};
+    const priority = triage.priority && typeof triage.priority === "object" ? triage.priority as Record<string, unknown> : {};
+    const choice = priority.choice;
+    const label = choice === "urgent" ? "紧急" : choice === "high" ? "高" : choice === "normal" ? "普通" : choice === "low" ? "低" : null;
+    return { title: "JEV 已生成分析建议", detail: label ? `建议优先级：${label}` : null };
+  }
+  if (entry.action === "jev_adopted") {
+    const action = payload.action ?? payload.adopted_action;
+    return { title: action === "clarify" ? "采纳 JEV 澄清建议" : action === "priority" ? "采纳 JEV 优先级建议" : "采纳 JEV 建议", detail: null };
+  }
+  return { title: entry.action, detail: entry.detail ?? null };
 }
 
 function Meta({ label, value }: { label: string; value: string }) { return <div><div>{label}</div><div className="mt-1 font-medium text-foreground">{value}</div></div>; }

@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   type AnyPgColumn,
+  boolean,
+  check,
   customType,
   index,
   integer,
@@ -140,8 +142,32 @@ export const projects = pgTable("projects", {
   gitRemoteHash: text("git_remote_hash").notNull().unique(),
   gitRemoteUrl: text("git_remote_url"),
   displayName: text("display_name"),
+  jevEnabled: boolean("jev_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Human authorization changes for sending project work-item data to JEV. */
+export const projectJevPolicyEvents = pgTable(
+  "project_jev_policy_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "restrict" }),
+    source: text("source").notNull(), // web | ops
+    oldEnabled: boolean("old_enabled").notNull(),
+    newEnabled: boolean("new_enabled").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("project_jev_policy_events_project_created_idx").on(t.projectId, t.createdAt),
+    check(
+      "project_jev_policy_events_actor_source_check",
+      sql`(${t.source} = 'web' AND ${t.actorUserId} IS NOT NULL) OR (${t.source} = 'ops' AND ${t.actorUserId} IS NULL)`
+    ),
+  ]
+);
 
 /**
  * project_members — users who can see and collaborate in a project.
@@ -355,6 +381,7 @@ export const workItemEvents = pgTable(
   (t) => [
     index("work_item_events_item_created_idx").on(t.workItemId, t.createdAt),
     index("work_item_events_type_idx").on(t.eventType, t.createdAt),
+    index("work_item_events_actor_type_created_idx").on(t.actorUserId, t.eventType, t.createdAt),
   ]
 );
 

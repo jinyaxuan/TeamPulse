@@ -50,6 +50,7 @@ export default async function ProjectWorkItemPage({ params }: { params: Promise<
           canManage={canManage}
           canReview={canManage}
           currentUserId={user.id}
+          jevEnabled={project.jevEnabled}
         />
       </Workspace>
     </AppShell>

@@ -74,6 +74,23 @@ export type WorkSession = {
   heartbeatAt?: string | null;
 };
 
+export type WorkTriage = {
+  model: string;
+  priority: { choice: "low" | "normal" | "high" | "urgent"; confidence: number };
+  needsClarification: { noul: number };
+  agentFit: { score: number; confidence: number };
+  deliveryRisk: { score: number; confidence: number };
+};
+
+export type WorkTriageRecord = {
+  eventId: string;
+  inputVersion: number;
+  createdAt: string;
+  actorName: string | null;
+  triage: WorkTriage;
+  adoptedAction?: "priority" | "clarify";
+};
+
 export type WorkItem = {
   id: string;
   projectId: string;
@@ -106,11 +123,13 @@ export type WorkItem = {
   evidence: WorkEvidence[];
   reviews: WorkReview[];
   knowledge: WorkKnowledge[];
+  latestTriage: WorkTriageRecord | null;
   audit: Array<{
     id: string;
     action: string;
     actorName?: string | null;
     detail?: string | null;
+    payload?: unknown;
     createdAt: string;
   }>;
 };
@@ -182,6 +201,31 @@ function normalizeStage(value: unknown): WorkStage {
 function normalizePolicy(value: unknown): AcceptancePolicy {
   const policy = stringValue(value);
   return policy === "agent" || policy === "both" ? policy : "human";
+}
+
+function normalizeLatestTriage(value: unknown): WorkTriageRecord | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, any>;
+  const triage = record.triage;
+  if (!triage || typeof triage !== "object" ||
+    !["low", "normal", "high", "urgent"].includes(triage.priority?.choice) ||
+    typeof triage.model !== "string" ||
+    typeof triage.priority?.confidence !== "number" ||
+    typeof triage.needsClarification?.noul !== "number" ||
+    typeof triage.agentFit?.score !== "number" ||
+    typeof triage.agentFit?.confidence !== "number" ||
+    typeof triage.deliveryRisk?.score !== "number" ||
+    typeof triage.deliveryRisk?.confidence !== "number" ||
+    typeof record.eventId !== "string" ||
+    typeof record.inputVersion !== "number") return null;
+  return {
+    eventId: record.eventId,
+    inputVersion: record.inputVersion,
+    createdAt: dateValue(record.createdAt),
+    actorName: nullableString(record.actorName),
+    triage: triage as WorkTriage,
+    adoptedAction: record.adoptedAction === "priority" || record.adoptedAction === "clarify" ? record.adoptedAction : undefined,
+  };
 }
 
 export function normalizeWorkItem(raw: any, fallbackProjectId = ""): WorkItem {
@@ -263,11 +307,13 @@ export function normalizeWorkItem(raw: any, fallbackProjectId = ""): WorkItem {
     evidence,
     reviews,
     knowledge,
+    latestTriage: normalizeLatestTriage(raw.latestTriage),
     audit: arrayValue(raw.audit ?? raw.auditLog).map((entry: any) => ({
       id: stringValue(entry.id),
       action: stringValue(entry.action, "更新"),
       actorName: nullableString(entry.actorName ?? entry.actor_name),
       detail: nullableString(entry.detail),
+      payload: entry.payload,
       createdAt: dateValue(entry.createdAt ?? entry.created_at),
     })),
   };

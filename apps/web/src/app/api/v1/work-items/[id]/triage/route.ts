@@ -4,7 +4,7 @@ import { db, workItemEvents, workItems } from "@/db";
 import { ApiError, handler, json, parseBody, requireAuth } from "@/lib/api";
 import { env } from "@/lib/env";
 import { isAllowedTriageOrigin, JevServiceError, triageWorkItem } from "@/lib/jev";
-import { rateLimit } from "@/lib/rate-limit";
+import { isJevEnabled, reserveJevRequest } from "@/lib/jev-project-policy";
 import {
   ensureVersion,
   publishWorkItemUpdate,
@@ -28,10 +28,14 @@ export const POST = handler<{ id: string }>(async (request, params) => {
   const body = await parseBody(request, triageSchema);
   ensureVersion(body.version, item.version);
 
+  const disabledResponse = () =>
+    json({ error: "该项目尚未启用 JEV 分析", code: "JEV_PROJECT_DISABLED" }, { status: 403 });
+  if (!(await isJevEnabled(item.projectId))) return disabledResponse();
+
   const apiKey = env.TYPESAFE_API_KEY;
   if (!apiKey) throw new ApiError("JEV 未配置，请联系管理员设置 TYPESAFE_API_KEY", 503);
-  if (!rateLimit(`jev-triage:${ctx.user.id}`, 10, 60 * 60 * 1000).allowed) {
-    throw new ApiError("JEV 分析过于频繁，请稍后重试", 429);
+  if (!(await reserveJevRequest(item, ctx.user.id, ctx.deviceId ?? null, body.version))) {
+    return disabledResponse();
   }
 
   let triage;

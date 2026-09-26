@@ -1,20 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { withBasePath } from "@/lib/base-path";
 import { Panel } from "@/components/ui/panel";
-import type { WorkItem } from "./work-item-types";
+import { formatWorkDate, type WorkItem, type WorkTriage } from "./work-item-types";
 
-type Metric = { score: number; confidence: number };
-type Triage = {
-  model: string;
-  priority: { choice: "low" | "normal" | "high" | "urgent"; confidence: number };
-  needsClarification: { noul: number };
-  agentFit: Metric;
-  deliveryRisk: Metric;
-};
-
-const priorityLabels: Record<Triage["priority"]["choice"], string> = {
+const priorityLabels: Record<WorkTriage["priority"]["choice"], string> = {
   low: "低",
   normal: "普通",
   high: "高",
@@ -25,83 +16,153 @@ function percentage(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-function rubricPercentage(score: number): string {
-  return percentage(score / 2);
+function rubricScore(value: number): string {
+  return `${Math.round(value * 100) / 100} / 2`;
 }
 
-function isTriage(value: unknown): value is Triage {
-  if (!value || typeof value !== "object") return false;
-  const result = value as Partial<Triage>;
-  return typeof result.model === "string"
-    && !!result.priority && result.priority.choice in priorityLabels
-    && typeof result.priority.confidence === "number"
-    && typeof result.needsClarification?.noul === "number"
-    && typeof result.agentFit?.score === "number"
-    && typeof result.agentFit.confidence === "number"
-    && typeof result.deliveryRisk?.score === "number"
-    && typeof result.deliveryRisk.confidence === "number";
+async function readProjectPolicy(projectId: string, signal?: AbortSignal): Promise<boolean> {
+  const response = await fetch(withBasePath(`/api/v1/projects/${projectId}/jev`), { cache: "no-store", signal });
+  const payload: { enabled?: unknown; error?: string } = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error ?? "读取 JEV 项目设置失败");
+  if (typeof payload.enabled !== "boolean") throw new Error("JEV 项目设置格式异常");
+  return payload.enabled;
 }
 
-export function WorkItemTriage({ item, canEdit }: { item: Pick<WorkItem, "id" | "version">; canEdit: boolean }) {
-  const [triage, setTriage] = useState<Triage | null>(null);
-  const [pending, setPending] = useState(false);
+export function WorkItemTriage({ item, projectId, initialJevEnabled, canEdit, canManage, onChanged }: {
+  item: WorkItem;
+  projectId: string;
+  initialJevEnabled: boolean;
+  canEdit: boolean;
+  canManage: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [enabled, setEnabled] = useState(initialJevEnabled);
+  const [policyLoading, setPolicyLoading] = useState(true);
+  const [policyPending, setPolicyPending] = useState(false);
+  const [pending, setPending] = useState<"analyze" | "priority" | "clarify" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [unconfigured, setUnconfigured] = useState(false);
+  const [conflict, setConflict] = useState(false);
 
-  async function analyze() {
-    setPending(true);
-    setTriage(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void readProjectPolicy(projectId, controller.signal)
+      .then(setEnabled)
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "读取 JEV 项目设置失败");
+      })
+      .finally(() => { if (!controller.signal.aborted) setPolicyLoading(false); });
+    return () => controller.abort();
+  }, [projectId]);
+
+  async function updatePolicy() {
+    setPolicyPending(true);
     setError(null);
-    setUnconfigured(false);
+    setConflict(false);
     try {
-      const response = await fetch(withBasePath(`/api/v1/work-items/${item.id}/triage`), {
-        method: "POST",
+      const response = await fetch(withBasePath(`/api/v1/projects/${projectId}/jev`), {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: item.version }),
+        body: JSON.stringify({ enabled: !enabled }),
       });
-      const payload: { error?: string; code?: string; triage?: unknown } = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        if (payload.code === "JEV_NOT_CONFIGURED" || (response.status === 503 && /未配置|未设置/.test(payload.error ?? ""))) {
-          setUnconfigured(true);
-        } else {
-          setError(payload.error ?? "JEV 分析失败，请稍后重试");
-        }
-        return;
-      }
-      if (!isTriage(payload.triage)) throw new Error("JEV 返回的分析结果格式异常");
-      setTriage(payload.triage);
+      const payload: { enabled?: unknown; error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error ?? "更新 JEV 项目设置失败");
+      if (typeof payload.enabled !== "boolean") throw new Error("JEV 项目设置格式异常");
+      setEnabled(payload.enabled);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "JEV 分析失败，请稍后重试");
+      setError(cause instanceof Error ? cause.message : "更新 JEV 项目设置失败");
     } finally {
-      setPending(false);
+      setPolicyPending(false);
     }
   }
 
+  async function submit(action: "analyze" | "priority" | "clarify") {
+    const record = item.latestTriage;
+    if (action !== "analyze" && (!record || record.inputVersion !== item.version)) return;
+    setPending(action);
+    setError(null);
+    setConflict(false);
+    try {
+      const response = await fetch(withBasePath(`/api/v1/work-items/${item.id}/triage${action === "analyze" ? "" : "/adopt"}`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "analyze"
+          ? { version: item.version }
+          : { version: item.version, triageEventId: record!.eventId, action }),
+      });
+      const payload: { error?: string; code?: string } = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409) setConflict(true);
+        if (response.status === 403 && payload.code === "JEV_PROJECT_DISABLED") {
+          setEnabled(false);
+          try {
+            setEnabled(await readProjectPolicy(projectId));
+          } catch {
+            throw new Error(`${payload.error ?? "该项目尚未启用 JEV"}。刷新项目设置失败，请重新加载页面`);
+          }
+        }
+        throw new Error(payload.error ?? (action === "analyze" ? "JEV 分析失败" : "采纳建议失败"));
+      }
+      await onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "请求失败，请稍后重试");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  const record = item.latestTriage;
+  const stale = !!record && record.inputVersion !== item.version;
+  const canAdopt = enabled && canManage && !policyLoading && !policyPending && !!record && !stale && !record.adoptedAction;
+  const canAdoptPriority = canAdopt && !["awaiting_acceptance", "accepted", "cancelled"].includes(item.stage) && item.priority !== record?.triage.priority.choice;
+
   return <Panel
     title="JEV 分析"
-    description="点击后会将工作项类型、标题、描述、验收标准、当前状态和优先级发送给 TypeSafe AI。分析仅供参考，不会自动修改工作项。"
-    actions={canEdit ? <button type="button" onClick={() => void analyze()} disabled={pending} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium hover:bg-surface disabled:opacity-50">{pending ? "分析中…" : triage ? "重新分析" : "开始分析"}</button> : undefined}
+    description="工作项分析与决策记录"
+    actions={enabled && canEdit ? <button type="button" onClick={() => void submit("analyze")} disabled={!!pending || policyLoading || policyPending} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium hover:bg-surface disabled:opacity-50">{pending === "analyze" ? "分析中…" : record ? "重新分析" : "开始分析"}</button> : undefined}
   >
-    {pending && <p role="status" className="text-sm text-muted-foreground">正在分析工作项…</p>}
-    {unconfigured && <p role="alert" className="text-sm text-amber-800">JEV 尚未配置，请联系管理员设置 TypeSafe API Key。</p>}
-    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-    {!triage && !pending && !error && !unconfigured && <p className="text-sm text-muted-foreground">尚无本次页面会话的分析结果。</p>}
-    {triage && <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Result label="建议优先级" value={priorityLabels[triage.priority.choice]} detail={`模型把握度 ${percentage(triage.priority.confidence)}`} explanation="建议处理顺序，需由项目成员决定是否采用。" />
-        <Result label="需澄清概率" value={percentage(triage.needsClarification.noul)} explanation="越高表示需求信息越可能需要进一步澄清。" />
-        <Result label="Agent 适配度" value={rubricPercentage(triage.agentFit.score)} detail={`模型把握度 ${percentage(triage.agentFit.confidence)}`} explanation="越高表示越适合交由 Agent 执行。" />
-        <Result label="交付风险" value={rubricPercentage(triage.deliveryRisk.score)} detail={`模型把握度 ${percentage(triage.deliveryRisk.confidence)}`} explanation="越高表示按当前描述交付的风险越大。" />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] pb-4">
+        <div>
+          <div className="text-sm font-medium">允许本项目使用 JEV</div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">启用后，分析时会向 TypeSafe AI 发送工作项类型、标题、描述、验收标准、当前阶段和优先级。</p>
+        </div>
+        {canManage ? <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+          <input type="checkbox" role="switch" aria-label="允许本项目使用 JEV" checked={enabled} disabled={policyLoading || policyPending || !!pending} onChange={() => void updatePolicy()} className="h-4 w-4 accent-foreground" />
+          {policyLoading ? "读取中…" : policyPending ? "保存中…" : enabled ? "已启用" : "未启用"}
+        </label> : <span className="text-xs text-muted-foreground">{enabled ? "已启用" : "未启用"}</span>}
       </div>
-      <p className="text-xs text-muted-foreground">分析模型：{triage.model} · 本页展示本次结果，结构化结果已记入工作项审计记录。</p>
-    </div>}
+
+      {!enabled && <p className="text-sm text-muted-foreground">本项目尚未启用 JEV。{canManage ? "启用后可分析工作项。" : "请联系项目 Owner 或管理员。"}</p>}
+      {pending === "analyze" && <p role="status" className="text-sm text-muted-foreground">正在分析工作项…</p>}
+      {error && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-700"><span>{error}</span>{conflict && <button type="button" onClick={() => { setError(null); setConflict(false); void onChanged(); }} className="font-medium underline">刷新工作项</button>}</div>}
+      {enabled && !record && pending !== "analyze" && <p className="text-sm text-muted-foreground">暂无分析记录。</p>}
+
+      {record && <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>{record.actorName ?? "项目成员"} · {formatWorkDate(record.createdAt)}</span>
+          <span>工作项版本 {record.inputVersion}</span>
+          <span>{stale ? "工作项已变更，建议已过期" : "基于当前版本"}</span>
+          {record.adoptedAction && <span>{record.adoptedAction === "priority" ? "已采纳优先级" : "已转入澄清"}</span>}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Result label="建议优先级" value={priorityLabels[record.triage.priority.choice]} detail={`当前：${priorityLabels[item.priority as keyof typeof priorityLabels] ?? "普通"} · 把握度 ${percentage(record.triage.priority.confidence)}`} />
+          <Result label="需澄清概率" value={percentage(record.triage.needsClarification.noul)} />
+          <Result label="Agent 适配度" value={rubricScore(record.triage.agentFit.score)} detail={`把握度 ${percentage(record.triage.agentFit.confidence)}`} />
+          <Result label="交付风险" value={rubricScore(record.triage.deliveryRisk.score)} detail={`把握度 ${percentage(record.triage.deliveryRisk.confidence)}`} />
+        </div>
+        {canAdopt && (canAdoptPriority || item.stage === "intake") && <div className="flex flex-wrap gap-2 border-t border-black/[0.06] pt-3">
+          {canAdoptPriority && <button type="button" onClick={() => void submit("priority")} disabled={!!pending} className="rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-50">{pending === "priority" ? "采纳中…" : `采纳优先级：${priorityLabels[record.triage.priority.choice]}`}</button>}
+          {item.stage === "intake" && <button type="button" onClick={() => void submit("clarify")} disabled={!!pending} className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-medium hover:bg-surface disabled:opacity-50">{pending === "clarify" ? "转入中…" : "转入需求澄清"}</button>}
+        </div>}
+        <p className="text-xs text-muted-foreground">模型：{record.triage.model}。建议由项目负责人决定是否采纳。</p>
+      </div>}
+    </div>
   </Panel>;
 }
 
-function Result({ label, value, detail, explanation }: { label: string; value: string; detail?: string; explanation: string }) {
+function Result({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return <div className="border-t border-black/[0.06] pt-3">
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><span className="text-sm font-medium">{label}</span><span className="text-base font-semibold tabular-nums">{value}</span></div>
-    <p className="mt-1 text-xs leading-5 text-muted-foreground">{explanation}</p>
     {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
   </div>;
 }

@@ -27,13 +27,25 @@ const responseSchema = z.object({
   }),
 });
 
-export type JevTriage = {
-  model: string;
-  priority: z.infer<typeof choiceAnswer>;
-  needsClarification: z.infer<typeof noulAnswer>;
-  agentFit: z.infer<typeof scoreAnswer>;
-  deliveryRisk: z.infer<typeof scoreAnswer>;
-};
+const persistedTriageSchema = z.object({
+  model: z.string().min(1),
+  priority: choiceAnswer,
+  needsClarification: noulAnswer,
+  agentFit: scoreAnswer,
+  deliveryRisk: scoreAnswer,
+});
+const triageEventPayloadSchema = z.object({
+  input_version: z.number().int().positive(),
+  triage: persistedTriageSchema,
+});
+
+export type JevTriage = z.infer<typeof persistedTriageSchema>;
+
+export function parsePersistedJevTriage(payload: unknown): { inputVersion: number; triage: JevTriage } | null {
+  const parsed = triageEventPayloadSchema.safeParse(payload);
+  if (!parsed.success) return null;
+  return { inputVersion: parsed.data.input_version, triage: parsed.data.triage };
+}
 
 export type TriageInput = {
   kind: string;

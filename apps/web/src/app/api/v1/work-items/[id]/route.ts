@@ -30,6 +30,7 @@ import {
   WORK_ITEM_STATUSES,
 } from "@/lib/work-items";
 import { canManageProjectMembers } from "@/lib/project-access";
+import { parsePersistedJevTriage, type JevTriage } from "@/lib/jev";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -118,7 +119,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
       .from(workItemEvents)
       .leftJoin(actor, eq(workItemEvents.actorUserId, actor.id))
       .where(eq(workItemEvents.workItemId, item.id))
-      .orderBy(asc(workItemEvents.createdAt)),
+      .orderBy(asc(workItemEvents.createdAt), asc(workItemEvents.id)),
     db
       .select({
         id: acceptanceReviews.id,
@@ -171,6 +172,33 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     payload: row.payload,
     createdAt: row.created_at,
   }));
+  let latestTriage: {
+    eventId: string;
+    inputVersion: number;
+    createdAt: Date;
+    actorName: string | null;
+    triage: JevTriage;
+    adoptedAction?: "priority" | "clarify";
+  } | null = null;
+  for (let index = eventRows.length - 1; index >= 0; index -= 1) {
+    const event = eventRows[index];
+    if (event.event_type !== "jev_triaged") continue;
+    const parsed = parsePersistedJevTriage(event.payload);
+    if (!parsed) continue;
+    const adoption = eventRows.find((candidate) =>
+      candidate.event_type === "jev_adopted" && candidate.payload.triage_event_id === event.id
+    );
+    const action = adoption?.payload.action;
+    latestTriage = {
+      eventId: event.id,
+      inputVersion: parsed.inputVersion,
+      createdAt: event.created_at,
+      actorName: event.actor_display_name ?? event.actor_name,
+      triage: parsed.triage,
+      ...(action === "priority" || action === "clarify" ? { adoptedAction: action } : {}),
+    };
+    break;
+  }
   const evidence = eventRows
     .filter((event) => event.event_type === "submitted")
     .flatMap((event) => {
@@ -227,6 +255,7 @@ export const GET = handler<{ id: string }>(async (request, params) => {
     reviews,
     knowledge,
     audit,
+    latestTriage,
   };
 
   return json({ workItem: response, work_item: response });
