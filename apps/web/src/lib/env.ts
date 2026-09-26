@@ -48,4 +48,7 @@ export const env = {
   get OPS_GITEA_TOKEN() {
     return process.env.OPS_GITEA_TOKEN ?? "";
   },
+  get TYPESAFE_API_KEY() {
+    return process.env.TYPESAFE_API_KEY ?? "";
+  },
 };

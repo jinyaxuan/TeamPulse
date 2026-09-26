@@ -21,7 +21,7 @@ function recordingClient() {
 test("publishes each durable work-item action as an MCP tool", () => {
   assert.deepEqual(workItemTools.map((tool) => tool.name), [
     "teampulse_search_knowledge",
-    "teampulse_list_work_items", "teampulse_get_work_item", "teampulse_create_work_item",
+    "teampulse_list_work_items", "teampulse_get_work_item", "teampulse_triage_work_item", "teampulse_create_work_item",
     "teampulse_update_work_item", "teampulse_link_work_session", "teampulse_submit_work_item",
     "teampulse_review_work_item", "teampulse_create_knowledge", "teampulse_update_knowledge",
   ]);
@@ -43,6 +43,27 @@ test("create uses the explicit project and does not send local cwd to the API", 
     method: "post", path: `/api/v1/projects/${projectId}/work-items`,
     body: { kind: "requirement", title: "结算异常恢复", review_policy: "both", acceptance_criteria: ["用户能恢复订单"] },
   }]);
+});
+
+test("triage sends only the work-item version to the server-side JEV route", async () => {
+  const { client, calls } = recordingClient();
+  await callWorkItemTool("teampulse_triage_work_item", {
+    work_item_id: workItemId, version: 7, confirm_external_transfer: true,
+  }, client, () => "/repo");
+  assert.deepEqual(calls, [{
+    method: "post", path: `/api/v1/work-items/${workItemId}/triage`, body: { version: 7 },
+  }]);
+});
+
+test("triage rejects missing or false external-transfer acknowledgement locally", async () => {
+  const { client, calls } = recordingClient();
+  for (const confirmation of [undefined, false]) {
+    const result = await callWorkItemTool("teampulse_triage_work_item", {
+      work_item_id: workItemId, version: 7, confirm_external_transfer: confirmation,
+    }, client, () => "/repo");
+    assert.equal(result.ok, false);
+  }
+  assert.equal(calls.length, 0);
 });
 
 test("submit, review and knowledge writes keep the work-item version and evidence", async () => {

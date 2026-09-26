@@ -29,6 +29,15 @@ export const workItemTools = [
     inputSchema: { type: "object", properties: itemId, required: ["work_item_id"] },
   },
   {
+    name: "teampulse_triage_work_item",
+    description: "Ask JEV for structured work-item triage recommendations. This sends work-item details to external provider TypeSafe. Set confirm_external_transfer to true only after acknowledging that transfer. Does not change priority or assignment; use the latest work-item version.",
+    inputSchema: {
+      type: "object",
+      properties: { ...itemId, version, confirm_external_transfer: { type: "boolean", const: true } },
+      required: ["work_item_id", "version", "confirm_external_transfer"],
+    },
+  },
+  {
     name: "teampulse_create_work_item",
     description: "Capture a requirement or task with acceptance criteria. Assignment and reviewer policy require project manager rights.",
     inputSchema: {
@@ -151,6 +160,11 @@ export async function callWorkItemTool(name, args, client, cwd) {
   const path = `/api/v1/work-items/${encodeURIComponent(args.work_item_id)}`;
   switch (name) {
     case "teampulse_get_work_item": return client.get(path);
+    case "teampulse_triage_work_item":
+      if (args.confirm_external_transfer !== true) {
+        return { ok: false, error: "confirm_external_transfer must be true before sending work-item details to TypeSafe" };
+      }
+      return client.post(`${path}/triage`, { version: args.version });
     case "teampulse_update_work_item": return client.patch(path, without(args, "work_item_id"));
     case "teampulse_link_work_session": return client.post(`${path}/sessions`, without(args, "work_item_id"));
     case "teampulse_submit_work_item": return client.post(`${path}/submit`, without(args, "work_item_id"));

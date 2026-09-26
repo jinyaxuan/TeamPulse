@@ -44,6 +44,7 @@ services:
       - REGISTRATION_MODE=open
       - XUNHU_APPID=${XUNHU_APPID:-}
       - XUNHU_APPSECRET=${XUNHU_APPSECRET:-}
+      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
     ports:
       - "3020:3000"
     depends_on:

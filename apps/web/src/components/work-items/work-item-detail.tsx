@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { withBasePath } from "@/lib/base-path";
 import { EmptyPanel, Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { WorkItemTriage } from "./work-item-triage";
 import {
   acceptancePolicyLabels,
   formatWorkDate,
@@ -86,6 +87,7 @@ export function WorkItemDetail({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <WorkItemOverview item={item} canEdit={canEdit && !["accepted", "cancelled"].includes(item.stage)} canManage={canManage} currentUserId={currentUserId} members={members} agents={agents} onSaved={() => void loadItem()} />
+          <WorkItemTriage key={`${item.id}:${item.version}`} item={item} canEdit={canEdit} />
           {item.kind === "requirement" && <DecompositionPanel item={item} members={members} agents={agents} canCreate={canEdit && !["accepted", "cancelled"].includes(item.stage)} canManage={canManage} />}
           <ExecutionSessions item={item} canLink={canEdit && !["awaiting_acceptance", "accepted", "cancelled"].includes(item.stage)} onLinked={() => void loadItem()} />
           <EvidencePanel item={item} canSubmit={canEdit && !["accepted", "cancelled"].includes(item.stage)} onSubmitted={() => void loadItem()} />
