@@ -199,15 +199,33 @@ docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
 成员安装对应 Skill 后，Agent 注册设备并给出认领码。成员登录网页，在 `/settings/connect` 绑定认领码，Agent 再领取 token，写入 `~/.teampulse/credentials.json`。
 
-分诊模型另外部署。配了本地 OpenAI 兼容地址就用本地模型，否则用 TypeSafe：
+分诊模型跑在两台 DGX Spark 上，每台是 NVIDIA GB10、128GB 统一内存。两台用 tensor parallel 组成一组，CUDA 架构 `12.1a`。
+
+当前配置的对话模型是 `GLM-5.3-Flash-EXL3`：
+
+| 参数 | 值 |
+| --- | --- |
+| 权重 | `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw` |
+| 运行时 | vLLM，`quantization=exl3`，`load-format=instanttensor` |
+| 并行 | `tensor-parallel-size=2`，`nnodes=2` |
+| 上下文 | `max-model-len=262144` |
+| KV cache | FP8，5 GiB |
+| 显存比例 | `gpu-memory-utilization=0.80` |
+| 并发 | `max-num-seqs=4`，`max-num-batched-tokens=1024` |
+| 投机解码 | DFlash，`num_speculative_tokens=7`，草稿模型 `incoai/GLM-5.3-Flash-DFlash2` |
+| 单机资源 | 1 GPU，内存请求 96Gi、上限 116Gi |
+
+同一对 Spark 上还配置了 `qwen3.8-flash-next`，权重是 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，用 SGLang 运行。量化 `modelopt_fp4`，GEMM 后端 `flashinfer_cutlass`，同样是两机 `tp-size=2`，上下文 262144，静态显存比例 0.80。投机解码使用 NEXTN，3 步、4 个草稿 token。这份部署当前副本数是 0。
+
+服务对外提供 OpenAI 兼容接口。TeamPulse 这样接入：
 
 ```bash
-JEV_BASE_URL=http://127.0.0.1:8000/v1
-JEV_MODEL=nvidia/nemotron
+JEV_BASE_URL=http://<spark-gateway>/v1
+JEV_MODEL=GLM-5.3-Flash-EXL3
 JEV_API_KEY=
 ```
 
-本地地址会请求 `${JEV_BASE_URL}/chat/completions`，回答必须是规定的 JSON。DGX Spark 上的 NVIDIA NIM 或 TensorRT-LLM 按各自的镜像启动，把服务地址填到 `JEV_BASE_URL`。StepFun 如果提供同样的接口，也填这里。
+请求发往 `${JEV_BASE_URL}/chat/completions`，回答必须是规定的 JSON。没有本地地址时使用 TypeSafe。
 
 三份 Skill 对应三种运行方式：
 
@@ -223,9 +241,8 @@ JEV_API_KEY=
 | --- | --- |
 | 面板 | Next.js 14、React 18、Postgres、Drizzle、Tailwind、Docker、Caddy |
 | Agent | Claude Code hooks 与 MCP、Codex MCP、Node.js、Agent Skills |
-| 分诊 | TypeSafe `jev-latest`，或 `JEV_BASE_URL` 指向的 OpenAI 兼容服务 |
-
-本地 NVIDIA NIM、TensorRT-LLM、Nemotron 和 StepFun 通过 `JEV_BASE_URL` 接入。
+| 分诊 | 两台 DGX Spark 上的 vLLM / SGLang；未配置本地地址时用 TypeSafe `jev-latest` |
+| NVIDIA | GB10、CUDA `12.1a`、vLLM、SGLang、FlashInfer、EXL3、NVFP4、FP8 KV cache |
 
 ## 目录说明
 

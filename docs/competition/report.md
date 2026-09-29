@@ -65,7 +65,11 @@ JEV 给工作项提供分诊建议。项目默认关闭。Owner 或管理员在�
 
 面板用 Docker 部署。Agent 运行在成员本机，通过认领码接入。
 
-`JEV_BASE_URL` 指向本地 OpenAI 兼容服务，`JEV_MODEL` 指定模型，分诊请求发往 `${JEV_BASE_URL}/chat/completions`。未配置时使用 TypeSafe。DGX Spark 上的 NVIDIA NIM、TensorRT-LLM 和 StepFun 启动后，把地址填进 `JEV_BASE_URL`。
+本地模型部署在两台 DGX Spark 上，每台 NVIDIA GB10、128GB 统一内存，用双机 tensor parallel 提供 OpenAI 兼容接口。
+
+`GLM-5.3-Flash-EXL3` 用 vLLM 加载 `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw`，量化 EXL3，上下文 262144，KV cache 为 FP8，显存比例 0.80，并用 DFlash 做 7 token 投机解码。`qwen3.8-flash-next` 用 SGLang 加载 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，量化 NVFP4，上下文同样是 262144。
+
+`JEV_BASE_URL` 指向这个服务，`JEV_MODEL` 填 `GLM-5.3-Flash-EXL3`。未配置时使用 TypeSafe。
 
 Agent Skill：
 
