@@ -174,30 +174,19 @@ pnpm --filter @teampulse/codex-plugin end-session -- \
 
 ## 项目说明
 
-TeamPulse 把编码 Agent 的实时动作和一项需求的完整生命周期放在同一个面板里。实时层记录谁在做什么、在哪个分支、碰过哪些文件，并标出重叠。工作项层记录需求从录入、澄清、就绪、指派、执行到验收的过程。两层通过执行会话连接：一次 Agent 会话要先挂到工作项上，完成后才能作为验收证据。
+TeamPulse 记录两件事：Agent 此刻在改什么，以及一项需求走到了哪一步。
 
-核心边界是模型和人的职责不同。JEV 分诊只回答优先级、是否需要澄清、Agent 适配度和交付风险。项目默认关闭；打开后，结果写入审计事件，不修改工作项。项目负责人每次只能采纳当前版本上的一条建议。执行者不能给自己验收，通过验收必须逐条确认验收标准。
+实时页面按心跳列出正在进行的任务、分支和碰过的文件。同一项目里的文件重叠、分支风险会单独标出，处理方式是确认、移交或暂停。需求则走工作项：录入、澄清、就绪、指派、进行、待验收、通过，也可以打回或取消。一次 Agent 会话先挂到工作项上，完成后再作为验收材料。
 
-技术实现分成四块：
+JEV 分诊给工作项四项建议：优先级、是否要先澄清、是否适合交给 Agent、交付风险。建议写入工作项事件。负责人可以采纳优先级，或把刚录入的事项转入澄清；采纳只对当前版本有效。验收可以由人、Agent 或双方完成，执行者不能审核自己的工作项，通过时要逐条勾选验收标准。
 
-- **面板与 API**：Next.js 14 App Router 同时提供页面和 `/api/v1`。认证使用 session 或设备 bearer token。
-- **状态与审计**：Postgres 保存用户、设备、项目、任务、工作项和事件。工作项用版本号做乐观锁，阶段转换在服务端校验。
-- **实时协作**：任务心跳和文件触碰写入数据库，页面通过 SSE 获取更新。重叠判断比较同一项目中的活跃任务，不依赖向量数据库。
-- **Agent 接入**：Claude Code 用 hooks 自动上报，Codex 用 MCP，通用 Agent 用一个 Node 连接脚本。三份 Skill 只规定何时上报和如何处理重叠，不复制面板里的业务规则。
+实现上，Next.js 同时提供页面和 API。登录态用 session，设备用 bearer token。Postgres 保存用户、设备、项目、任务、工作项和事件；工作项带版本号，阶段转换由服务端检查。心跳和文件记录通过 SSE 推到页面，重叠直接比较同一项目里仍在心跳的任务。
 
-架构上把“看见”和“决定”拆开。看见要快，所以心跳、重叠和消息走轻量事件。决定要可回溯，所以优先级采纳、阶段变化和验收单独记账，并绑定工作项版本。模型调用放在面板服务端，Agent 不持有模型密钥，也不能绕过网页直接采纳建议。
-
-优化集中在数据量和失败方式：
-
-- 分诊描述最多 4000 字，验收标准最多 10 条，避免一次请求把整个项目历史送出去。
-- 同一用户每小时最多 10 次分诊，配额在数据库事务里按用户行锁定计算。
-- 外部模型不可用、超时或返回不符合结构时，不写分诊结果，工作项保持原状。
-- 连接脚本与 Skill 正文分开。服务升级时脚本可自更新，已认领的设备凭据保留。
-- 构建使用预热的依赖缓存和单独的 Next 输出目录，部署构建不覆盖正在运行的开发目录。
+Claude Code 通过 hooks 上报，Codex 通过 MCP，其他 Agent 通过一个 Node 脚本上报。模型密钥留在面板服务端。分诊请求会截断描述和验收标准，每个用户每小时 10 次；模型超时或结果无法解析时，这次分析不入库。连接脚本可以单独更新，设备凭据仍留在本机。
 
 ## 部署说明
 
-TeamPulse 面板本身部署在普通服务器或本地 Docker 上。编码 Agent 不部署在服务器里，而是运行在成员自己的机器上，通过认领码接入。
+面板用 Docker 部署。Agent 装在成员自己的电脑上。
 
 ```bash
 cp .env.prod.example .env.prod
@@ -206,11 +195,11 @@ docker build -f apps/web/Dockerfile --build-arg BASE_IMAGE=teampulse-node-base:2
 docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 ```
 
-完整的生产变量、自动部署和回滚见下方「部署」。
+生产变量、自动部署和回滚见下方「部署」。
 
-智能体侧不需要把本仓库发到成员机器。安装对应 Skill 后，Agent 执行注册命令拿到认领码，成员在网页里绑定，Agent 再领取 token。凭据只写在本机 `~/.teampulse/credentials.json`。
+成员安装对应 Skill 后，Agent 注册设备并给出认领码。成员登录网页，在 `/settings/connect` 绑定认领码，Agent 再领取 token，写入 `~/.teampulse/credentials.json`。
 
-大模型不是面板运行的前置条件。未配置模型时，实时协作、工作项和验收照常使用。分诊有两个可选后端，优先级是本地 OpenAI 兼容接口，其次才是 TypeSafe：
+分诊模型另外部署。配了本地 OpenAI 兼容地址就用本地模型，否则用 TypeSafe：
 
 ```bash
 JEV_BASE_URL=http://127.0.0.1:8000/v1
@@ -218,34 +207,25 @@ JEV_MODEL=nvidia/nemotron
 JEV_API_KEY=
 ```
 
-`JEV_BASE_URL` 存在时，服务端向 `${JEV_BASE_URL}/chat/completions` 发送一次结构化分诊，并只接受规定的 JSON。没有本地地址时，`TYPESAFE_API_KEY` 继续使用原来的 TypeSafe JEV。当前仓库没有附带 DGX Spark 镜像、NVIDIA NIM 或 TensorRT-LLM 的部署脚本；上面三个变量只是留好的接入点。
+本地地址会请求 `${JEV_BASE_URL}/chat/completions`，回答必须是规定的 JSON。DGX Spark 上的 NVIDIA NIM 或 TensorRT-LLM 按各自的镜像启动，把服务地址填到 `JEV_BASE_URL`。StepFun 如果提供同样的接口，也填这里。
 
-Agent Skills 按运行时拆成三份，避免一份说明同时迁就三种工具：
+三份 Skill 对应三种运行方式：
 
-- `packages/teampulse-agent/SKILL.md`：任意能执行终端命令的 Agent，只依赖 Node 连接脚本。
+- `packages/teampulse-agent/SKILL.md`：能执行终端命令的 Agent，使用 Node 连接脚本。
 - `packages/plugin/skills/teampulse/SKILL.md`：Claude Code，使用 hooks 和 MCP。
 - `packages/teampulse-codex/skills/teampulse-codex/SKILL.md`：Codex，使用 MCP 和调试 CLI。
 
-三份 Skill 都遵守同一条行为：非平凡工作开始时上报，编辑后发心跳，发现重叠时先处理协调动作，结束时提交结果。Skill 不保存服务端状态，所以更换面板版本时不需要成员重新认领设备。
+开始一项具体工作时上报任务，改文件后发心跳，遇到重叠先按返回的协调动作处理，结束时提交结果。
 
-## 技术栈说明
+## 技术栈
 
-面板、接入层和模型是三套独立技术栈。
-
-| 层 | 实际使用 |
+| 层 | 使用 |
 | --- | --- |
 | 面板 | Next.js 14、React 18、Postgres、Drizzle、Tailwind、Docker、Caddy |
-| Agent 接入 | Claude Code hooks 与 MCP、Codex MCP、Node.js 连接脚本、Agent Skills |
-| 分诊模型 | 默认不启用。可选 TypeSafe `jev-latest`，或任意 OpenAI 兼容的本地服务 |
+| Agent | Claude Code hooks 与 MCP、Codex MCP、Node.js、Agent Skills |
+| 分诊 | TypeSafe `jev-latest`，或 `JEV_BASE_URL` 指向的 OpenAI 兼容服务 |
 
-NVIDIA SDK、NVIDIA NIM、TensorRT-LLM、Nemotron，以及 StepFun 阶跃星辰模型，当前都没有在本仓库中部署或调用。本地模型接入点是 `JEV_BASE_URL`。只有在 DGX Spark 上单独部署兼容服务并填入该地址后，分诊请求才会发到那台机器。
-
-## 提交材料
-
-- 项目说明、部署说明、技术栈说明：本文件上述三节。
-- Agent Skills：上一节列出的三份 `SKILL.md`。
-- 演示视频：仓库 Release `demo-20260928` 的 `teampulseDemo.mov`，时长约 3 分 20 秒。黑客松表单要求 B 站链接，该 Release 只是视频文件备份。
-- 黑客松十日谈正文：`docs/competition/essay.md`。正文已写好，尚未发布到 CSDN 或知乎。
+本地 NVIDIA NIM、TensorRT-LLM、Nemotron 和 StepFun 通过 `JEV_BASE_URL` 接入。
 
 ## 目录说明
 

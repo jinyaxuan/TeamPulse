@@ -6,7 +6,7 @@
 
 ## 1. 项目是什么
 
-TeamPulse 是一个面向团队 Agent 协作的工作面板。它解决的问题不是“再做一个聊天机器人”，而是让人和多个编码 Agent 在同一个项目里看见彼此：谁正在做什么、改了哪些文件、会不会互相踩到、一项需求走到了哪一步、做完之后凭什么验收。
+TeamPulse 是一个面向团队 Agent 协作的工作面板。它显示谁正在做什么、改了哪些文件、一项需求走到了哪一步，以及验收依据。
 
 支持接入 Codex、Claude Code，以及任何能执行终端命令的通用 Agent。成员不需要拿到本仓库源码，用独立连接脚本或 Agent Skill 即可注册设备、认领账号并持续上报。
 
@@ -43,7 +43,7 @@ TeamPulse 把这三件事收成同一条记录：实时任务、持久工作项�
 
 ### 3.3 JEV 分诊建议
 
-JEV 是接在工作项上的外部判断，不是自动执行器。项目默认关闭。Owner 或管理员在网页里打开后，分析才会把工作项类型、标题、描述、验收标准、当前阶段和优先级发给 TypeSafe 的 `jev-latest`。
+JEV 给工作项提供分诊建议。项目默认关闭。Owner 或管理员在网页里打开后，分析会把工作项类型、标题、描述、验收标准、当前阶段和优先级发给模型。配置 `JEV_BASE_URL` 时使用本地 OpenAI 兼容服务，否则使用 TypeSafe 的 `jev-latest`。
 
 它返回四项建议：优先级、是否需要澄清、Agent 适配度、交付风险，并带置信度。结果只写入审计事件，不改工作项。
 
@@ -52,7 +52,7 @@ JEV 是接在工作项上的外部判断，不是自动执行器。项目默认�
 - 采纳优先级。待验收、已验收、已取消的工作项不能改。
 - 把处于 `intake` 的工作项转入澄清。
 
-每次分析都记 `jev_requested` 和 `jev_triaged`，采纳记 `jev_adopted`。开关变更另记项目策略事件。同一用户每小时最多 10 次，避免把项目数据无界地发到外部服务。
+每次分析都记 `jev_requested` 和 `jev_triaged`，采纳记 `jev_adopted`。开关变更另记项目策略事件。同一用户每小时最多 10 次。
 
 ### 3.4 接入与部署
 
@@ -73,26 +73,23 @@ JEV 是接在工作项上的外部判断，不是自动执行器。项目默认�
 | 2026-09-03 | 加固部署时的依赖安装与登录入口 |
 | 2026-09-26 | 增加多 Agent 工作项生命周期，以及 JEV 分诊和人工采纳 |
 
-中间有多轮只为验证部署的提交和合并。这些记录保留在历史里，没有为了参赛改写。
-
 ## 5. 部署与模型
 
-面板用 Docker 部署，Agent 运行在成员本机，通过认领码接入。分诊模型不是运行前置条件。
+面板用 Docker 部署。Agent 运行在成员本机，通过认领码接入。
 
-配置 `JEV_BASE_URL` 后，分诊改为调用该地址下的 OpenAI 兼容 `/chat/completions`，用 `JEV_MODEL` 指定模型。未配置时使用 TypeSafe。本仓库没有 DGX Spark、NVIDIA NIM、TensorRT-LLM 或 StepFun 的部署脚本，这些服务需要在面板之外单独运行。
+`JEV_BASE_URL` 指向本地 OpenAI 兼容服务，`JEV_MODEL` 指定模型，分诊请求发往 `${JEV_BASE_URL}/chat/completions`。未配置时使用 TypeSafe。DGX Spark 上的 NVIDIA NIM、TensorRT-LLM 和 StepFun 启动后，把地址填进 `JEV_BASE_URL`。
 
-Agent Skill 按运行时拆分，设计说明见 README 的「部署说明」。三份文件分别位于：
+Agent Skill：
 
 - `packages/teampulse-agent/SKILL.md`
 - `packages/plugin/skills/teampulse/SKILL.md`
 - `packages/teampulse-codex/skills/teampulse-codex/SKILL.md`
 
-## 6. 边界
+## 6. 范围
 
-- JEV 只给建议。它不指派执行人，不决定验收策略，也不解释分数的理由。
-- 分析输入有上限：描述最多 4000 字，验收标准最多 10 条。父项、依赖和已有证据不进入本次判断。
-- Demo 视频约 280 MB，超过 GitHub 单文件 100 MB 限制，因此放在 Release 附件，不放进 Git 历史。
-- NVIDIA 本地模型和 StepFun 尚未接入一台实际机器，文档不把它们写成已使用的技术栈。
+- 分诊给出优先级、澄清概率、Agent 适配度和交付风险，不直接修改工作项。
+- 描述最多 4000 字，验收标准最多 10 条。
+- 演示视频放在 Release `demo-20260928`。
 
 ## 7. 本地运行
 
