@@ -4,74 +4,31 @@
 
 演示视频：见仓库 Release `demo-20260928` 附件 `teampulseDemo.mov`（时长约 3 分 20 秒）
 
-## 1. 项目是什么
+## 1. 项目
 
-TeamPulse 是一个面向团队 Agent 协作的工作面板。它显示谁正在做什么、改了哪些文件、一项需求走到了哪一步，以及验收依据。
+TeamPulse 给同一个项目里的人和编码 Agent 提供一块面板。Agent 上报当前任务、分支和碰过的文件，面板按心跳区分正在进行和最近完成的工作，并标出文件重叠与分支风险。一项需求则保留负责人、验收标准和阶段，做完后留下验收意见。
 
-支持接入 Codex、Claude Code，以及任何能执行终端命令的通用 Agent。成员不需要拿到本仓库源码，用独立连接脚本或 Agent Skill 即可注册设备、认领账号并持续上报。
+Codex、Claude Code 和能执行终端命令的 Agent 都可以接入。成员不需要本仓库源码，用 Agent Skill 或连接脚本注册设备，再用认领码把设备绑到自己的账号。
 
-## 2. 为什么做
+## 2. 工作项与分诊
 
-团队开始同时使用多个编码 Agent 之后，原有的看板和即时消息不够用。Agent 的工作发生在本机终端里，默认没有共享状态。结果通常是三件事：
-
-- 两个人或两个 Agent 同时改同一批文件，直到提交时才发现冲突。
-- 需求停在聊天记录里，没有负责人、验收标准和阶段。
-- 做完以后只剩一段对话，无法回溯谁做的、依据什么通过验收。
-
-TeamPulse 把这三件事收成同一条记录：实时任务、持久工作项、可审计的决策。
-
-## 3. 做了什么
-
-### 3.1 实时协作
-
-- Agent 上报当前任务、分支和触碰的文件，面板按心跳区分“正在做”和“最近做过”。
-- 检测同一项目里的文件重叠和分支风险，并支持确认、移交或暂停。
-- 设备通过认领码绑定到具体账号，后续任务归到这个人，而不是归到某台匿名机器。
-- 保留任务历史，可筛选并导出，便于复盘。
-
-### 3.2 工作项生命周期
-
-一条需求或任务按固定阶段推进：
+工作项阶段为：
 
 `intake → clarifying → ready → assigned → in_progress → awaiting_acceptance → accepted`
 
-也可以进入 `rejected` 或 `cancelled`。阶段转换在服务端校验，不能从任意状态跳到任意状态。
+也可以进入 `rejected` 或 `cancelled`。阶段转换在服务端检查。工作项包含标题、描述、验收标准、优先级、负责人和验收人。验收可以由人、Agent 或双方完成；执行者不能审核自己的工作项，通过时要逐条确认验收标准。执行会话先挂到工作项上，至少有一条已完成的会话，才能提交验收。
 
-工作项包含标题、描述、验收标准、优先级、负责人、验收人和验收策略。验收策略可以是人工、Agent，或两者都要通过。Agent 不能给自己验收。通过时必须逐条确认验收标准。
+JEV 在项目打开后，把工作项类型、标题、描述、验收标准、当前阶段和优先级发给模型，返回优先级、是否需要澄清、Agent 适配度和交付风险。描述最多 4000 字，验收标准最多 10 条，每个用户每小时最多 10 次。结果写入 `jev_triaged`。负责人可以采纳当前版本上的一条建议：调整优先级，或把处于 `intake` 的工作项转入澄清。采纳记为 `jev_adopted`。
 
-执行会话要先挂到工作项上，至少有一条已完成的会话，才能提交验收。验收意见、证据和知识草稿都留在工作项上。
+## 3. 部署
 
-### 3.3 JEV 分诊建议
+面板用 Docker 部署，技术栈是 Next.js、Postgres、Drizzle。Agent 运行在成员本机。连接脚本可以单独更新，已认领的设备不用重新绑定。
 
-JEV 给工作项提供分诊建议。项目默认关闭。Owner 或管理员在网页里打开后，分析会把工作项类型、标题、描述、验收标准、当前阶段和优先级发给模型。配置 `JEV_BASE_URL` 时使用本地 OpenAI 兼容服务，否则使用 TypeSafe 的 `jev-latest`。
+JEV 使用两台 DGX Spark，每台 NVIDIA GB10、128GB 统一内存。驱动 580.173.02，CUDA SDK 13.0.3，NVIDIA Container Toolkit 1.19.0，GPU 由 `nvcr.io/nvidia/k8s-device-plugin:v0.19.1` 分配。两机通过 NCCL 做 tensor parallel，通道数 4，编译目标 `12.1a`。显存比例 0.80，上下文 262144，KV cache 为 FP8，同时最多 4 个序列。可用内存过低时服务停止。
 
-它返回四项建议：优先级、是否需要澄清、Agent 适配度、交付风险，并带置信度。结果只写入审计事件，不改工作项。
+`GLM-5.3-Flash-EXL3` 由 vLLM 加载 `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw`，量化 EXL3，预填批次 1024 token，并用 DFlash 一次取 7 个草稿 token。`qwen3.8-flash-next` 由 SGLang 加载 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，量化 NVFP4，分块预填 4096 token，投机解码使用 NEXTN。
 
-负责人可以显式采纳其中一项，且必须对应当前版本：
-
-- 采纳优先级。待验收、已验收、已取消的工作项不能改。
-- 把处于 `intake` 的工作项转入澄清。
-
-每次分析都记 `jev_requested` 和 `jev_triaged`，采纳记 `jev_adopted`。开关变更另记项目策略事件。同一用户每小时最多 10 次。
-
-### 3.4 接入与部署
-
-- Web 与 API 同仓，技术栈是 Next.js、Postgres、Drizzle。
-- Codex 侧提供 MCP 工具，包括查询工作项、发起 JEV 分析、提交验收和记录评审。发起外部分析必须显式确认 `confirm_external_transfer`。
-- 连接脚本可自更新，升级服务时不必重新认领设备。
-- 提供 Docker 部署、邀请注册、OIDC 登录和套餐限额。
-
-## 4. 部署与模型
-
-面板用 Docker 部署。Agent 运行在成员本机，通过认领码接入。
-
-本地模型部署在两台 DGX Spark 上，每台 NVIDIA GB10、128GB 统一内存。驱动 580.173.02，CUDA SDK 13.0.3，NVIDIA Container Toolkit 1.19.0，GPU 由 `nvcr.io/nvidia/k8s-device-plugin:v0.19.1` 分配。两机使用 NCCL 做 tensor parallel，编译目标是 `12.1a`。
-
-模型使用 EXL3 4-bit 或 NVFP4，KV cache 使用 FP8，显存比例 0.80，上下文 256K。并发限制为 4 个序列，并用 DFlash 或 NEXTN 做投机解码。可用内存过低时，内存保护会停掉服务。
-
-`GLM-5.3-Flash-EXL3` 用 vLLM 加载 `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw`，量化 EXL3，上下文 262144，KV cache 为 FP8，显存比例 0.80，并用 DFlash 做 7 token 投机解码。`qwen3.8-flash-next` 用 SGLang 加载 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，量化 NVFP4，上下文同样是 262144。
-
-`JEV_BASE_URL` 指向这个服务，`JEV_MODEL` 填 `GLM-5.3-Flash-EXL3`。未配置时使用 TypeSafe。
+`JEV_BASE_URL` 指向该服务，`JEV_MODEL` 填 `GLM-5.3-Flash-EXL3`。未设置时使用 TypeSafe 的 `jev-latest`。
 
 Agent Skill：
 
@@ -79,13 +36,7 @@ Agent Skill：
 - `packages/plugin/skills/teampulse/SKILL.md`
 - `packages/teampulse-codex/skills/teampulse-codex/SKILL.md`
 
-## 5. 范围
-
-- 分诊给出优先级、澄清概率、Agent 适配度和交付风险，不直接修改工作项。
-- 描述最多 4000 字，验收标准最多 10 条。
-- 演示视频放在 Release `demo-20260928`。
-
-## 6. 本地运行
+## 4. 本地运行
 
 ```bash
 docker-compose up -d postgres

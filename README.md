@@ -1,6 +1,12 @@
 # TeamPulse
 
-TeamPulse 是一个面向团队 Agent 协作的 AI 工作面板。它用来查看成员当前正在做什么、最近做过什么，并支持 Codex、Claude Code 以及能执行终端命令的通用 Agent 接入。
+TeamPulse 是团队里人和编码 Agent 共用的工作面板。它显示谁正在做什么、改了哪些文件，也记录一项需求从录入到验收的过程。Codex、Claude Code 和能执行终端命令的 Agent 都可以接入。
+
+成员的 Agent 在自己的电脑上运行。开始一项工作时上报任务和分支，之后持续上报心跳与碰过的文件。同一项目里的文件重叠和分支风险会标出来，处理方式是确认、移交或暂停。设备用认领码绑定到账号，这台机器上的记录都归到这个人。
+
+需求走工作项，阶段是录入、澄清、就绪、指派、进行、待验收、通过，也可以打回或取消。Agent 的一次执行要先挂到工作项上，完成后再作为验收材料。验收可以由人、Agent 或双方完成；执行者不能审核自己的工作项，通过时要逐条确认验收标准。
+
+JEV 对工作项做分诊，给出优先级、是否要先澄清、是否适合交给 Agent、交付风险。建议记在工作项事件里。负责人可以采纳优先级，或把刚录入的事项转入澄清，而且只对当前版本有效。项目默认关闭，由 Owner 或管理员在网页里打开。描述最多取 4000 字，验收标准最多取 10 条，每个用户每小时最多分析 10 次。
 
 ## 项目结构
 
@@ -164,29 +170,13 @@ pnpm --filter @teampulse/codex-plugin end-session -- \
 - `teampulse_web_login`
 - `teampulse_recent_events`
 
-## 架构要点
+## 架构
 
-- **Web 优先**：核心产品是团队面板，插件只是轻量接入层。
-- **展示 presence，而不是自动判定冲突**：TeamPulse 只展示“谁在做什么”，具体是否协调由人和 Claude 决定。
-- **单进程后端**：Next.js 14 App Router 同时承载页面和 API。SSE 使用进程内 `EventEmitter`，不依赖 Redis，适合小团队规模。
-- **工作项与分诊分开**：工作项状态由服务端状态机约束。模型只返回分诊建议，不直接改优先级、指派或阶段。
-- **账号认领认证**：开发者设备自注册后生成认领码，由当前登录账号在 `/settings/connect` 确认绑定。插件拿到 bearer token 后保存本机凭据。
+Next.js 同时提供页面和 API。人用 session 登录，设备用 bearer token。Postgres 保存用户、设备、项目、任务、工作项和事件；工作项带版本号，阶段转换由服务端检查。心跳通过 SSE 推到页面。Claude Code 用 hooks 上报，Codex 用 MCP，其他 Agent 用 Node 连接脚本。模型密钥留在面板服务端，分诊结果无法解析时不入库。
 
-## 项目说明
+## 部署
 
-TeamPulse 记录两件事：Agent 此刻在改什么，以及一项需求走到了哪一步。
-
-实时页面按心跳列出正在进行的任务、分支和碰过的文件。同一项目里的文件重叠、分支风险会单独标出，处理方式是确认、移交或暂停。需求则走工作项：录入、澄清、就绪、指派、进行、待验收、通过，也可以打回或取消。一次 Agent 会话先挂到工作项上，完成后再作为验收材料。
-
-JEV 分诊给工作项四项建议：优先级、是否要先澄清、是否适合交给 Agent、交付风险。建议写入工作项事件。负责人可以采纳优先级，或把刚录入的事项转入澄清；采纳只对当前版本有效。验收可以由人、Agent 或双方完成，执行者不能审核自己的工作项，通过时要逐条勾选验收标准。
-
-实现上，Next.js 同时提供页面和 API。登录态用 session，设备用 bearer token。Postgres 保存用户、设备、项目、任务、工作项和事件；工作项带版本号，阶段转换由服务端检查。心跳和文件记录通过 SSE 推到页面，重叠直接比较同一项目里仍在心跳的任务。
-
-Claude Code 通过 hooks 上报，Codex 通过 MCP，其他 Agent 通过一个 Node 脚本上报。模型密钥留在面板服务端。分诊请求会截断描述和验收标准，每个用户每小时 10 次；模型超时或结果无法解析时，这次分析不入库。连接脚本可以单独更新，设备凭据仍留在本机。
-
-## 部署说明
-
-面板用 Docker 部署。Agent 装在成员自己的电脑上。
+面板：
 
 ```bash
 cp .env.prod.example .env.prod
@@ -195,39 +185,15 @@ docker build -f apps/web/Dockerfile --build-arg BASE_IMAGE=teampulse-node-base:2
 docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 ```
 
-生产变量、自动部署和回滚见下方「部署」。
+生产变量、自动部署和回滚见下方「部署」。成员侧的设备认领见上文「开发者接入」。
 
-成员安装对应 Skill 后，Agent 注册设备并给出认领码。成员登录网页，在 `/settings/connect` 绑定认领码，Agent 再领取 token，写入 `~/.teampulse/credentials.json`。
+JEV 跑在两台 DGX Spark 上。每台是 NVIDIA GB10、128GB 统一内存，驱动 580.173.02，CUDA SDK 13.0.3，NVIDIA Container Toolkit 1.19.0，GPU 由 `nvcr.io/nvidia/k8s-device-plugin:v0.19.1` 分配。单机内存放不下模型，两台用 NCCL 做 tensor parallel，通道数 4，编译目标是 GB10 的 `12.1a`。容器设置 `CUDA_MODULE_LOADING=LAZY`，并保留 vLLM 与 FlashInfer 的编译缓存。可用内存过低时，服务会停止。
 
-分诊模型跑在两台 DGX Spark 上，每台是 NVIDIA GB10、128GB 统一内存。系统驱动是 NVIDIA 580.173.02，CUDA SDK 13.0.3，容器运行时是 NVIDIA Container Toolkit 1.19.0，Kubernetes 使用 `nvcr.io/nvidia/k8s-device-plugin:v0.19.1` 分配 GPU。两台用 tensor parallel 组成一组，编译目标是 GB10 的 CUDA 架构 `12.1a`。
+分诊模型是 `GLM-5.3-Flash-EXL3`。vLLM 加载 `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw`，量化为 EXL3，加载格式 `instanttensor`。两机 `tensor-parallel-size=2`，上下文 262144，KV cache 使用 FP8、占 5 GiB，显存比例 0.80。同时最多 4 个序列，预填批次 1024 token。投机解码使用 DFlash，一次取 7 个草稿 token，草稿模型是 `incoai/GLM-5.3-Flash-DFlash2`。每台机器分配 1 块 GPU，内存请求 96Gi、上限 116Gi。
 
-JEV 分诊使用 `GLM-5.3-Flash-EXL3`：
+同一对机器上还配置了 `qwen3.8-flash-next`。SGLang 加载 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，量化 NVFP4，GEMM 使用 FlashInfer CUTLASS。并行、上下文和显存比例与 GLM 相同，分块预填是 4096 token。投机解码使用 NEXTN，3 步、4 个草稿 token；CUDA graph 只覆盖 batch 4 以内，预填阶段不使用 CUDA graph。
 
-| 参数 | 值 |
-| --- | --- |
-| 权重 | `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw` |
-| 运行时 | vLLM，`quantization=exl3`，`load-format=instanttensor` |
-| 并行 | `tensor-parallel-size=2`，`nnodes=2` |
-| 上下文 | `max-model-len=262144` |
-| KV cache | FP8，5 GiB |
-| 显存比例 | `gpu-memory-utilization=0.80` |
-| 并发 | `max-num-seqs=4`，`max-num-batched-tokens=1024` |
-| 投机解码 | DFlash，`num_speculative_tokens=7`，草稿模型 `incoai/GLM-5.3-Flash-DFlash2` |
-| 单机资源 | 1 GPU，内存请求 96Gi、上限 116Gi |
-
-同一对 Spark 上还配置了 `qwen3.8-flash-next`，权重是 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，用 SGLang 运行。量化 `modelopt_fp4`，GEMM 后端 `flashinfer_cutlass`，同样是两机 `tp-size=2`，上下文 262144，静态显存比例 0.80。投机解码使用 NEXTN，3 步、4 个草稿 token。这份部署当前副本数是 0。
-
-针对这两台 Spark 的配置：
-
-- 单机 128GB 统一内存装不下目标模型，所以用两机 `tensor parallel`，节点间走 NCCL，通道数限制为 4。
-- 量化分别使用 EXL3 4-bit 和 NVFP4，KV cache 使用 FP8，把显存留给 256K 上下文。
-- 静态显存比例设为 0.80，并设置内存保护；可用内存过低时停止服务，避免 GB10 被统一内存打满。
-- 并发限制为 4 个序列。GLM 的预填批次是 1024 token，Qwen 的分块预填是 4096 token。
-- 投机解码用来降低解码延迟：GLM 使用 DFlash，一次 7 个草稿 token；Qwen 使用 NEXTN，3 步、4 个草稿 token。
-- CUDA graph 只覆盖小 batch，Qwen 关闭了预填阶段的 CUDA graph 和 radix cache。
-- 容器里设置 `CUDA_MODULE_LOADING=LAZY`，并分别配置 vLLM 与 FlashInfer 的编译缓存。
-
-服务对外提供 OpenAI 兼容接口。TeamPulse 这样接入：
+两个服务都提供 OpenAI 兼容接口。TeamPulse 接入 GLM：
 
 ```bash
 JEV_BASE_URL=http://<spark-gateway>/v1
@@ -235,15 +201,13 @@ JEV_MODEL=GLM-5.3-Flash-EXL3
 JEV_API_KEY=
 ```
 
-请求发往 `${JEV_BASE_URL}/chat/completions`，回答必须是规定的 JSON。没有本地地址时使用 TypeSafe。
+请求发往 `${JEV_BASE_URL}/chat/completions`。未设置 `JEV_BASE_URL` 时，使用 TypeSafe 的 `jev-latest`。
 
-三份 Skill 对应三种运行方式：
+Agent Skill 按运行时分开：
 
 - `packages/teampulse-agent/SKILL.md`：能执行终端命令的 Agent，使用 Node 连接脚本。
 - `packages/plugin/skills/teampulse/SKILL.md`：Claude Code，使用 hooks 和 MCP。
 - `packages/teampulse-codex/skills/teampulse-codex/SKILL.md`：Codex，使用 MCP 和调试 CLI。
-
-开始一项具体工作时上报任务，改文件后发心跳，遇到重叠先按返回的协调动作处理，结束时提交结果。
 
 ## 技术栈
 
@@ -251,8 +215,8 @@ JEV_API_KEY=
 | --- | --- |
 | 面板 | Next.js 14、React 18、Postgres、Drizzle、Tailwind、Docker、Caddy |
 | Agent | Claude Code hooks 与 MCP、Codex MCP、Node.js、Agent Skills |
-| 分诊 | 两台 DGX Spark 上的 vLLM / SGLang；未配置本地地址时用 TypeSafe `jev-latest` |
-| NVIDIA | 驱动 580.173.02、CUDA SDK 13.0.3、Container Toolkit 1.19.0、k8s-device-plugin v0.19.1、NCCL、GB10 `sm_121`、vLLM、SGLang、FlashInfer、EXL3、NVFP4、FP8 KV cache |
+| 分诊 | DGX Spark 上的 vLLM、SGLang；也可改用 TypeSafe `jev-latest` |
+| NVIDIA | 驱动 580.173.02、CUDA SDK 13.0.3、Container Toolkit 1.19.0、k8s-device-plugin v0.19.1、NCCL、GB10 `sm_121`、FlashInfer、EXL3、NVFP4、FP8 KV cache |
 
 ## 目录说明
 
@@ -357,7 +321,7 @@ packages/teampulse-agent/
   - Caddy 自动 TLS，并对 SSE 做长连接友好配置。
   - `.env.prod.example` 生产环境变量模板。
 
-## 部署
+## 生产环境
 
 ```bash
 # 1. 复制并填写生产环境变量
