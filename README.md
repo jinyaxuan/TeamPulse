@@ -1,5 +1,15 @@
 # TeamPulse
 
+## 在线体验
+
+- 体验网址：[https://teampulse.tangchaolizi.com/](https://teampulse.tangchaolizi.com/)
+- 体验账号：`admin`
+- 体验密码：`admin123`
+
+以上为公开体验账号，请勿录入敏感信息。
+
+## 项目介绍
+
 TeamPulse 是团队里人和编码 Agent 共用的工作面板。它显示谁正在做什么、改了哪些文件，也记录一项需求从录入到验收的过程。Codex、Claude Code 和能执行终端命令的 Agent 都可以接入。
 
 成员的 Agent 在自己的电脑上运行。开始一项工作时上报任务和分支，之后持续上报心跳与碰过的文件。同一项目里的文件重叠和分支风险会标出来，处理方式是确认、移交或暂停。设备用认领码绑定到账号，这台机器上的记录都归到这个人。
