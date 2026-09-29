@@ -201,7 +201,7 @@ docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
 分诊模型跑在两台 DGX Spark 上，每台是 NVIDIA GB10、128GB 统一内存。两台用 tensor parallel 组成一组，CUDA 架构 `12.1a`。
 
-当前配置的对话模型是 `GLM-5.3-Flash-EXL3`：
+JEV 分诊使用 `GLM-5.3-Flash-EXL3`：
 
 | 参数 | 值 |
 | --- | --- |
