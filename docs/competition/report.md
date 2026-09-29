@@ -65,7 +65,9 @@ JEV 给工作项提供分诊建议。项目默认关闭。Owner 或管理员在�
 
 面板用 Docker 部署。Agent 运行在成员本机，通过认领码接入。
 
-本地模型部署在两台 DGX Spark 上，每台 NVIDIA GB10、128GB 统一内存，用双机 tensor parallel 提供 OpenAI 兼容接口。
+本地模型部署在两台 DGX Spark 上，每台 NVIDIA GB10、128GB 统一内存。驱动 580.173.02，CUDA SDK 13.0.3，NVIDIA Container Toolkit 1.19.0，GPU 由 `nvcr.io/nvidia/k8s-device-plugin:v0.19.1` 分配。两机使用 NCCL 做 tensor parallel，编译目标是 `12.1a`。
+
+模型使用 EXL3 4-bit 或 NVFP4，KV cache 使用 FP8，显存比例 0.80，上下文 256K。并发限制为 4 个序列，并用 DFlash 或 NEXTN 做投机解码。可用内存过低时，内存保护会停掉服务。
 
 `GLM-5.3-Flash-EXL3` 用 vLLM 加载 `Mia-AiLab/GLM-5.3-Flash-EXL3-TR3-4bpw`，量化 EXL3，上下文 262144，KV cache 为 FP8，显存比例 0.80，并用 DFlash 做 7 token 投机解码。`qwen3.8-flash-next` 用 SGLang 加载 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，量化 NVFP4，上下文同样是 262144。
 

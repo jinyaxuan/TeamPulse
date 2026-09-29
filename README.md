@@ -199,7 +199,7 @@ docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
 成员安装对应 Skill 后，Agent 注册设备并给出认领码。成员登录网页，在 `/settings/connect` 绑定认领码，Agent 再领取 token，写入 `~/.teampulse/credentials.json`。
 
-分诊模型跑在两台 DGX Spark 上，每台是 NVIDIA GB10、128GB 统一内存。两台用 tensor parallel 组成一组，CUDA 架构 `12.1a`。
+分诊模型跑在两台 DGX Spark 上，每台是 NVIDIA GB10、128GB 统一内存。系统驱动是 NVIDIA 580.173.02，CUDA SDK 13.0.3，容器运行时是 NVIDIA Container Toolkit 1.19.0，Kubernetes 使用 `nvcr.io/nvidia/k8s-device-plugin:v0.19.1` 分配 GPU。两台用 tensor parallel 组成一组，编译目标是 GB10 的 CUDA 架构 `12.1a`。
 
 JEV 分诊使用 `GLM-5.3-Flash-EXL3`：
 
@@ -216,6 +216,16 @@ JEV 分诊使用 `GLM-5.3-Flash-EXL3`：
 | 单机资源 | 1 GPU，内存请求 96Gi、上限 116Gi |
 
 同一对 Spark 上还配置了 `qwen3.8-flash-next`，权重是 `RadixArk/Qwen3.8-Flash-Next-NVFP4`，用 SGLang 运行。量化 `modelopt_fp4`，GEMM 后端 `flashinfer_cutlass`，同样是两机 `tp-size=2`，上下文 262144，静态显存比例 0.80。投机解码使用 NEXTN，3 步、4 个草稿 token。这份部署当前副本数是 0。
+
+针对这两台 Spark 的配置：
+
+- 单机 128GB 统一内存装不下目标模型，所以用两机 `tensor parallel`，节点间走 NCCL，通道数限制为 4。
+- 量化分别使用 EXL3 4-bit 和 NVFP4，KV cache 使用 FP8，把显存留给 256K 上下文。
+- 静态显存比例设为 0.80，并设置内存保护；可用内存过低时停止服务，避免 GB10 被统一内存打满。
+- 并发限制为 4 个序列。GLM 的预填批次是 1024 token，Qwen 的分块预填是 4096 token。
+- 投机解码用来降低解码延迟：GLM 使用 DFlash，一次 7 个草稿 token；Qwen 使用 NEXTN，3 步、4 个草稿 token。
+- CUDA graph 只覆盖小 batch，Qwen 关闭了预填阶段的 CUDA graph 和 radix cache。
+- 容器里设置 `CUDA_MODULE_LOADING=LAZY`，并分别配置 vLLM 与 FlashInfer 的编译缓存。
 
 服务对外提供 OpenAI 兼容接口。TeamPulse 这样接入：
 
@@ -242,7 +252,7 @@ JEV_API_KEY=
 | 面板 | Next.js 14、React 18、Postgres、Drizzle、Tailwind、Docker、Caddy |
 | Agent | Claude Code hooks 与 MCP、Codex MCP、Node.js、Agent Skills |
 | 分诊 | 两台 DGX Spark 上的 vLLM / SGLang；未配置本地地址时用 TypeSafe `jev-latest` |
-| NVIDIA | GB10、CUDA `12.1a`、vLLM、SGLang、FlashInfer、EXL3、NVFP4、FP8 KV cache |
+| NVIDIA | 驱动 580.173.02、CUDA SDK 13.0.3、Container Toolkit 1.19.0、k8s-device-plugin v0.19.1、NCCL、GB10 `sm_121`、vLLM、SGLang、FlashInfer、EXL3、NVFP4、FP8 KV cache |
 
 ## 目录说明
 
