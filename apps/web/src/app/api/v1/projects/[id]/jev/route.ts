@@ -35,8 +35,8 @@ export const PATCH = handler<{ id: string }>(async (request, params) => {
     throw new ApiError("只有项目 owner 或管理员可以修改 JEV 设置", 403);
   }
   const body = await parseBody(request, policySchema);
-  if (body.enabled && !env.TYPESAFE_API_KEY) {
-    throw new ApiError("JEV 未配置，请联系管理员设置 TYPESAFE_API_KEY", 503);
+  if (body.enabled && !env.jevConfigured) {
+    throw new ApiError("JEV 未配置，请联系管理员设置 JEV_BASE_URL 或 TYPESAFE_API_KEY", 503);
   }
   const updated = await db.transaction(async (tx) => {
     const [current] = await tx

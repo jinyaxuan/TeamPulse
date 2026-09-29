@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const endpoint = "https://api.typesafe.ai/v1/systemone";
+const typesafeEndpoint = "https://api.typesafe.ai/v1/systemone";
 
 const probability = z.number().min(0).max(1);
 const choiceAnswer = z.object({
@@ -47,6 +47,12 @@ export function parsePersistedJevTriage(payload: unknown): { inputVersion: numbe
   return { inputVersion: parsed.data.input_version, triage: parsed.data.triage };
 }
 
+export type TriageProvider = {
+  endpoint: string;
+  apiKey: string;
+  model?: string;
+};
+
 export type TriageInput = {
   kind: string;
   title: string;
@@ -68,12 +74,15 @@ export function isAllowedTriageOrigin(origin: string | null, publicAppUrl: strin
 
 export async function triageWorkItem(
   item: TriageInput,
-  apiKey: string,
+  provider: TriageProvider | string,
   request: typeof fetch = fetch
 ): Promise<JevTriage> {
+  const target = typeof provider === "string"
+    ? { endpoint: typesafeEndpoint, apiKey: provider, model: "jev-latest" }
+    : provider;
   const description = item.description?.slice(0, 4000) ?? null;
   const criteria = item.acceptanceCriteria.slice(0, 10).map((criterion) => criterion.slice(0, 500));
-  const body = {
+  const bounded = {
     model: "jev-latest",
     state: {
       kind: item.kind,
@@ -120,13 +129,28 @@ export async function triageWorkItem(
       },
     },
   };
+  const localModel = target.model && target.endpoint !== typesafeEndpoint;
+  const body = localModel
+    ? {
+        model: target.model,
+        temperature: 0,
+        messages: [{
+          role: "user",
+          content: [
+            "只返回一个 JSON 对象，不要使用 Markdown。",
+            "格式：{\"model\":string,\"answers\":{\"priority\":{\"type\":\"choice\",\"choice\":\"low|normal|high|urgent\",\"confidence\":0到1},\"needs_clarification\":{\"type\":\"noul\",\"noul\":0到1},\"agent_fit\":{\"type\":\"score\",\"score\":0到2,\"confidence\":0到1},\"delivery_risk\":{\"type\":\"score\",\"score\":0到2,\"confidence\":0到1}}}",
+            JSON.stringify(bounded),
+          ].join("\n"),
+        }],
+      }
+    : { ...bounded, model: "jev-latest" };
 
   let response: Response;
   try {
-    response = await request(endpoint, {
+    response = await request(target.endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        ...(target.apiKey ? { Authorization: `Bearer ${target.apiKey}` } : {}),
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -152,7 +176,8 @@ export async function triageWorkItem(
   } catch {
     throw new JevServiceError("JEV 返回了无效结果", 502);
   }
-  const parsed = responseSchema.safeParse(payload);
+  const normalized = localModel ? openAiTriagePayload(payload, target.model ?? "") : payload;
+  const parsed = responseSchema.safeParse(normalized);
   if (!parsed.success) throw new JevServiceError("JEV 返回了无效结果", 502);
 
   return {
@@ -162,4 +187,21 @@ export async function triageWorkItem(
     agentFit: parsed.data.answers.agent_fit,
     deliveryRisk: parsed.data.answers.delivery_risk,
   };
+}
+
+function openAiTriagePayload(payload: unknown, fallbackModel: string): unknown {
+  if (!payload || typeof payload !== "object") return payload;
+  const choice = "choices" in payload && Array.isArray(payload.choices) ? payload.choices[0] : null;
+  const content = choice && typeof choice === "object" && "message" in choice
+    && choice.message && typeof choice.message === "object" && "content" in choice.message
+    ? choice.message.content
+    : null;
+  if (typeof content !== "string") return payload;
+  try {
+    const parsed: unknown = JSON.parse(content);
+    if (!parsed || typeof parsed !== "object" || !("model" in parsed)) return { ...parsed as object, model: fallbackModel };
+    return parsed;
+  } catch {
+    return payload;
+  }
 }

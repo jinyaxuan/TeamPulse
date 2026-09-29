@@ -32,15 +32,17 @@ export const POST = handler<{ id: string }>(async (request, params) => {
     json({ error: "该项目尚未启用 JEV 分析", code: "JEV_PROJECT_DISABLED" }, { status: 403 });
   if (!(await isJevEnabled(item.projectId))) return disabledResponse();
 
-  const apiKey = env.TYPESAFE_API_KEY;
-  if (!apiKey) throw new ApiError("JEV 未配置，请联系管理员设置 TYPESAFE_API_KEY", 503);
+  const provider = env.JEV_BASE_URL
+    ? { endpoint: `${env.JEV_BASE_URL}/chat/completions`, apiKey: env.JEV_API_KEY, model: env.JEV_MODEL || "local-model" }
+    : env.TYPESAFE_API_KEY;
+  if (!provider) throw new ApiError("JEV 未配置，请联系管理员设置 JEV_BASE_URL 或 TYPESAFE_API_KEY", 503);
   if (!(await reserveJevRequest(item, ctx.user.id, ctx.deviceId ?? null, body.version))) {
     return disabledResponse();
   }
 
   let triage;
   try {
-    triage = await triageWorkItem(item, apiKey);
+    triage = await triageWorkItem(item, provider);
   } catch (error) {
     if (error instanceof JevServiceError) throw new ApiError(error.message, error.status);
     throw error;

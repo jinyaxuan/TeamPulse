@@ -51,4 +51,17 @@ export const env = {
   get TYPESAFE_API_KEY() {
     return process.env.TYPESAFE_API_KEY ?? "";
   },
+  /** OpenAI-compatible local triage endpoint, for example NVIDIA NIM on DGX Spark. */
+  get JEV_BASE_URL() {
+    return (process.env.JEV_BASE_URL ?? "").replace(/\/$/, "");
+  },
+  get JEV_MODEL() {
+    return process.env.JEV_MODEL ?? "";
+  },
+  get JEV_API_KEY() {
+    return process.env.JEV_API_KEY ?? "";
+  },
+  get jevConfigured() {
+    return Boolean(env.JEV_BASE_URL || env.TYPESAFE_API_KEY);
+  },
 };

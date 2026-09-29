@@ -75,13 +75,26 @@ JEV 是接在工作项上的外部判断，不是自动执行器。项目默认�
 
 中间有多轮只为验证部署的提交和合并。这些记录保留在历史里，没有为了参赛改写。
 
-## 5. 边界
+## 5. 部署与模型
+
+面板用 Docker 部署，Agent 运行在成员本机，通过认领码接入。分诊模型不是运行前置条件。
+
+配置 `JEV_BASE_URL` 后，分诊改为调用该地址下的 OpenAI 兼容 `/chat/completions`，用 `JEV_MODEL` 指定模型。未配置时使用 TypeSafe。本仓库没有 DGX Spark、NVIDIA NIM、TensorRT-LLM 或 StepFun 的部署脚本，这些服务需要在面板之外单独运行。
+
+Agent Skill 按运行时拆分，设计说明见 README 的「部署说明」。三份文件分别位于：
+
+- `packages/teampulse-agent/SKILL.md`
+- `packages/plugin/skills/teampulse/SKILL.md`
+- `packages/teampulse-codex/skills/teampulse-codex/SKILL.md`
+
+## 6. 边界
 
 - JEV 只给建议。它不指派执行人，不决定验收策略，也不解释分数的理由。
 - 分析输入有上限：描述最多 4000 字，验收标准最多 10 条。父项、依赖和已有证据不进入本次判断。
 - Demo 视频约 280 MB，超过 GitHub 单文件 100 MB 限制，因此放在 Release 附件，不放进 Git 历史。
+- NVIDIA 本地模型和 StepFun 尚未接入一台实际机器，文档不把它们写成已使用的技术栈。
 
-## 6. 本地运行
+## 7. 本地运行
 
 ```bash
 docker-compose up -d postgres

@@ -73,3 +73,23 @@ test("JEV network failures return a safe service error", async () => {
     error instanceof JevServiceError && error.status === 503 && !error.message.includes("credentials")
   );
 });
+
+test("local OpenAI-compatible triage parses the JSON answer", async () => {
+  const request: typeof fetch = async (url, init) => {
+    assert.equal(url, "http://127.0.0.1:8000/v1/chat/completions");
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.model, "nvidia/nemotron");
+    assert.equal(body.messages.length, 1);
+    assert.equal(new Headers(init?.headers).has("Authorization"), false);
+    return Response.json({
+      choices: [{ message: { content: JSON.stringify({ answers: validResponse.answers }) } }],
+    });
+  };
+  const result = await triageWorkItem(item, {
+    endpoint: "http://127.0.0.1:8000/v1/chat/completions",
+    apiKey: "",
+    model: "nvidia/nemotron",
+  }, request);
+  assert.equal(result.model, "nvidia/nemotron");
+  assert.equal(result.priority.choice, "high");
+});
